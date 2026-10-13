@@ -121,3 +121,41 @@ Las versiones oficiales del proyecto siguen el estándar SemVer (`MAJOR.MINOR.PA
   git tag -a v0.1.0 -m "Release inicial base v0.1.0"
   git push origin v0.1.0
   ```
+
+---
+
+## 5. Código de Conducta
+
+Esperamos que todos los integrantes mantengan un ambiente de respeto, colaboración y profesionalismo. Toda revisión de código debe ser constructiva y enfocada en el aspecto técnico, nunca dirigida a la persona.
+
+---
+
+## 6. Requisitos Previos y Configuración Local
+
+Antes de comenzar a programar, asegúrate de:
+1. Tener instalado **Node.js >= 20.x** y **npm >= 10.x**.
+2. Contar con acceso al repositorio en GitHub y permisos de escritura.
+3. Clonar el repositorio e instalar las dependencias:
+   ```bash
+   npm install
+   cp .env.example .env
+   ```
+4. Completar las variables de entorno de `.env` (credenciales de Supabase, etc.) según las instrucciones del [README.md](README.md).
+
+---
+
+## 7. Política de Revisión y Pruebas
+
+* **Pruebas locales:** Antes de abrir el Pull Request, verifica que la aplicación compile y corra sin errores en consola, y que las pruebas pasen:
+  ```bash
+  npm run build
+  npm run test
+  ```
+* **Revisión de código:** Todo Pull Request debe ser aprobado por al menos un integrante revisor del comité antes de fusionarse en `develop`.
+* **Commits pequeños y atómicos:** Cada commit debe representar un único cambio lógico para facilitar la revisión.
+
+---
+
+## 8. Reconocimiento
+
+Toda contribución aprobada y fusionada en `develop` forma parte vital del éxito del proyecto. ¡Gracias por hacer crecer este sistema de boletería!
