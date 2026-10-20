@@ -1,69 +1,50 @@
+import { EstadoBus } from '../Constants/EstadosSistema';
+
+export type EstructuraBus = 'UnPiso' | 'DosPisos';
+
 export class Bus {
-	public id?: number;
-	public marcaChasis?: string;
-	public marcaCarroceria?: string;
-	public anio?: number;
-	public fotoUrl?: string;
-	public createdAt?: Date;
-	public asientosNormales?: BusAsiento[];
-	public asientosVip?: BusAsiento[];
-	public estructura?: string = "UnPiso";
+  public id?: number;
+  public marcaChasis?: string;
+  public marcaCarroceria?: string;
+  public anio?: number;
+  public fotoUrl?: string;
+  public estructura: EstructuraBus = 'UnPiso';
+  public createdAt?: Date;
 
-	constructor(
-		public cooperativaId: number,
-		public numero: string,
-		public placa: string,
-		public totalAsientos: number,
-		public estado: string = "Activo",
-	) {}
+  constructor(
+    public cooperativaId: number,
+    public numero: string,
+    public placa: string,
+    public totalAsientos: number,
+    public estado: EstadoBus = EstadoBus.ACTIVO,
+  ) {}
 
-	esValido(): boolean {
-		return (
-			this.numero.length > 0 &&
-			this.placa.length >= 6 &&
-			this.cooperativaId > 0 &&
-			this.totalAsientos > 0
-		);
-	}
+  esValido(): boolean {
+    return (
+      Boolean(this.numero && this.numero.trim().length > 0) &&
+      Boolean(this.placa && this.placa.trim().length >= 6) &&
+      this.cooperativaId > 0 &&
+      this.totalAsientos > 0
+    );
+  }
 
-	desactivar(): void {
-		this.estado = "Inactivo";
-	}
+  activar(): void {
+    this.estado = EstadoBus.ACTIVO;
+  }
 
-	activar(): void {
-		this.estado = "Activo";
-	}
-}
+  desactivar(): void {
+    this.estado = EstadoBus.INACTIVO;
+  }
 
-export class BusAsiento {
-	public id?: number;
-	public fila?: string;
-	public columna?: string;
-	public disponible: boolean = true;
-	public pasajeroId?: string;
-	public createdAt?: Date;
-	public updatedAt?: Date;
+  marcarEnMantenimiento(): void {
+    this.estado = EstadoBus.MANTENIMIENTO;
+  }
 
-	constructor(
-		public busId: number,
-		public configuracionId: number,
-		public numeroAsiento: string,
-		public tipo: string,
-	) {}
+  marcarFueraDeServicio(): void {
+    this.estado = EstadoBus.FUERA_DE_SERVICIO;
+  }
 
-	ocupar(pasajeroId: string): void {
-		this.disponible = false;
-		this.pasajeroId = pasajeroId;
-		this.updatedAt = new Date();
-	}
-
-	liberar(): void {
-		this.disponible = true;
-		this.pasajeroId = undefined;
-		this.updatedAt = new Date();
-	}
-
-	estaDisponible(): boolean {
-		return this.disponible;
-	}
+  estaDisponibleParaOperar(): boolean {
+    return this.estado === EstadoBus.ACTIVO;
+  }
 }

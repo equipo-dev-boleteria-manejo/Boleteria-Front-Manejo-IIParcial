@@ -1,46 +1,20 @@
 /**
- * IBusRepository.ts - Contrato de repositorio para Buses
+ * IBusRepository.ts - Contrato de persistencia para la gestión de flota de buses
+ * Responsabilidad Única: Catálogo, registro y estado operativo del vehículo físico.
  */
 
-import type { Bus, BusAsiento } from "../Entities/Bus";
-
-export interface BusFiltros {
-	cooperativaId?: number;
-	tipoAsiento?: "NORMAL" | "VIP";
-	precioMinimo?: number;
-	precioMaximo?: number;
-	ordenarPor?: "precio" | "salida" | "cooperativa";
-}
+import type { Bus } from '../Entities/Bus';
+import type { EstadoBus } from '../Constants/EstadosSistema';
 
 export interface IBusRepository {
-	obtenerTodos(): Promise<Bus[]>;
-	obtenerPorCooperativa(cooperativaId: number): Promise<Bus[]>;
-	obtenerPorId(id: number): Promise<Bus | null>;
-	obtenerPorPlaca(placa: string): Promise<Bus | null>;
-	obtenerPorNumero(numero: string): Promise<Bus | null>;
-	crear(bus: Bus): Promise<Bus>;
-	actualizar(id: number, bus: Partial<Bus>): Promise<Bus>;
-	eliminarLogico(id: number): Promise<void>;
-	obtenerAsientos(busId: number): Promise<BusAsiento[]>;
-	obtenerAsientosDisponibles(
-		busId: number,
-		tipo: "NORMAL" | "VIP",
-	): Promise<BusAsiento[]>;
-	actualizarAsiento(asiento: BusAsiento): Promise<BusAsiento>;
-	reservarAsientos(asientos: BusAsiento[]): Promise<void>;
-	liberarAsientos(asientos: BusAsiento[]): Promise<void>;
-	buscarDisponibles(
-		ciudadOrigen: string,
-		ciudadDestino: string,
-		fecha: Date,
-		filtros?: BusFiltros,
-	): Promise<Bus[]>;
-	marcarFueraDeServicio(
-		busId: number,
-		motivo: string,
-		descripcion?: string,
-		replacementBusId?: number,
-		reportadoPor?: string,
-	): Promise<Bus>;
-	obtenerRutasAfectadas(busId: number): Promise<number>;
+  obtenerTodos(): Promise<Bus[]>;
+  obtenerPorCooperativa(cooperativaId: number): Promise<Bus[]>;
+  obtenerDisponiblesParaOperar(cooperativaId: number): Promise<Bus[]>;
+  obtenerPorId(id: number): Promise<Bus | null>;
+  obtenerPorPlaca(placa: string): Promise<Bus | null>;
+  obtenerPorNumero(cooperativaId: number, numero: string): Promise<Bus | null>;
+  crear(bus: Bus): Promise<Bus>;
+  actualizar(id: number, bus: Partial<Bus>): Promise<Bus>;
+  cambiarEstado(id: number, nuevoEstado: EstadoBus): Promise<Bus>;
+  eliminarLogico(id: number): Promise<void>;
 }
