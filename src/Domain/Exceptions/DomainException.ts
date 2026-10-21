@@ -1,10 +1,14 @@
 /**
- * DomainException.ts - Clase base para todas las excepciones del dominio
+ * Excepción base para todas las anomalías y violaciones de reglas en la capa de Dominio.
+ * Provee identificación estandarizada y código de error opcional sin dependencias externas.
  */
 export class DomainException extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'DomainException';
-    Object.setPrototypeOf(this, new.target.prototype);
+  public readonly code: string
+
+  constructor(message: string, code: string = 'DOMAIN_ERROR') {
+    super(message)
+    this.name = 'DomainException'
+    this.code = code
+    Object.setPrototypeOf(this, new.target.prototype)
   }
 }
