@@ -64,3 +64,37 @@ export const TipoPasajero = {
   MENOR_EDAD: 'MenorEdad',
 } as const
 export type TipoPasajero = (typeof TipoPasajero)[keyof typeof TipoPasajero]
+
+export const RolUsuario = {
+  ADMIN: 'admin',
+  ENCARGADO: 'encargado',
+  OFICINISTA: 'oficinista',
+  CHOFER: 'chofer',
+  CLIENTE: 'cliente',
+} as const
+export type RolUsuario = (typeof RolUsuario)[keyof typeof RolUsuario]
+
+export const EstadoCambio = {
+  SOLICITADO: 'Solicitado',
+  EN_EVALUACION: 'EnEvaluacion',
+  APROBADO: 'Aprobado',
+  RECHAZADO: 'Rechazado',
+  EN_DESARROLLO: 'EnDesarrollo',
+  IMPLEMENTADO: 'Implementado',
+} as const
+export type EstadoCambio = (typeof EstadoCambio)[keyof typeof EstadoCambio]
+
+export const TipoCambio = {
+  NORMAL: 'Normal',
+  ESTANDAR: 'Estandar',
+  EMERGENCIA: 'Emergencia',
+} as const
+export type TipoCambio = (typeof TipoCambio)[keyof typeof TipoCambio]
+
+export const PrioridadCambio = {
+  BAJA: 'Baja',
+  MEDIA: 'Media',
+  ALTA: 'Alta',
+  CRITICA: 'Critica',
+} as const
+export type PrioridadCambio = (typeof PrioridadCambio)[keyof typeof PrioridadCambio]
