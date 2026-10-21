@@ -56,3 +56,11 @@ export const MetodoPago = {
   DEPOSITO: 'Deposito',
 } as const
 export type MetodoPago = (typeof MetodoPago)[keyof typeof MetodoPago]
+
+export const TipoPasajero = {
+  GENERAL: 'General',
+  TERCERA_EDAD: 'TerceraEdad',
+  DISCAPACITADO: 'Discapacitado',
+  MENOR_EDAD: 'MenorEdad',
+} as const
+export type TipoPasajero = (typeof TipoPasajero)[keyof typeof TipoPasajero]
