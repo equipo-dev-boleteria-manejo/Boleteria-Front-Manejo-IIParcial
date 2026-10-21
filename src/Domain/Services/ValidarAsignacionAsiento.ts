@@ -2,10 +2,10 @@
  * ValidarAsignacionAsiento.ts - Servicio de dominio para validar paradas según el tipo de ruta
  */
 
-import { AsientoException } from '../Exceptions/AsientoException';
+import { AsignacionAsientoInvalidaException } from '../Exceptions/AsientoException';
 
 export interface ValidarAsientoInput {
-  rutaTipoDirecta: boolean;     // true si la frecuencia es directa
+  rutaTipoDirecta: boolean;           // true si la frecuencia/ruta es directa
   paradaDestinoId: number | string;   // ID de la parada donde baja el pasajero
   terminalDestinoId: number | string; // ID de la terminal final real del bus
 }
@@ -27,7 +27,7 @@ export class ValidarAsignacionAsiento {
    */
   public static validar(input: ValidarAsientoInput): void {
     if (!this.esAsignacionValida(input)) {
-      throw new AsientoException(
+      throw new AsignacionAsientoInvalidaException(
         'Las rutas de tipo directa solo permiten como destino la terminal final.'
       );
     }

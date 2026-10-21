@@ -2,48 +2,41 @@
  * SeatType.ts - Entidad de Dominio para Tipos de Asiento y Tarifas
  */
 
+import {
+  PrecioNegativoException,
+  ColorHexInvalidoException,
+} from '../Exceptions/SeatTypeException';
+
+const HEX_REGEX = /^#[0-9A-Fa-f]{6}$/;
+
 export class SeatType {
-  id?: number | string;
-  nombre: string;
-  colorHex: string;
-  precioBase: number;
-  descripcion?: string;
-  estado: boolean;
-  createdAt?: Date;
-  updatedAt?: Date;
+  public id?: number;
+  public createdAt?: Date;
+  public updatedAt?: Date;
 
   constructor(
-    nombre: string,
-    colorHex: string,
-    precioBase: number,
-    descripcion?: string,
-    estado: boolean = true,
-    id?: number | string
-  ) {
-    this.id = id;
-    this.nombre = nombre;
-    this.colorHex = colorHex;
-    this.precioBase = precioBase;
-    this.descripcion = descripcion;
-    this.estado = estado;
-  }
+    public nombre: string,
+    public colorHex: string,
+    public precioBase: number,
+    public descripcion?: string,
+    public estado: boolean = true,
+  ) {}
 
   esValido(): boolean {
     return (
-      this.nombre.trim().length >= 3 &&
+      Boolean(this.nombre && this.nombre.trim().length >= 3) &&
       this.validarColorHex(this.colorHex) &&
       this.precioBase >= 0
     );
   }
 
-  private validarColorHex(color: string): boolean {
-    const hexRegex = /^#[0-9A-F]{6}$/i;
-    return hexRegex.test(color);
+  validarColorHex(color: string): boolean {
+    return HEX_REGEX.test(color.trim());
   }
 
   actualizarPrecio(nuevoPrecio: number): void {
     if (nuevoPrecio < 0) {
-      throw new Error('El precio no puede ser negativo');
+      throw new PrecioNegativoException();
     }
     this.precioBase = nuevoPrecio;
     this.updatedAt = new Date();
@@ -51,9 +44,9 @@ export class SeatType {
 
   actualizarColor(nuevoColor: string): void {
     if (!this.validarColorHex(nuevoColor)) {
-      throw new Error('El color debe ser un hexadecimal válido (ej: #FF5733)');
+      throw new ColorHexInvalidoException(nuevoColor);
     }
-    this.colorHex = nuevoColor;
+    this.colorHex = nuevoColor.trim();
     this.updatedAt = new Date();
   }
 
@@ -70,40 +63,18 @@ export class SeatType {
   estaActivo(): boolean {
     return this.estado;
   }
-
-  obtenerDatosUI(): {
-    id?: number | string;
-    nombre: string;
-    color: string;
-    precio: number;
-    descripcion?: string;
-  } {
-    return {
-      id: this.id,
-      nombre: this.nombre,
-      color: this.colorHex,
-      precio: this.precioBase,
-      descripcion: this.descripcion,
-    };
-  }
-}
-
-export enum TiposAsientoEstandar {
-  NORMAL = 'NORMAL',
-  VIP = 'VIP',
-  EJECUTIVO = 'EJECUTIVO',
 }
 
 export class SeatTypeFactory {
   static crearNormal(): SeatType {
-    return new SeatType('Normal', '#3498db', 10.0, 'Asiento estándar para pasajeros');
+    return new SeatType('Normal', '#3498db', 10.0, 'Asiento clásico estándar');
   }
 
   static crearVIP(): SeatType {
-    return new SeatType('VIP', '#e74c3c', 20.0, 'Asiento de lujo con mayor comodidad');
+    return new SeatType('VIP', '#e74c3c', 15.0, 'Asiento VIP con reclinación superior');
   }
 
   static crearEjecutivo(): SeatType {
-    return new SeatType('Ejecutivo', '#f39c12', 15.0, 'Asiento ejecutivo semi-premium');
+    return new SeatType('Ejecutivo', '#f39c12', 12.5, 'Asiento semi-cama ejecutivo');
   }
 }
