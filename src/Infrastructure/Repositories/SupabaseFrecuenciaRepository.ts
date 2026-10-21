@@ -14,6 +14,13 @@ import type {
   FrecuenciaFiltros,
   IFrecuenciaRepository,
 } from "../../Domain/Repositories/IFrecuenciaRepository";
+import {
+  FrecuenciaNoEncontradaException,
+  FrecuenciaInvalidaException,
+  IdentificadorFrecuenciaDuplicadoException,
+  ParadaNoEncontradaException,
+  ParadaInvalidaException,
+} from "../../Domain/Exceptions/FrecuenciaException";
 
 interface ParadaRow {
   Id: number;
@@ -123,7 +130,7 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
 
   async crear(frecuencia: Frecuencia): Promise<Frecuencia> {
     if (!frecuencia.esValida()) {
-      throw new Error(
+      throw new FrecuenciaInvalidaException(
         "La frecuencia contiene datos inválidos. Verifica origen, destino, hora, identificador, días y paradas",
       );
     }
@@ -133,8 +140,9 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
       frecuencia.identificadorFrecuencia,
     );
     if (existente) {
-      throw new Error(
-        `El identificador ${frecuencia.identificadorFrecuencia} ya existe para esta cooperativa`,
+      throw new IdentificadorFrecuenciaDuplicadoException(
+        frecuencia.identificadorFrecuencia,
+        frecuencia.cooperativaId,
       );
     }
 
@@ -164,9 +172,11 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
       throw new Error(`Error al crear paradas: ${errorParadas.message}`);
     }
 
-    creada.paradas = ((paradas ?? []) as ParadaRow[])
-      .map((fila) => this.mapearParada(fila))
-      .sort((a, b) => a.orden - b.orden);
+    creada.establecerParadas(
+      ((paradas ?? []) as ParadaRow[])
+        .map((fila) => this.mapearParada(fila))
+        .sort((a, b) => a.orden - b.orden),
+    );
     return creada;
   }
 
@@ -175,7 +185,7 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
     cambios: Partial<Frecuencia>,
   ): Promise<Frecuencia> {
     const actual = await this.obtenerPorId(id);
-    if (!actual) throw new Error(`Frecuencia con ID ${id} no encontrada`);
+    if (!actual) throw new FrecuenciaNoEncontradaException(id);
 
     const actualizada = new Frecuencia(
       cambios.cooperativaId ?? actual.cooperativaId,
@@ -190,10 +200,10 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
     actualizada.id = id;
     actualizada.codigoAnt = cambios.codigoAnt ?? actual.codigoAnt;
     actualizada.resolucionAnt = cambios.resolucionAnt ?? actual.resolucionAnt;
-    actualizada.paradas = actual.paradas;
+    actualizada.establecerParadas([...actual.paradas]);
 
     if (!actualizada.esValida()) {
-      throw new Error("La frecuencia contiene datos inválidos");
+      throw new FrecuenciaInvalidaException("La frecuencia contiene datos inválidos");
     }
 
     const { error } = await supabase
@@ -222,7 +232,7 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
       .order("Orden", { ascending: true });
 
     if (error) throw new Error(`Error al obtener paradas: ${error.message}`);
-    return ((data ?? []) as ParadaRow[]).map((fila) => this.mapearParada(fila));
+    return (data || []).map((fila) => this.mapearParada(fila));
   }
 
   async agregarParada(
@@ -231,12 +241,12 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
   ): Promise<ParadaIntermedia> {
     const frecuencia = await this.obtenerPorId(frecuenciaId);
     if (!frecuencia) {
-      throw new Error(`Frecuencia con ID ${frecuenciaId} no encontrada`);
+      throw new FrecuenciaNoEncontradaException(frecuenciaId);
     }
 
     frecuencia.agregarParada(parada);
     if (!frecuencia.paradasSonValidas()) {
-      throw new Error(
+      throw new ParadaInvalidaException(
         "La parada es inválida o su orden/tiempo es inconsistente con las demás paradas",
       );
     }
@@ -264,7 +274,7 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
     if (errorLectura) {
       throw new Error(`Error al obtener parada: ${errorLectura.message}`);
     }
-    if (!fila) throw new Error(`Parada con ID ${id} no encontrada`);
+    if (!fila) throw new ParadaNoEncontradaException(id);
 
     const actual = this.mapearParada(fila as ParadaRow);
     const actualizada = new ParadaIntermedia(
@@ -279,14 +289,16 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
 
     const frecuencia = await this.obtenerPorId(actual.frecuenciaId!);
     if (!frecuencia) {
-      throw new Error(`Frecuencia con ID ${actual.frecuenciaId} no encontrada`);
+      throw new FrecuenciaNoEncontradaException(actual.frecuenciaId!);
     }
 
-    frecuencia.paradas = frecuencia.paradas.map((parada) =>
-      parada.id === id ? actualizada : parada,
+    const paradasActualizadas = frecuencia.paradas.map((parada) =>
+      parada.id === id ? actualizada : (parada as ParadaIntermedia),
     );
+    frecuencia.establecerParadas(paradasActualizadas);
+
     if (!frecuencia.paradasSonValidas()) {
-      throw new Error(
+      throw new ParadaInvalidaException(
         "La parada es inválida o su orden/tiempo es inconsistente con las demás paradas",
       );
     }
@@ -332,9 +344,11 @@ export class SupabaseFrecuenciaRepository implements IFrecuenciaRepository {
     frecuencia.codigoAnt = fila.CodigoAnt ?? undefined;
     frecuencia.resolucionAnt = fila.ResolucionAnt ?? undefined;
     frecuencia.createdAt = fila.CreatedAt ? new Date(fila.CreatedAt) : undefined;
-    frecuencia.paradas = (fila.ParadasIntermedias ?? [])
-      .map((parada) => this.mapearParada(parada))
-      .sort((a, b) => a.orden - b.orden);
+    frecuencia.establecerParadas(
+      (fila.ParadasIntermedias ?? [])
+        .map((parada) => this.mapearParada(parada))
+        .sort((a, b) => a.orden - b.orden),
+    );
     return frecuencia;
   }
 

@@ -52,7 +52,7 @@ export class Frecuencia {
   public codigoAnt?: string;
   public resolucionAnt?: string;
   public createdAt?: Date;
-  public paradas: ParadaIntermedia[] = [];
+  private _paradas: ParadaIntermedia[] = [];
 
   constructor(
     public cooperativaId: number,
@@ -64,6 +64,17 @@ export class Frecuencia {
     public diasOperacion: DiaOperacion[] = [...DIAS_SEMANA],
     public activa: boolean = true,
   ) {}
+
+  /**
+   * Retorna una copia inmutable de las paradas registradas para proteger la invariante.
+   */
+  get paradas(): readonly ParadaIntermedia[] {
+    return [...this._paradas];
+  }
+
+  establecerParadas(paradas: ParadaIntermedia[]): void {
+    this._paradas = [...paradas];
+  }
 
   esValida(): boolean {
     return (
@@ -110,7 +121,7 @@ export class Frecuencia {
   }
 
   obtenerParadasOrdenadas(): ParadaIntermedia[] {
-    return [...this.paradas].sort((a, b) => a.orden - b.orden);
+    return [...this._paradas].sort((a, b) => a.orden - b.orden);
   }
 
   obtenerParadasConVenta(): ParadaIntermedia[] {
@@ -120,7 +131,7 @@ export class Frecuencia {
   }
 
   agregarParada(parada: ParadaIntermedia): void {
-    this.paradas.push(parada);
+    this._paradas.push(parada);
   }
 
   /**
