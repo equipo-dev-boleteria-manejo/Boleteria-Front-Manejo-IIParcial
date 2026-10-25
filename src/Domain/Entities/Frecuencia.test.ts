@@ -58,6 +58,15 @@ describe("Paradas intermedias", () => {
     expect(enExtremo.esValida()).toBe(false);
   });
 
+  it("calcula la duración mínima como el tiempo de la última parada", () => {
+    const frecuencia = crearFrecuencia();
+    expect(frecuencia.duracionMinimaMinutos()).toBe(0);
+
+    frecuencia.agregarParada(new ParadaIntermedia("Latacunga", 1, 120));
+    frecuencia.agregarParada(new ParadaIntermedia("Riobamba", 2, 240));
+    expect(frecuencia.duracionMinimaMinutos()).toBe(240);
+  });
+
   it("valida los campos de una parada", () => {
     expect(new ParadaIntermedia("", 1, 10).esValida()).toBe(false);
     expect(new ParadaIntermedia("Ambato", 0, 10).esValida()).toBe(false);

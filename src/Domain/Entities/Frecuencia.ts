@@ -124,6 +124,17 @@ export class Frecuencia {
     return [...this._paradas].sort((a, b) => a.orden - b.orden);
   }
 
+  /**
+   * Duración mínima conocida del recorrido: el tiempo de la última parada
+   * intermedia. Es 0 cuando la frecuencia no tiene paradas registradas.
+   */
+  duracionMinimaMinutos(): number {
+    return this._paradas.reduce(
+      (maximo, parada) => Math.max(maximo, parada.minutosDesdeOrigen),
+      0,
+    );
+  }
+
   obtenerParadasConVenta(): ParadaIntermedia[] {
     return this.obtenerParadasOrdenadas().filter(
       (parada) => parada.permiteVenta,
