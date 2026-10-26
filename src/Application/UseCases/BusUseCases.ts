@@ -1,5 +1,5 @@
-import { Bus, BusAsiento } from '../../Domain/Entities/Bus';
-import { IBusRepository, BusFiltros } from '../../Domain/Repositories/IBusRepository';
+import { Bus } from '../../Domain/Entities/Bus';
+import { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 
 export interface CrearBusInput {
@@ -79,53 +79,6 @@ export class EliminarBus {
 
   async ejecutar(id: number): Promise<void> {
     return this.busRepository.eliminarLogico(id);
-  }
-}
-
-export class ObtenerAsientosDisponibles {
-  constructor(private busRepository: IBusRepository) {}
-
-  async ejecutar(busId: number, tipo: 'NORMAL' | 'VIP'): Promise<BusAsiento[]> {
-    return this.busRepository.obtenerAsientosDisponibles(busId, tipo);
-  }
-}
-
-export class ReservarAsientos {
-  constructor(private busRepository: IBusRepository) {}
-
-  async ejecutar(asientos: BusAsiento[], pasajeroId: string): Promise<void> {
-    asientos.forEach((a) => a.ocupar(pasajeroId));
-    return this.busRepository.reservarAsientos(asientos);
-  }
-}
-
-export class LiberarAsientos {
-  constructor(private busRepository: IBusRepository) {}
-
-  async ejecutar(asientos: BusAsiento[]): Promise<void> {
-    asientos.forEach((a) => a.liberar());
-    return this.busRepository.liberarAsientos(asientos);
-  }
-}
-
-export class BuscarBusesDisponibles {
-  constructor(private busRepository: IBusRepository) {}
-
-  async ejecutar(
-    ciudadOrigen: string,
-    ciudadDestino: string,
-    fecha: Date,
-    filtros?: BusFiltros
-  ): Promise<Bus[]> {
-    return this.busRepository.buscarDisponibles(ciudadOrigen, ciudadDestino, fecha, filtros);
-  }
-}
-
-export class ObtenerAsientosBus {
-  constructor(private busRepository: IBusRepository) {}
-
-  async ejecutar(busId: number): Promise<BusAsiento[]> {
-    return this.busRepository.obtenerAsientos(busId);
   }
 }
 
