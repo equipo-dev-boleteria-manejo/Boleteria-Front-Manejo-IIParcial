@@ -8,8 +8,6 @@ import {
 import { ActualizarBus } from "../../Application/UseCases/BusUseCases";
 import { ReportarIncidenteOperativo } from "../../Application/UseCases/ReportarIncidenteOperativo";
 import { SupabaseBusRepository } from "../../Infrastructure/Repositories/SupabaseBusRepository";
-import { SupabaseRutaRepository } from "../../Infrastructure/Repositories/SupabaseRutaRepository";
-import { SupabaseVentasRepository } from "../../Infrastructure/Repositories/SupabaseVentasRepository";
 
 export function useBuses() {
 	const buses = ref<Bus[]>([]);
@@ -17,16 +15,10 @@ export function useBuses() {
 	const error = ref("");
 
 	const busRepo = new SupabaseBusRepository();
-	const rutaRepo = new SupabaseRutaRepository();
-	const ventaRepo = new SupabaseVentasRepository();
 
 	const crearBusUseCase = new CrearBus(busRepo);
 	const actualizarBusUseCase = new ActualizarBus(busRepo);
-	const reportarIncidenteUseCase = new ReportarIncidenteOperativo(
-		busRepo,
-		rutaRepo,
-		ventaRepo
-	);
+	const reportarIncidenteUseCase = new ReportarIncidenteOperativo(busRepo);
 
 	const nuevoBus = ref<CrearBusInput>({
 		cooperativaId: 1, // Asumimos ID 1 para la única cooperativa

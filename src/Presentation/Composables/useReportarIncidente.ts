@@ -2,8 +2,6 @@ import { ref, reactive } from 'vue';
 import { ReportarIncidenteOperativo, ReportarIncidenteOperativoResponse } from '../../Application/UseCases/ReportarIncidenteOperativo';
 import { ReactivarBus, ReactivarBusResponse } from '../../Application/UseCases/ReactivarBus';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
-import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
-import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { ReportarIncidenteOperativoDto } from '../../Application/Dtos/ReportarIncidenteOperativoDto';
 import { ReactivarBusDto } from '../../Application/Dtos/ReactivarBusDto';
 
@@ -18,14 +16,8 @@ export interface FormIncidente {
 
 export function useReportarIncidente(cooperativaId: number = 1) {
   const busRepository = new SupabaseBusRepository();
-  const rutaRepository = new SupabaseRutaRepository();
-  const ventaRepository = new SupabaseVentasRepository();
 
-  const reportarIncidenteUseCase = new ReportarIncidenteOperativo(
-    busRepository,
-    rutaRepository,
-    ventaRepository
-  );
+  const reportarIncidenteUseCase = new ReportarIncidenteOperativo(busRepository);
   const reactivarBusUseCase = new ReactivarBus(busRepository);
 
   const loading = ref(false);
