@@ -70,10 +70,6 @@ export function useControlBuses() {
     }
   }
 
-  async function marcarBusEnRuta(busId: number) {
-    await cambiarEstadoBus(busId, 'EnRuta')
-  }
-
   async function liberarBus(busId: number) {
     await cambiarEstadoBus(busId, 'Activo')
   }
@@ -103,7 +99,6 @@ export function useControlBuses() {
     obtenerBusesActivos,
     obtenerBusesDisponiblesPorFecha,
     cambiarEstadoBus,
-    marcarBusEnRuta,
     liberarBus,
     desactivarBus,
     validarBusDisponible,
