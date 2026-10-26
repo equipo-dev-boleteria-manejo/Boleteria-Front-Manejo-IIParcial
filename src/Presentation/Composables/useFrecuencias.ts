@@ -18,21 +18,21 @@ import type {
 } from '../../Application/Dtos/CrearFrecuenciaDto';
 import {
   CrearFrecuenciaUseCase,
-  crearFrecuenciaUseCase as defaultCrear,
+  crearFrecuenciaUseCase as defaultCrearUseCase,
 } from '../../Application/UseCases/CrearFrecuencia';
 import {
   GestionarFrecuenciasUseCase,
-  gestionarFrecuenciasUseCase as defaultGestionar,
+  gestionarFrecuenciasUseCase as defaultGestionarUseCase,
 } from '../../Application/UseCases/GestionarFrecuencias';
 
 export function useFrecuencias(
-  gestionar: GestionarFrecuenciasUseCase = defaultGestionar,
-  crear: CrearFrecuenciaUseCase = defaultCrear,
+  crearUseCase: CrearFrecuenciaUseCase = defaultCrearUseCase,
+  gestionarUseCase: GestionarFrecuenciasUseCase = defaultGestionarUseCase,
 ) {
   const loading = ref(false);
   const error = ref<string | null>(null);
   const frecuencias = shallowRef<Frecuencia[]>([]);
-  const seleccionada = shallowRef<Frecuencia | null>(null);
+  const frecuenciaSeleccionada = shallowRef<Frecuencia | null>(null);
 
   const total = computed(() => frecuencias.value.length);
   const frecuenciasActivas = computed(() => frecuencias.value.filter((frecuencia) => frecuencia.activa));
@@ -59,91 +59,107 @@ export function useFrecuencias(
     frecuencias.value = frecuencias.value.map((frecuencia) =>
       frecuencia.id === actualizada.id ? actualizada : frecuencia,
     );
-    if (seleccionada.value?.id === actualizada.id) {
-      seleccionada.value = actualizada;
+    if (frecuenciaSeleccionada.value?.id === actualizada.id) {
+      frecuenciaSeleccionada.value = actualizada;
     }
   }
 
   async function recargar(frecuenciaId: number): Promise<Frecuencia> {
-    const actualizada = await gestionar.obtenerPorId(frecuenciaId);
+    const actualizada = await gestionarUseCase.obtenerPorId(frecuenciaId);
     reemplazar(actualizada);
     return actualizada;
   }
 
-  async function cargar(filtros?: FrecuenciaFiltros): Promise<Frecuencia[]> {
+  /** Busca, entre las frecuencias cargadas, a cuál pertenece una parada. */
+  function frecuenciaIdDeParada(paradaId: number): number | undefined {
+    const cargadas = frecuenciaSeleccionada.value
+      ? [...frecuencias.value, frecuenciaSeleccionada.value]
+      : frecuencias.value;
+
+    return cargadas.find((frecuencia) => frecuencia.paradas.some((parada) => parada.id === paradaId))?.id;
+  }
+
+  async function cargarFrecuencias(filtros?: FrecuenciaFiltros): Promise<Frecuencia[]> {
     return ejecutar(async () => {
-      frecuencias.value = await gestionar.listar(filtros);
+      frecuencias.value = await gestionarUseCase.listar(filtros);
       return frecuencias.value;
     }, 'Error al cargar las frecuencias');
   }
 
   async function cargarPorCooperativa(cooperativaId: number): Promise<Frecuencia[]> {
     return ejecutar(async () => {
-      frecuencias.value = await gestionar.obtenerPorCooperativa(cooperativaId);
+      frecuencias.value = await gestionarUseCase.obtenerPorCooperativa(cooperativaId);
       return frecuencias.value;
     }, 'Error al cargar las frecuencias de la cooperativa');
   }
 
   async function buscarPorTramo(origen: string, destino: string, dia?: DiaOperacion): Promise<Frecuencia[]> {
     return ejecutar(async () => {
-      frecuencias.value = await gestionar.buscarPorTramo(origen, destino, dia);
+      frecuencias.value = await gestionarUseCase.buscarPorTramo(origen, destino, dia);
       return frecuencias.value;
     }, 'Error al buscar frecuencias');
   }
 
-  async function seleccionar(id: number): Promise<Frecuencia> {
+  async function seleccionarFrecuencia(id: number): Promise<Frecuencia> {
     return ejecutar(async () => {
-      seleccionada.value = await gestionar.obtenerPorId(id);
-      return seleccionada.value;
+      frecuenciaSeleccionada.value = await gestionarUseCase.obtenerPorId(id);
+      return frecuenciaSeleccionada.value;
     }, 'Error al obtener la frecuencia');
   }
 
   function limpiarSeleccion(): void {
-    seleccionada.value = null;
+    frecuenciaSeleccionada.value = null;
   }
 
-  async function crearFrecuencia(dto: CrearFrecuenciaDto): Promise<Frecuencia> {
+  async function registrarFrecuencia(dto: CrearFrecuenciaDto): Promise<Frecuencia> {
     return ejecutar(async () => {
-      const nueva = await crear.execute(dto);
+      const nueva = await crearUseCase.execute(dto);
       frecuencias.value = [...frecuencias.value, nueva];
       return nueva;
-    }, 'Error al crear la frecuencia');
+    }, 'Error al registrar la frecuencia');
   }
 
-  async function actualizar(id: number, cambios: ActualizarFrecuenciaDto): Promise<Frecuencia> {
+  async function actualizarFrecuencia(id: number, cambios: ActualizarFrecuenciaDto): Promise<Frecuencia> {
     return ejecutar(async () => {
-      const actualizada = await gestionar.actualizar(id, cambios);
+      const actualizada = await gestionarUseCase.actualizar(id, cambios);
       reemplazar(actualizada);
       return actualizada;
     }, 'Error al actualizar la frecuencia');
   }
 
-  async function activar(id: number): Promise<Frecuencia> {
+  async function activarFrecuencia(id: number): Promise<Frecuencia> {
     return ejecutar(async () => {
-      const actualizada = await gestionar.activar(id);
+      const actualizada = await gestionarUseCase.activar(id);
       reemplazar(actualizada);
       return actualizada;
     }, 'Error al activar la frecuencia');
   }
 
-  async function desactivar(id: number): Promise<void> {
+  async function desactivarFrecuencia(id: number): Promise<void> {
     await ejecutar(async () => {
-      await gestionar.desactivar(id);
+      await gestionarUseCase.desactivar(id);
       await recargar(id);
     }, 'Error al desactivar la frecuencia');
   }
 
-  async function agregarParada(frecuenciaId: number, dto: ParadaIntermediaDto): Promise<Frecuencia> {
+  async function agregarParadaAFrecuencia(frecuenciaId: number, dto: ParadaIntermediaDto): Promise<Frecuencia> {
     return ejecutar(async () => {
-      await gestionar.agregarParada(frecuenciaId, dto);
+      await gestionarUseCase.agregarParada(frecuenciaId, dto);
       return recargar(frecuenciaId);
     }, 'Error al agregar la parada');
   }
 
-  async function eliminarParada(frecuenciaId: number, paradaId: number): Promise<Frecuencia> {
-    return ejecutar(async () => {
-      await gestionar.eliminarParada(paradaId);
-      return recargar(frecuenciaId);
+  /**
+   * Elimina una parada. Si la parada pertenece a una frecuencia ya cargada,
+   * refresca esa frecuencia para reflejar el cambio.
+   */
+  async function eliminarParada(paradaId: number): Promise<void> {
+    await ejecutar(async () => {
+      const frecuenciaId = frecuenciaIdDeParada(paradaId);
+      await gestionarUseCase.eliminarParada(paradaId);
+      if (frecuenciaId !== undefined) {
+        await recargar(frecuenciaId);
+      }
     }, 'Error al eliminar la parada');
   }
 
@@ -155,19 +171,19 @@ export function useFrecuencias(
     loading,
     error,
     frecuencias,
-    seleccionada,
+    frecuenciaSeleccionada,
     total,
     frecuenciasActivas,
-    cargar,
+    cargarFrecuencias,
     cargarPorCooperativa,
     buscarPorTramo,
-    seleccionar,
+    seleccionarFrecuencia,
     limpiarSeleccion,
-    crearFrecuencia,
-    actualizar,
-    activar,
-    desactivar,
-    agregarParada,
+    registrarFrecuencia,
+    actualizarFrecuencia,
+    activarFrecuencia,
+    desactivarFrecuencia,
+    agregarParadaAFrecuencia,
     eliminarParada,
     limpiarError,
   };
