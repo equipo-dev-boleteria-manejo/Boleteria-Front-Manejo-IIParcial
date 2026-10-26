@@ -33,16 +33,39 @@ describe('ReactivarBus', () => {
     useCase = new ReactivarBus(mockBusRepo);
   });
 
-  it('debe reactivar un bus en Mantenimiento cambiando su estado a Activo', async () => {
+  it.each([EstadoBus.MANTENIMIENTO, EstadoBus.INACTIVO])(
+    'debe reactivar un bus en estado %s cambiando su estado a Activo',
+    async (estado) => {
+      mockBusRepo.obtenerPorId = vi.fn().mockResolvedValue(crearBusConEstado(estado));
+
+      const resultado = await useCase.ejecutar({ busId: 5, reactivadoPor: 'admin-1' });
+
+      expect(resultado.success).toBe(true);
+      expect(resultado.busReactivado.id).toBe(5);
+      expect(resultado.busReactivado.numero).toBe('25');
+      expect(resultado.busReactivado.estado).toBe(EstadoBus.ACTIVO);
+      expect(resultado.mensaje).toContain('Bus 25');
+      expect(mockBusRepo.cambiarEstado).toHaveBeenCalledTimes(1);
+      expect(mockBusRepo.cambiarEstado).toHaveBeenCalledWith(5, EstadoBus.ACTIVO);
+    }
+  );
+
+  it('debe devolver los datos de auditoría (reactivadoPor y motivo) en la respuesta', async () => {
+    const resultado = await useCase.ejecutar({
+      busId: 5,
+      reactivadoPor: 'admin-1',
+      motivo: 'Reparación completada',
+    });
+
+    expect(resultado.reactivadoPor).toBe('admin-1');
+    expect(resultado.motivo).toBe('Reparación completada');
+  });
+
+  it('debe devolver el motivo como undefined cuando no se proporciona', async () => {
     const resultado = await useCase.ejecutar({ busId: 5, reactivadoPor: 'admin-1' });
 
-    expect(resultado.success).toBe(true);
-    expect(resultado.busReactivado.id).toBe(5);
-    expect(resultado.busReactivado.numero).toBe('25');
-    expect(resultado.busReactivado.estado).toBe(EstadoBus.ACTIVO);
-    expect(resultado.mensaje).toContain('Bus 25');
-    expect(mockBusRepo.cambiarEstado).toHaveBeenCalledTimes(1);
-    expect(mockBusRepo.cambiarEstado).toHaveBeenCalledWith(5, EstadoBus.ACTIVO);
+    expect(resultado.reactivadoPor).toBe('admin-1');
+    expect(resultado.motivo).toBeUndefined();
   });
 
   it('debe usar el busId recibido si el repositorio devuelve el bus sin id', async () => {
@@ -64,7 +87,7 @@ describe('ReactivarBus', () => {
     expect(mockBusRepo.cambiarEstado).not.toHaveBeenCalled();
   });
 
-  it.each([EstadoBus.ACTIVO, EstadoBus.INACTIVO, EstadoBus.FUERA_DE_SERVICIO])(
+  it.each([EstadoBus.ACTIVO, EstadoBus.FUERA_DE_SERVICIO])(
     'debe lanzar BusNoDisponibleParaReactivarException si el bus está en estado %s',
     async (estado) => {
       mockBusRepo.obtenerPorId = vi.fn().mockResolvedValue(crearBusConEstado(estado));

@@ -11,14 +11,18 @@ export interface ReactivarBusResponse {
     numero: string;
     estado: string;
   };
+  reactivadoPor: string;
+  motivo?: string;
   mensaje: string;
 }
+
+const ESTADOS_REACTIVABLES: EstadoBus[] = [EstadoBus.MANTENIMIENTO, EstadoBus.INACTIVO];
 
 export class ReactivarBus {
   constructor(private busRepository: IBusRepository) {}
 
   async ejecutar(input: ReactivarBusDto): Promise<ReactivarBusResponse> {
-    const { busId } = input;
+    const { busId, reactivadoPor, motivo } = input;
 
     // Obtener bus actual
     const busActual = await this.busRepository.obtenerPorId(busId);
@@ -26,8 +30,8 @@ export class ReactivarBus {
       throw new BusNoEncontradoException(String(busId));
     }
 
-    // Validar que está en estado Mantenimiento
-    if (busActual.estado !== EstadoBus.MANTENIMIENTO) {
+    // Validar que está en un estado desde el cual se puede reactivar
+    if (!ESTADOS_REACTIVABLES.includes(busActual.estado)) {
       throw new BusNoDisponibleParaReactivarException(
         busId,
         busActual.estado || 'desconocido'
@@ -44,6 +48,8 @@ export class ReactivarBus {
         numero: busReactivado.numero,
         estado: busReactivado.estado,
       },
+      reactivadoPor,
+      motivo,
       mensaje: `Bus ${busReactivado.numero} ha sido reactivado exitosamente y está disponible para nuevas asignaciones.`,
     };
   }
