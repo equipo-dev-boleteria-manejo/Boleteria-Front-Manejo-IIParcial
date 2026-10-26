@@ -1,11 +1,12 @@
 import { Bus } from '../../Domain/Entities/Bus';
+import { Ruta } from '../../Domain/Entities/Ruta';
+import { EstadoBus, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import { BusReemplazoNoValidoException } from '../../Domain/Exceptions/BusFueraDeServicioException';
 import { BusNoEncontradoException } from '../../Domain/Exceptions/BusException';
 import { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
 import { IVentaRepository } from '../../Domain/Repositories/IVentaRepository';
 import { ReportarIncidenteOperativoDto } from '../Dtos/ReportarIncidenteOperativoDto';
-import { Ruta } from '../../Domain/Entities/Ruta';
 
 export interface ReportarIncidenteOperativoResponse {
   success: boolean;
@@ -33,10 +34,10 @@ export class ReportarIncidenteOperativo {
   ) {}
 
   async ejecutar(input: ReportarIncidenteOperativoDto): Promise<ReportarIncidenteOperativoResponse> {
-    const { busNumero, motivo, descripcion, replacementBusNumero, reportadoPor } = input;
+    const { cooperativaId, busNumero, motivo, descripcion, replacementBusNumero } = input;
 
     // 1. Obtener bus actual
-    const busActual = await this.busRepository.obtenerPorNumero(busNumero.trim());
+    const busActual = await this.busRepository.obtenerPorNumero(cooperativaId, busNumero.trim());
     if (!busActual) {
       throw new BusNoEncontradoException(String(busNumero));
     }
@@ -50,11 +51,11 @@ export class ReportarIncidenteOperativo {
     // 3. Validar bus de reemplazo si se proporciona
     let busReemplazo: Bus | null = null;
     if (replacementBusNumero && replacementBusNumero.trim()) {
-      busReemplazo = await this.busRepository.obtenerPorNumero(replacementBusNumero.trim());
+      busReemplazo = await this.busRepository.obtenerPorNumero(cooperativaId, replacementBusNumero.trim());
       if (!busReemplazo) {
         throw new BusReemplazoNoValidoException(replacementBusNumero, 'Bus no encontrado');
       }
-      if (busReemplazo.estado === 'EnMantenimiento' || busReemplazo.estado === 'Inactivo') {
+      if (busReemplazo.estado === EstadoBus.MANTENIMIENTO || busReemplazo.estado === EstadoBus.INACTIVO) {
         throw new BusReemplazoNoValidoException(replacementBusNumero, `El bus está en estado ${busReemplazo.estado}`);
       }
       if (busReemplazo.id === busActual.id) {
@@ -62,51 +63,40 @@ export class ReportarIncidenteOperativo {
       }
     }
 
-    // 4. Marcar bus como Fuera de Servicio
-    await this.busRepository.marcarFueraDeServicio(
-      Number(busActual.id),
-      motivo,
-      descripcion,
-      busReemplazo?.id,
-      reportadoPor
-    );
+    // 4. Sacar el bus de operación (estado Mantenimiento)
+    const busActualizado = await this.busRepository.cambiarEstado(busActual.id!, EstadoBus.MANTENIMIENTO);
 
     // 5. Gestión de Ruta "En Curso" (Transbordo)
-    const rutaActiva = await this.rutaRepository.obtenerRutaActivaPorBus(Number(busActual.id));
+    const rutasEnCurso = await this.rutaRepository.obtenerTodas({
+      busId: busActual.id!,
+      estado: EstadoRuta.EN_CURSO,
+    });
+    const rutaActiva = rutasEnCurso[0];
     let nuevaRutaId: number | undefined;
     let mensajeExtra = '';
 
     if (rutaActiva) {
-      // Marcar ruta original como incidente/cancelada con prefijo estricto
-      await this.rutaRepository.actualizarEstado(rutaActiva.id!, 'Cancelada');
-      
-      const { supabase } = await import('../../Infrastructure/Api/supabaseClient');
-      await supabase
-        .from('Rutas')
-        .update({ 
-          ObservacionChofer: `🚨 INCIDENTE: ${motivo}. ${descripcion || ''}`.trim() 
-        })
-        .eq('Id', rutaActiva.id);
-      
+      // Cancelar la ruta original y dejar registrado el incidente
+      await this.rutaRepository.cambiarEstado(rutaActiva.id!, EstadoRuta.CANCELADA);
+      await this.rutaRepository.actualizar(rutaActiva.id!, {
+        observacionChofer: `🚨 INCIDENTE: ${motivo}. ${descripcion || ''}`.trim(),
+      });
+
       // Si hay reemplazo, crear nueva ruta y migrar ventas
       if (busReemplazo) {
         const nuevaRuta = new Ruta(
           rutaActiva.frecuenciaId,
           busReemplazo.id!,
           rutaActiva.fecha,
-          'EnCurso', // Inicia directamente en curso
-          undefined,
-          rutaActiva.choferId,
-          rutaActiva.horaSalida,
-          null,
-          `🔄 Transbordo desde unidad ${busActual.numero} por incidente.`,
-          undefined,
-          rutaActiva.hojaRutaId,
-          rutaActiva.esDirecta,
-          true // excepcionEmergencia: true por ser un transbordo operativo
+          EstadoRuta.EN_CURSO, // Inicia directamente en curso
         );
+        nuevaRuta.choferId = rutaActiva.choferId;
+        nuevaRuta.horaSalida = rutaActiva.horaSalida;
+        nuevaRuta.observacionChofer = `🔄 Transbordo desde unidad ${busActual.numero} por incidente.`;
+        nuevaRuta.hojaRutaId = rutaActiva.hojaRutaId;
+        nuevaRuta.esDirecta = rutaActiva.esDirecta;
 
-        const rutaCreada = await this.rutaRepository.crearRuta(nuevaRuta);
+        const rutaCreada = await this.rutaRepository.crear(nuevaRuta);
         nuevaRutaId = rutaCreada.id;
 
         // Migrar todas las ventas de la ruta vieja a la nueva
@@ -118,7 +108,11 @@ export class ReportarIncidenteOperativo {
     }
 
     // 6. Obtener conteo de otras rutas afectadas (programadas)
-    const rutasAfectadas = await this.busRepository.obtenerRutasAfectadas(Number(busActual.id));
+    const rutasProgramadas = await this.rutaRepository.obtenerTodas({
+      busId: busActual.id!,
+      estado: EstadoRuta.PROGRAMADA,
+    });
+    const rutasAfectadas = rutasProgramadas.length;
 
     const incidenteId = `INC-${busActual.id}-${Date.now()}`;
 
@@ -126,9 +120,9 @@ export class ReportarIncidenteOperativo {
       success: true,
       incidenteId,
       busActualizado: {
-        id: busActual.id!,
-        numero: busActual.numero,
-        estado: 'EnMantenimiento',
+        id: busActualizado.id ?? busActual.id!,
+        numero: busActualizado.numero,
+        estado: busActualizado.estado,
       },
       rutasAfectadas,
       acciones: {

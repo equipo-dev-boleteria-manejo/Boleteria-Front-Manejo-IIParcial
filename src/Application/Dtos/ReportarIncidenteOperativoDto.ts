@@ -4,5 +4,6 @@ export interface ReportarIncidenteOperativoDto {
   descripcion?: string
   fechaIncidente?: string // ISO
   replacementBusNumero?: string | null
-  reportadoPor?: string | null
+  reportadoPor?: string | null 
+  cooperativaId: number;
 }
