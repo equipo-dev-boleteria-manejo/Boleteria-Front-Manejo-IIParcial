@@ -3,7 +3,10 @@ import { CrearBus } from './CrearBus';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
-import { DomainException } from '../../Domain/Exceptions/DomainException';
+import {
+  BusInvalidoException,
+  PlacaDuplicadaException,
+} from '../../Domain/Exceptions/BusException';
 
 describe('CrearBus', () => {
   let mockBusRepo: IBusRepository;
@@ -64,10 +67,10 @@ describe('CrearBus', () => {
     expect(resultado.fotoUrl).toBe('https://ejemplo.com/bus.jpg');
   });
 
-  it('debe lanzar DomainException si la placa es demasiado corta y no consultar ni persistir', async () => {
+  it('debe lanzar BusInvalidoException si la placa es demasiado corta y no consultar ni persistir', async () => {
     await expect(
       useCase.ejecutar({ ...inputValido, placa: 'AB1' })
-    ).rejects.toThrow(DomainException);
+    ).rejects.toThrow(BusInvalidoException);
 
     await expect(
       useCase.ejecutar({ ...inputValido, placa: 'AB1' })
@@ -77,24 +80,22 @@ describe('CrearBus', () => {
     expect(mockBusRepo.crear).not.toHaveBeenCalled();
   });
 
-  it('debe lanzar DomainException si la capacidad es cero', async () => {
+  it('debe lanzar BusInvalidoException si la capacidad es cero', async () => {
     await expect(
       useCase.ejecutar({ ...inputValido, totalAsientos: 0 })
-    ).rejects.toThrow(DomainException);
+    ).rejects.toThrow(BusInvalidoException);
 
     expect(mockBusRepo.crear).not.toHaveBeenCalled();
   });
 
-  it('debe lanzar DomainException si ya existe un bus con la misma placa', async () => {
+  it('debe lanzar PlacaDuplicadaException si ya existe un bus con la misma placa', async () => {
     mockBusRepo.obtenerPorPlaca = vi
       .fn()
       .mockResolvedValue(new Bus(1, '10', 'PBA-1234', 40));
 
-    await expect(useCase.ejecutar(inputValido)).rejects.toThrow(DomainException);
+    await expect(useCase.ejecutar(inputValido)).rejects.toThrow(PlacaDuplicadaException);
 
-    await expect(useCase.ejecutar(inputValido)).rejects.toThrow(
-      'Ya existe un autobús registrado con la placa PBA-1234'
-    );
+    await expect(useCase.ejecutar(inputValido)).rejects.toThrow('PBA-1234');
 
     expect(mockBusRepo.crear).not.toHaveBeenCalled();
   });
