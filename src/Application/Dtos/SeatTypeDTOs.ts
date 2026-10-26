@@ -8,7 +8,8 @@ export interface SeatTypeResponseDTO {
 }
 
 export interface CalcularTarifaInputDTO {
-  precioBase: number;
+  seatTypeId?: number | string;
+  precioBase?: number;
   porcentajeDescuento?: number;
 }
 
