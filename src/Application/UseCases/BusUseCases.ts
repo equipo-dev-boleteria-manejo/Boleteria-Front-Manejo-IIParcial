@@ -19,6 +19,14 @@ export class ObtenerBusesPorCooperativa {
   }
 }
 
+export class ObtenerBusesDisponibles {
+  constructor(private busRepository: IBusRepository) {}
+
+  async ejecutar(cooperativaId: number): Promise<Bus[]> {
+    return this.busRepository.obtenerDisponiblesParaOperar(cooperativaId);
+  }
+}
+
 export class ObtenerBusPorId {
   constructor(private busRepository: IBusRepository) {}
 
