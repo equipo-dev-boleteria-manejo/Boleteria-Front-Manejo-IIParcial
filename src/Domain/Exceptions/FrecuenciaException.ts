@@ -48,33 +48,3 @@ export class ParadaInvalidaException extends FrecuenciaException {
     );
   }
 }
-
-export class FrecuenciaInactivaException extends FrecuenciaException {
-  constructor(frecuenciaId: number) {
-    super(`La frecuencia ${frecuenciaId} está inactiva y no admite asignaciones`, 'FRECUENCIA_INACTIVE');
-  }
-}
-
-export class FrecuenciaNoOperaEnFechaException extends FrecuenciaException {
-  constructor(frecuenciaId: number, fecha: string, dia: string) {
-    super(`La frecuencia ${frecuenciaId} no opera los días ${dia} (fecha ${fecha})`, 'FRECUENCIA_NOT_OPERATING');
-  }
-}
-
-export class AsignacionBusInvalidaException extends FrecuenciaException {
-  constructor(mensaje: string) {
-    super(mensaje, 'ASIGNACION_BUS_INVALID');
-  }
-}
-
-export class BusNoPerteneceACooperativaException extends FrecuenciaException {
-  constructor(busId: number, cooperativaId: number) {
-    super(`El bus ${busId} no pertenece a la cooperativa ${cooperativaId} dueña de la frecuencia`, 'BUS_COOPERATIVA_MISMATCH');
-  }
-}
-
-export class ConflictoHorarioBusException extends FrecuenciaException {
-  constructor(busId: number, fecha: string, horaSalida: string) {
-    super(`El bus ${busId} ya tiene un viaje que se cruza con la salida de las ${horaSalida} del ${fecha}`, 'BUS_SCHEDULE_CONFLICT');
-  }
-}
