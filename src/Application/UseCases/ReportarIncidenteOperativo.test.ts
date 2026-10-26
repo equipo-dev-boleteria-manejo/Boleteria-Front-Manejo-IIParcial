@@ -3,7 +3,7 @@ import { ReportarIncidenteOperativo } from './ReportarIncidenteOperativo';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
-import { BusException, BusNoEncontradoException } from '../../Domain/Exceptions/BusException';
+import { BusNoEncontradoException, MotivoIncidenteInvalidoException } from '../../Domain/Exceptions/BusException';
 import { BusReemplazoNoValidoException } from '../../Domain/Exceptions/BusFueraDeServicioException';
 
 describe('ReportarIncidenteOperativo', () => {
@@ -83,10 +83,10 @@ describe('ReportarIncidenteOperativo', () => {
     expect(mockBusRepo.cambiarEstado).not.toHaveBeenCalled();
   });
 
-  it('debe lanzar BusException si el motivo no es válido', async () => {
+  it('debe lanzar MotivoIncidenteInvalidoException si el motivo no es válido', async () => {
     await expect(
       useCase.ejecutar({ ...inputBase, motivo: 'MotivoInventado' })
-    ).rejects.toThrow(BusException);
+    ).rejects.toThrow(MotivoIncidenteInvalidoException);
 
     await expect(
       useCase.ejecutar({ ...inputBase, motivo: 'MotivoInventado' })

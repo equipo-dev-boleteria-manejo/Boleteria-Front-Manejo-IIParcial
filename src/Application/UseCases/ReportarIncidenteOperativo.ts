@@ -1,6 +1,6 @@
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
-import { BusException, BusNoEncontradoException } from '../../Domain/Exceptions/BusException';
+import { BusNoEncontradoException, MotivoIncidenteInvalidoException } from '../../Domain/Exceptions/BusException';
 import { BusReemplazoNoValidoException } from '../../Domain/Exceptions/BusFueraDeServicioException';
 import { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { ReportarIncidenteOperativoDto } from '../Dtos/ReportarIncidenteOperativoDto';
@@ -38,10 +38,7 @@ export class ReportarIncidenteOperativo {
 
     // 2. Validar que el motivo sea válido
     if (!MOTIVOS_VALIDOS.includes(motivo)) {
-      throw new BusException(
-        `Motivo inválido: ${motivo}. Debe ser uno de: ${MOTIVOS_VALIDOS.join(', ')}`,
-        'BUS_INCIDENT_REASON_INVALID'
-      );
+      throw new MotivoIncidenteInvalidoException(motivo, MOTIVOS_VALIDOS);
     }
 
     // 3. Validar bus de reemplazo si se proporciona
