@@ -1,9 +1,12 @@
 import { ref, computed } from 'vue';
 import { ISeatTypeRepository } from '../../Domain/Repositories/ISeatTypeRepository';
+import { SupabaseSeatTypeRepository } from '../../Infrastructure/Repositories/SupabaseSeatTypeRepository';
 import { SeatTypeUseCases } from '../../Application/UseCases/SeatTypeUseCases';
 import { SeatTypeResponseDTO, ValidarAsignacionInputDTO } from '../../Application/Dtos/SeatTypeDTOs';
 
-export function useSeatTypes(repository: ISeatTypeRepository) {
+export function useSeatTypes(
+  repository: ISeatTypeRepository = new SupabaseSeatTypeRepository()
+) {
   const useCases = new SeatTypeUseCases(repository);
 
   const seatTypes = ref<SeatTypeResponseDTO[]>([]);
@@ -25,13 +28,21 @@ export function useSeatTypes(repository: ISeatTypeRepository) {
     }
   };
 
-  const calcularTarifa = (precioBase: number, descuento: number = 0): number => {
+  const calcularTarifa = async (
+    precioBaseOrSeatTypeId: number | string,
+    descuento: number = 0
+  ): Promise<number> => {
     try {
-      return useCases.calcularTarifaAsiento({ precioBase, porcentajeDescuento: descuento });
+      error.value = null;
+      const input = typeof precioBaseOrSeatTypeId === 'number' && precioBaseOrSeatTypeId > 100
+        ? { precioBase: precioBaseOrSeatTypeId, porcentajeDescuento: descuento }
+        : { seatTypeId: precioBaseOrSeatTypeId, porcentajeDescuento: descuento };
+
+      return await useCases.calcularTarifaAsiento(input);
     } catch (e) {
       const err = e as Error;
       error.value = err.message;
-      return precioBase;
+      return typeof precioBaseOrSeatTypeId === 'number' ? precioBaseOrSeatTypeId : 0;
     }
   };
 
