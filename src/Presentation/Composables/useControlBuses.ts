@@ -1,106 +1,174 @@
-import { ref } from 'vue'
-import { supabase } from '../../Infrastructure/Api/supabaseClient'
-import { EstadoBus } from '../../Domain/Constants/EstadosSistema'
+/**
+ * useControlBuses.ts - Composable Headless para el control operativo de la flota.
+ *
+ * Arquitectura:
+ * - No importa Supabase ni ejecuta consultas SQL.
+ * - Consume exclusivamente casos de uso de la capa de Aplicación.
+ * - La disponibilidad de un bus por fecha/ruta es responsabilidad del módulo de
+ *   Rutas; este composable no consulta la tabla 'Rutas'.
+ */
 
-export function useControlBuses() {
-  const loading = ref(false)
-  const error = ref('')
-  const success = ref('')
+import { ref } from 'vue';
+import type { Bus } from '../../Domain/Entities/Bus';
+import { CrearBus, type CrearBusInput } from '../../Application/UseCases/CrearBus';
+import {
+  ReactivarBus,
+  type ReactivarBusResponse,
+} from '../../Application/UseCases/ReactivarBus';
+import {
+  ActivarBus,
+  DesactivarBus,
+  ObtenerBusesDisponibles,
+} from '../../Application/UseCases/BusUseCases';
+import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 
-  async function obtenerBusesActivos() {
-    const { data, error: err } = await supabase
-      .from('Buses')
-      .select('Id, Numero, Placa, TotalAsientos, Estado, CooperativaId')
-      .eq('Estado', 'Activo')
-      .order('Numero', { ascending: true })
+export interface UseControlBusesDependencies {
+  obtenerBusesDisponibles: Pick<ObtenerBusesDisponibles, 'ejecutar'>;
+  crearBus: Pick<CrearBus, 'ejecutar'>;
+  reactivarBus: Pick<ReactivarBus, 'ejecutar'>;
+  activarBus: Pick<ActivarBus, 'ejecutar'>;
+  desactivarBus: Pick<DesactivarBus, 'ejecutar'>;
+}
 
-    if (err) throw err
+export interface UseControlBusesOptions {
+  cooperativaId?: number;
+  dependencies?: Partial<UseControlBusesDependencies>;
+}
 
-    return data || []
-  }
+function crearDependenciasPorDefecto(): UseControlBusesDependencies {
+  const busRepo = new SupabaseBusRepository();
 
-  async function obtenerBusesDisponiblesPorFecha(fecha: string) {
-    loading.value = true
-    error.value = ''
+  return {
+    obtenerBusesDisponibles: new ObtenerBusesDisponibles(busRepo),
+    crearBus: new CrearBus(busRepo),
+    reactivarBus: new ReactivarBus(busRepo),
+    activarBus: new ActivarBus(busRepo),
+    desactivarBus: new DesactivarBus(busRepo),
+  };
+}
+
+export function useControlBuses(options: UseControlBusesOptions = {}) {
+  const cooperativaId = options.cooperativaId ?? 1;
+  const {
+    obtenerBusesDisponibles,
+    crearBus: crearBusUseCase,
+    reactivarBus: reactivarBusUseCase,
+    activarBus: activarBusUseCase,
+    desactivarBus: desactivarBusUseCase,
+  } = { ...crearDependenciasPorDefecto(), ...options.dependencies };
+
+  const buses = ref<Bus[]>([]);
+  const loading = ref(false);
+  const error = ref('');
+  const success = ref('');
+
+  async function cargarBusesActivos(): Promise<Bus[]> {
+    loading.value = true;
+    error.value = '';
+    success.value = '';
 
     try {
-      const busesActivos = await obtenerBusesActivos()
-
-      const { data: rutasOcupadas, error: rutasError } = await supabase
-        .from('Rutas')
-        .select('Id, BusId, Fecha, Estado')
-        .eq('Fecha', fecha)
-        .in('Estado', ['Programada', 'Habilitada', 'EnCurso'])
-
-      if (rutasError) throw rutasError
-
-      const busesOcupados = new Set(
-        (rutasOcupadas || []).map((ruta: any) => Number(ruta.BusId))
-      )
-
-      return busesActivos.filter((bus: any) => {
-        return !busesOcupados.has(Number(bus.Id))
-      })
+      buses.value = await obtenerBusesDisponibles.ejecutar(cooperativaId);
+      return buses.value;
     } catch (err: any) {
-      error.value = err.message || 'No se pudieron obtener buses disponibles.'
-      return []
+      error.value = err.message || 'No se pudieron obtener los buses activos.';
+      buses.value = [];
+      return [];
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
-  async function cambiarEstadoBus(busId: number, estado: EstadoBus) {
-    loading.value = true
-    error.value = ''
-    success.value = ''
+  async function crearBus(input: CrearBusInput): Promise<Bus | null> {
+    loading.value = true;
+    error.value = '';
+    success.value = '';
 
     try {
-      const { error: err } = await supabase
-        .from('Buses')
-        .update({ Estado: estado })
-        .eq('Id', busId)
-
-      if (err) throw err
-
-      success.value = `Bus actualizado a estado ${estado}.`
+      const busCreado = await crearBusUseCase.ejecutar(input);
+      success.value = `Bus ${busCreado.numero} creado correctamente.`;
+      return busCreado;
     } catch (err: any) {
-      error.value = err.message || 'No se pudo cambiar el estado del bus.'
+      error.value = err.message || 'No se pudo crear el bus.';
+      return null;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
   }
 
-  async function liberarBus(busId: number) {
-    await cambiarEstadoBus(busId, 'Activo')
+  async function reactivarBus(
+    busId: number,
+    reactivadoPor: string,
+    motivo?: string,
+  ): Promise<ReactivarBusResponse | null> {
+    loading.value = true;
+    error.value = '';
+    success.value = '';
+
+    try {
+      const response = await reactivarBusUseCase.ejecutar({
+        busId,
+        reactivadoPor,
+        motivo,
+      });
+      success.value = response.mensaje;
+      return response;
+    } catch (err: any) {
+      error.value = err.message || 'No se pudo reactivar el bus.';
+      return null;
+    } finally {
+      loading.value = false;
+    }
   }
 
-  async function desactivarBus(busId: number) {
-    await cambiarEstadoBus(busId, 'Inactivo')
+  async function activarBus(busId: number): Promise<Bus | null> {
+    loading.value = true;
+    error.value = '';
+    success.value = '';
+
+    try {
+      const bus = await activarBusUseCase.ejecutar(busId);
+      success.value = `Bus ${bus.numero} activado correctamente.`;
+      return bus;
+    } catch (err: any) {
+      error.value = err.message || 'No se pudo activar el bus.';
+      return null;
+    } finally {
+      loading.value = false;
+    }
   }
 
-  async function validarBusDisponible(busId: number, fecha: string) {
-    const { data, error: err } = await supabase
-      .from('Rutas')
-      .select('Id')
-      .eq('BusId', busId)
-      .eq('Fecha', fecha)
-      .in('Estado', ['Programada', 'Habilitada', 'EnCurso'])
-      .limit(1)
+  async function desactivarBus(busId: number): Promise<Bus | null> {
+    loading.value = true;
+    error.value = '';
+    success.value = '';
 
-    if (err) throw err
+    try {
+      const bus = await desactivarBusUseCase.ejecutar(busId);
+      success.value = `Bus ${bus.numero} desactivado correctamente.`;
+      return bus;
+    } catch (err: any) {
+      error.value = err.message || 'No se pudo desactivar el bus.';
+      return null;
+    } finally {
+      loading.value = false;
+    }
+  }
 
-    return !data || data.length === 0
+  async function liberarBus(busId: number): Promise<Bus | null> {
+    return activarBus(busId);
   }
 
   return {
+    buses,
     loading,
     error,
     success,
-    obtenerBusesActivos,
-    obtenerBusesDisponiblesPorFecha,
-    cambiarEstadoBus,
-    liberarBus,
+    cargarBusesActivos,
+    crearBus,
+    reactivarBus,
+    activarBus,
     desactivarBus,
-    validarBusDisponible,
-  }
+    liberarBus,
+  };
 }
