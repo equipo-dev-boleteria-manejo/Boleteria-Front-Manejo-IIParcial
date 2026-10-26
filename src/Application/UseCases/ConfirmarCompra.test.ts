@@ -2,12 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ConfirmarCompra, ConfirmInput } from './ConfirmarCompra';
 import type { IVentaRepository } from '../../Domain/Repositories/IVentaRepository';
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
+import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
 import { EstadoVenta } from '../../Domain/Constants/EstadosSistema';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 
 describe('ConfirmarCompra (Caso de Uso)', () => {
   let mockVentaRepo: IVentaRepository;
   let mockBoletosRepo: IBoletosRepository;
+  let mockCalcularDescuento: CalcularDescuentoVenta;
   let useCase: ConfirmarCompra;
 
   beforeEach(() => {
@@ -35,7 +37,20 @@ describe('ConfirmarCompra (Caso de Uso)', () => {
       obtenerBoletoPorId: vi.fn(),
     };
 
-    useCase = new ConfirmarCompra(mockVentaRepo, mockBoletosRepo);
+    mockCalcularDescuento = {
+      ejecutar: vi.fn().mockReturnValue({
+        numeroCedula: '1803456789',
+        edad: 30,
+        tieneDiscapacidad: false,
+        precioBase: 10,
+        categoria: 'SIN_DESCUENTO',
+        porcentajeDescuento: 0,
+        montoDescuento: 0,
+        precioFinal: 10,
+      }),
+    } as unknown as CalcularDescuentoVenta;
+
+    useCase = new ConfirmarCompra(mockVentaRepo, mockBoletosRepo, undefined, mockCalcularDescuento);
   });
 
   it('debe registrar una venta y boletos correctamente con método Transferencia', async () => {

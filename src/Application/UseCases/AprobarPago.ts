@@ -26,12 +26,12 @@ export class AprobarPago {
       throw new DomainException('La venta no existe.', 'VENTA_NO_ENCONTRADA');
     }
 
-    const estadoVenta = venta.estado ?? (venta as any).Estado;
+    const estadoVenta = venta.estado;
     if (estadoVenta !== EstadoVenta.PENDIENTE) {
       throw new DomainException('Solo se pueden aprobar ventas pendientes.', 'VENTA_NO_PENDIENTE');
     }
 
-    const comprobanteUrl = venta.comprobanteUrl ?? (venta as any).ComprobanteUrl;
+    const comprobanteUrl = venta.comprobanteUrl;
     if (!comprobanteUrl) {
       throw new DomainException('No se puede aprobar una venta sin comprobante.', 'COMPROBANTE_FALTANTE');
     }

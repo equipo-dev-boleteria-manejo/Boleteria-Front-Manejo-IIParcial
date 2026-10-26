@@ -1,13 +1,9 @@
 import type { IVentaRepository, VentaPayload } from '../../Domain/Repositories/IVentaRepository';
 import type { IBoletosRepository, BoletoPayload } from '../../Domain/Repositories/IBoletosRepository';
 import type { IAuditRepository } from '../../Domain/Repositories/IAuditRepository';
-import {
-  calcularDescuentoBoleto,
-  EstadoVenta,
-  EstadoBoleto,
-  MetodoPago,
-  TipoPasajero,
-} from '../../Domain/Constants/EstadosSistema';
+import { EstadoVenta, EstadoBoleto, MetodoPago, TipoPasajero } from '../../Domain/Constants/EstadosSistema';
+import { calcularEdad } from '../../Domain/Services/DescuentoService';
+import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
@@ -36,6 +32,7 @@ export class ConfirmarCompra {
     private ventaRepo: IVentaRepository = new SupabaseVentasRepository(),
     private boletosRepo: IBoletosRepository = new SupabaseBoletosRepository(),
     private auditRepo?: IAuditRepository,
+    private calcularDescuentoUseCase: CalcularDescuentoVenta = new CalcularDescuentoVenta(),
   ) {}
 
   async ejecutar(input: ConfirmInput) {
@@ -121,11 +118,22 @@ export class ConfirmarCompra {
     }
 
     // ---- 4. Calcular descuento y total ----
-    const descuento = calcularDescuentoBoleto(
-      input.fechaNacimiento,
-      !!input.tieneDiscapacidad,
-      input.precioUnitario,
-    );
+    const edadPasajero = calcularEdad(input.fechaNacimiento);
+    const resultadoDescuento = this.calcularDescuentoUseCase.ejecutar({
+      numeroCedula: input.cedula.trim(),
+      edad: edadPasajero >= 0 ? edadPasajero : 0,
+      tieneDiscapacidad: !!input.tieneDiscapacidad,
+      precioBase: input.precioUnitario,
+    });
+
+    // Adaptar el resultado al formato interno que usan los boletos
+    const descuento = {
+      esMenor: resultadoDescuento.categoria === 'MENOR',
+      esDiscapacitado: resultadoDescuento.categoria === 'DISCAPACIDAD',
+      esTerceraEdad: resultadoDescuento.categoria === 'TERCERA_EDAD',
+      descuentoAplicado: resultadoDescuento.porcentajeDescuento,
+      precioFinal: resultadoDescuento.precioFinal,
+    };
     const total = Number((descuento.precioFinal * input.asientos.length).toFixed(2));
 
     // Determinar tipo de pasajero según reglas de descuento
