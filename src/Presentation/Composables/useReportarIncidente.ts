@@ -16,7 +16,7 @@ export interface FormIncidente {
   reportadoPor: string;
 }
 
-export function useReportarIncidente() {
+export function useReportarIncidente(cooperativaId: number = 1) {
   const busRepository = new SupabaseBusRepository();
   const rutaRepository = new SupabaseRutaRepository();
   const ventaRepository = new SupabaseVentasRepository();
@@ -73,6 +73,7 @@ export function useReportarIncidente() {
       }
 
       const dto: ReportarIncidenteOperativoDto = {
+        cooperativaId,
         busNumero: formIncidente.busNumero.trim(),
         motivo: formIncidente.motivo,
         descripcion: formIncidente.descripcion,

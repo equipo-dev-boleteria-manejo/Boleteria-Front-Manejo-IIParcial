@@ -1,5 +1,6 @@
 import { ref, onMounted } from "vue";
-import type { Bus } from "../../Domain/Entities/Bus";
+import type { Bus, EstructuraBus } from "../../Domain/Entities/Bus";
+import type { EstadoBus } from "../../Domain/Constants/EstadosSistema";
 import {
 	CrearBus,
 	type CrearBusInput,
@@ -68,8 +69,8 @@ export function useBuses() {
 		numero: string;
 		placa: string;
 		totalAsientos: number;
-		estado: string;
-		estructura: string;
+		estado: EstadoBus;
+		estructura: EstructuraBus;
 	}) {
 		try {
 			loading.value = true;
@@ -112,6 +113,7 @@ export function useBuses() {
 			}
 
 			await reportarIncidenteUseCase.ejecutar({
+				cooperativaId: bus.cooperativaId,
 				busNumero: bus.numero,
 				motivo,
 				descripcion,
