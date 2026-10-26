@@ -1,56 +1,84 @@
-import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
-import { supabase } from '../../Infrastructure/Api/supabaseClient'
+import { defineStore } from 'pinia';
+import { ref, computed } from 'vue';
+import { loginUseCase } from '../../Application/UseCases/Login';
+import type { Usuario } from '../../Domain/Entities/Usuario';
+import { RolUsuario } from '../../Domain/Constants/EstadosSistema';
 
 export interface UserProfile {
-  id: string
-  email: string
-  nombre?: string
-  rol?: string
-  cedula?: string
-  cooperativaId?: number | null
+  id: string;
+  email: string;
+  nombre?: string;
+  nombres?: string;
+  apellidos?: string;
+  rol?: RolUsuario | string;
+  cedula?: string;
+  cooperativaId?: number | null;
 }
 
 export const useAuthStore = defineStore('auth', () => {
-  const user = ref<UserProfile | null>(null)
-  const loading = ref(false)
-  const error = ref('')
-  const ready = ref(false)
+  const user = ref<UserProfile | null>(null);
+  const loading = ref(false);
+  const error = ref('');
+  const ready = ref(false);
 
-  const isAuthenticated = computed(() => !!user.value)
-  const role = computed(() => user.value?.rol || 'cliente')
+  const isAuthenticated = computed(() => !!user.value);
+  const role = computed(() => user.value?.rol || RolUsuario.CLIENTE);
 
-  const login = async (email: string, _password: string) => {
-    loading.value = true
-    error.value = ''
+  const mapUsuarioToProfile = (usuario: Usuario): UserProfile => {
+    return {
+      id: usuario.id || '',
+      email: usuario.email,
+      nombre: usuario.nombreCompleto,
+      nombres: usuario.nombres,
+      apellidos: usuario.apellidos,
+      rol: usuario.rol,
+      cedula: usuario.cedula?.valor,
+      cooperativaId: usuario.cooperativaId,
+    };
+  };
+
+  const login = async (email: string, password: string) => {
+    loading.value = true;
+    error.value = '';
     try {
-      // Mock inicial para permitir navegación y pruebas en la semilla base
-      user.value = {
-        id: 'usr-1',
-        email,
-        nombre: 'Usuario Demo',
-        rol: email.includes('admin') ? 'admin' : email.includes('oficina') ? 'oficinista' : email.includes('chofer') ? 'chofer' : 'cliente',
-      }
+      const sesion = await loginUseCase.execute({ email, password });
+      user.value = mapUsuarioToProfile(sesion.usuario);
+      return sesion;
     } catch (err: any) {
-      error.value = err.message || 'Error al iniciar sesión'
-      throw err
+      error.value = err.message || 'Error al iniciar sesión';
+      throw err;
     } finally {
-      loading.value = false
+      loading.value = false;
     }
-  }
+  };
 
   const logout = async () => {
-    user.value = null
+    loading.value = true;
+    error.value = '';
     try {
-      await supabase.auth.signOut()
-    } catch {
-      // Ignorar error al cerrar sesión en mock
+      await loginUseCase.logout();
+      user.value = null;
+    } catch (err: any) {
+      error.value = err.message || 'Error al cerrar sesión';
+    } finally {
+      loading.value = false;
     }
-  }
+  };
 
   const initializeAuth = async () => {
-    ready.value = true
-  }
+    try {
+      const currentUser = await loginUseCase.getCurrentUser();
+      if (currentUser) {
+        user.value = mapUsuarioToProfile(currentUser);
+      } else {
+        user.value = null;
+      }
+    } catch {
+      user.value = null;
+    } finally {
+      ready.value = true;
+    }
+  };
 
   return {
     user,
@@ -62,5 +90,5 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     initializeAuth,
-  }
-})
+  };
+});
