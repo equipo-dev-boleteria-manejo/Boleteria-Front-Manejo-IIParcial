@@ -38,3 +38,12 @@ export class BusNoActivoException extends BusException {
     super(`El bus ${busId} no se encuentra activo para operar (Estado actual: ${estado})`, 'BUS_NOT_ACTIVE');
   }
 }
+
+export class MotivoIncidenteInvalidoException extends BusException {
+  constructor(motivo: string, motivosValidos: readonly string[] = []) {
+    const detalle = motivosValidos.length > 0
+      ? `. Debe ser uno de: ${motivosValidos.join(', ')}`
+      : '';
+    super(`Motivo inválido: ${motivo}${detalle}`, 'BUS_INCIDENT_REASON_INVALID');
+  }
+}
