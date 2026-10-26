@@ -1,4 +1,4 @@
-import { Bus } from "../../Domain/Entities/Bus";
+import { Bus, type EstructuraBus } from "../../Domain/Entities/Bus";
 import { DomainException } from "../../Domain/Exceptions/DomainException";
 import type { IBusRepository } from "../../Domain/Repositories/IBusRepository";
 
@@ -7,7 +7,7 @@ export interface CrearBusInput {
 	numero: string;
 	placa: string;
 	totalAsientos: number;
-	estructura?: string;
+	estructura?: EstructuraBus;
 	marcaChasis?: string;
 	marcaCarroceria?: string;
 	anio?: number;
