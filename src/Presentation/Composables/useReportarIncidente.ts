@@ -117,6 +117,13 @@ export function useReportarIncidente(cooperativaId: number = 1) {
     formIncidente.reportadoPor = '';
   }
 
+  function reiniciarReporte() {
+    limpiarFormulario();
+    error.value = '';
+    success.value = false;
+    responseData.value = null;
+  }
+
   return {
     formIncidente,
     motivosCatalogo,
@@ -128,5 +135,6 @@ export function useReportarIncidente(cooperativaId: number = 1) {
     reportarIncidente,
     reactivarBusOperativo,
     limpiarFormulario,
+    reiniciarReporte,
   };
 }
