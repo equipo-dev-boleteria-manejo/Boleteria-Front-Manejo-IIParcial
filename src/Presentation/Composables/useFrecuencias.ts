@@ -24,6 +24,15 @@ import {
   GestionarFrecuenciasUseCase,
   gestionarFrecuenciasUseCase as defaultGestionarUseCase,
 } from '../../Application/UseCases/GestionarFrecuencias';
+import {
+  aFilaFrecuencia,
+  aFilaParada,
+  siguienteOrdenParada,
+  type FilaFrecuencia,
+  type FilaParada,
+} from './presentacionFrecuencias';
+
+export type { FilaFrecuencia, FilaParada };
 
 export function useFrecuencias(
   crearUseCase: CrearFrecuenciaUseCase = defaultCrearUseCase,
@@ -36,6 +45,18 @@ export function useFrecuencias(
 
   const total = computed(() => frecuencias.value.length);
   const frecuenciasActivas = computed(() => frecuencias.value.filter((frecuencia) => frecuencia.activa));
+
+  // Modelos de presentación: las vistas renderizan estos datos ya formateados.
+  const filasFrecuencias = computed<FilaFrecuencia[]>(() => frecuencias.value.map(aFilaFrecuencia));
+  const filaSeleccionada = computed<FilaFrecuencia | null>(() =>
+    frecuenciaSeleccionada.value ? aFilaFrecuencia(frecuenciaSeleccionada.value) : null,
+  );
+  const paradasSeleccionadas = computed<FilaParada[]>(() =>
+    frecuenciaSeleccionada.value
+      ? frecuenciaSeleccionada.value.obtenerParadasOrdenadas().map(aFilaParada)
+      : [],
+  );
+  const ordenSugeridoParada = computed(() => siguienteOrdenParada(frecuenciaSeleccionada.value));
 
   /**
    * Ejecuta una acción del caso de uso gestionando loading y error de forma uniforme.
@@ -174,6 +195,10 @@ export function useFrecuencias(
     frecuenciaSeleccionada,
     total,
     frecuenciasActivas,
+    filasFrecuencias,
+    filaSeleccionada,
+    paradasSeleccionadas,
+    ordenSugeridoParada,
     cargarFrecuencias,
     cargarPorCooperativa,
     buscarPorTramo,

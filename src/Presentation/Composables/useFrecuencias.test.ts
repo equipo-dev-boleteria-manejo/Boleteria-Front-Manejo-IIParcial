@@ -282,4 +282,44 @@ describe('useFrecuencias Composable', () => {
     expect(repo.eliminarParada).toHaveBeenCalledWith(99);
     expect(repo.obtenerPorId).not.toHaveBeenCalled();
   });
+
+  describe('modelos de presentación', () => {
+    it('debe exponer filas ya formateadas de las frecuencias cargadas', async () => {
+      vi.mocked(repo.obtenerTodas).mockResolvedValue([frecuenciaDePrueba(1, '08:00'), frecuenciaDePrueba(2, '09:30')]);
+      const { filasFrecuencias, cargarFrecuencias } = crearComposable();
+      expect(filasFrecuencias.value).toEqual([]);
+
+      await cargarFrecuencias();
+
+      expect(filasFrecuencias.value.map((fila) => fila.horaSalida)).toEqual(['08:00', '09:30']);
+      expect(filasFrecuencias.value[0]).toMatchObject({
+        ruta: 'Quito → Cuenca',
+        dias: 'Todos los días',
+        totalParadas: 2,
+        tiempoUltimaParada: '4 h',
+      });
+    });
+
+    it('debe exponer la fila, las paradas ordenadas y el orden sugerido de la frecuencia seleccionada', async () => {
+      const seleccionada = frecuenciaDePrueba(5);
+      seleccionada.establecerParadas([new ParadaIntermedia('Riobamba', 2, 240), new ParadaIntermedia('Latacunga', 1, 90)]);
+      vi.mocked(repo.obtenerPorId).mockResolvedValue(seleccionada);
+      const { filaSeleccionada, paradasSeleccionadas, ordenSugeridoParada, seleccionarFrecuencia, limpiarSeleccion } =
+        crearComposable();
+      expect(filaSeleccionada.value).toBeNull();
+      expect(paradasSeleccionadas.value).toEqual([]);
+      expect(ordenSugeridoParada.value).toBe(1);
+
+      await seleccionarFrecuencia(5);
+
+      expect(filaSeleccionada.value?.id).toBe(5);
+      expect(paradasSeleccionadas.value.map((parada) => parada.ciudad)).toEqual(['Latacunga', 'Riobamba']);
+      expect(paradasSeleccionadas.value[0].tiempo).toBe('1 h 30 min');
+      expect(ordenSugeridoParada.value).toBe(3);
+
+      limpiarSeleccion();
+      expect(filaSeleccionada.value).toBeNull();
+      expect(paradasSeleccionadas.value).toEqual([]);
+    });
+  });
 });
