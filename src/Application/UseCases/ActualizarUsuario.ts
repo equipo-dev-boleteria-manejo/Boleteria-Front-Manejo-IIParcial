@@ -6,6 +6,7 @@ import type { IUsuarioRepository } from '../../Domain/Repositories/IUsuarioRepos
 import type { Usuario } from '../../Domain/Entities/Usuario';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { UsuarioNoEncontradoException } from '../../Domain/Exceptions/UsuarioException';
+import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin';
 import { SupabaseUsuarioRepository } from '../../Infrastructure/Repositories/SupabaseUsuarioRepository';
 import type { ActualizarUsuarioDto } from '../Dtos/UsuarioDto';
 
@@ -27,6 +28,16 @@ export class ActualizarUsuario {
     const usuarioExistente = await this.usuarioRepo.obtenerPorId(dto.id);
     if (!usuarioExistente) {
       throw new UsuarioNoEncontradoException(dto.id);
+    }
+
+    // Regla de inmutabilidad del Super Administrador
+    if (esSuperAdmin(usuarioExistente.email)) {
+      if (dto.activo === false) {
+        throw new DomainException('El Super Administrador no puede ser desactivado.');
+      }
+      if (!dto.rol.toLowerCase().includes('admin')) {
+        throw new DomainException('No se puede revocar el rol de Administrador al Super Administrador.');
+      }
     }
 
     usuarioExistente.nombres = nombres;
