@@ -9,6 +9,15 @@ import { ActualizarBus } from "../../Application/UseCases/BusUseCases";
 import { ReportarIncidenteOperativo } from "../../Application/UseCases/ReportarIncidenteOperativo";
 import { SupabaseBusRepository } from "../../Infrastructure/Repositories/SupabaseBusRepository";
 
+export interface GuardarBusInput {
+	id: number;
+	numero: string;
+	placa: string;
+	totalAsientos: number;
+	estructura: EstructuraBus;
+	estado?: EstadoBus;
+}
+
 export function useBuses() {
 	const buses = ref<Bus[]>([]);
 	const loading = ref(false);
@@ -40,7 +49,7 @@ export function useBuses() {
 		}
 	}
 
-	async function registrarBus() {
+	async function registrarBus(): Promise<boolean> {
 		try {
 			loading.value = true;
 			error.value = "";
@@ -49,21 +58,16 @@ export function useBuses() {
 			nuevoBus.value.placa = "";
 			nuevoBus.value.estructura = "UnPiso";
 			await cargarBuses();
+			return true;
 		} catch (err: any) {
 			error.value = err.message || "Error al registrar el bus.";
+			return false;
 		} finally {
 			loading.value = false;
 		}
 	}
 
-	async function guardarBus(busData: {
-		id: number;
-		numero: string;
-		placa: string;
-		totalAsientos: number;
-		estado: EstadoBus;
-		estructura: EstructuraBus;
-	}) {
+	async function guardarBus(busData: GuardarBusInput): Promise<boolean> {
 		try {
 			loading.value = true;
 			error.value = "";
@@ -71,12 +75,14 @@ export function useBuses() {
 				numero: busData.numero,
 				placa: busData.placa,
 				totalAsientos: busData.totalAsientos,
-				estado: busData.estado,
 				estructura: busData.estructura,
+				...(busData.estado ? { estado: busData.estado } : {}),
 			});
 			await cargarBuses();
+			return true;
 		} catch (err: any) {
 			error.value = err.message || "Error al actualizar el bus.";
+			return false;
 		} finally {
 			loading.value = false;
 		}
@@ -130,6 +136,7 @@ export function useBuses() {
 		nuevoBus,
 		loading,
 		error,
+		cargarBuses,
 		registrarBus,
 		guardarBus,
 		reportarIncidenteYRefrescar,
