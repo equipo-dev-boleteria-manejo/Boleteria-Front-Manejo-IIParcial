@@ -282,13 +282,13 @@ function toggleMode(registering: boolean) {
 async function submit() {
   await handleAuthSubmit()
   if (isAuthenticated.value) {
-    router.push('/dashboard')
+    router.push('/')
   }
 }
 
 onMounted(() => {
   if (isAuthenticated.value) {
-    router.push('/dashboard')
+    router.push('/')
   }
 })
 </script>

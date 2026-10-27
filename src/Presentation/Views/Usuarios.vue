@@ -150,7 +150,17 @@
                 </span>
               </td>
               <td class="px-6 py-4 text-center">
+                <!-- Super Admin base: estado inmutable y protegido -->
+                <span
+                  v-if="esSuperAdmin(u.email) || esSuperAdmin(u.cedula?.valor)"
+                  class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200"
+                  title="Usuario base del sistema. No puede ser desactivado."
+                >
+                  <span class="h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                  <span>Intocable</span>
+                </span>
                 <button
+                  v-else
                   type="button"
                   @click="toggleActivo(u)"
                   class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all"
@@ -172,8 +182,16 @@
                   >
                     Editar
                   </ButtonBase>
+                  <!-- Super Admin base protegido: botón de baja bloqueado -->
+                  <span
+                    v-if="esSuperAdmin(u.email) || esSuperAdmin(u.cedula?.valor)"
+                    class="text-[10px] font-black text-slate-400 bg-slate-100 px-2.5 py-1 rounded-md"
+                    title="Este usuario es intocable"
+                  >
+                    Protegido
+                  </span>
                   <ButtonBase
-                    v-if="u.activo"
+                    v-else-if="u.activo"
                     variant="ghost"
                     size="sm"
                     @click="confirmarBaja(u)"
@@ -262,13 +280,14 @@
           </label>
           <select
             v-model="formulario.rol"
+            :disabled="esEdicion && (esSuperAdmin(formulario.email) || esSuperAdmin(formulario.cedula))"
             required
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
           >
             <option value="Administrador">Administrador</option>
             <option value="Oficinista">Oficinista</option>
             <option value="Chofer">Chofer</option>
-            <option value="Cliente">Usuario Final / Cliente</option>
+            <option value="Usuario Final">Usuario Final / Cliente</option>
           </select>
         </div>
 
@@ -290,6 +309,7 @@ import { ref, onMounted, watch } from 'vue'
 import { useUsuarios } from '../Composables/useUsuarios'
 import { Cedula } from '../../Domain/ValueObjects/Cedula'
 import { RolUsuario } from '../../Domain/Constants/EstadosSistema'
+import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
 import ButtonBase from '../Components/ButtonBase.vue'
 import InputBase from '../Components/InputBase.vue'
@@ -428,6 +448,10 @@ async function guardar() {
 
 async function confirmarBaja(u: Usuario) {
   if (!u.id) return
+  if (esSuperAdmin(u.email) || esSuperAdmin(u.cedula?.valor)) {
+    window.alert('El usuario Super Administrador es un registro base del sistema y no puede ser dado de baja.')
+    return
+  }
   const confirmacion = window.confirm(`¿Confirmas dar de baja lógica al usuario ${u.nombres} ${u.apellidos}?`)
   if (confirmacion) {
     await desactivar(u.id)

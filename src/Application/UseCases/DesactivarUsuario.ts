@@ -5,6 +5,7 @@
 import type { IUsuarioRepository } from '../../Domain/Repositories/IUsuarioRepository';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { UsuarioNoEncontradoException } from '../../Domain/Exceptions/UsuarioException';
+import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin';
 import { SupabaseUsuarioRepository } from '../../Infrastructure/Repositories/SupabaseUsuarioRepository';
 
 export class DesactivarUsuario {
@@ -19,6 +20,10 @@ export class DesactivarUsuario {
     const usuarioExistente = await this.usuarioRepo.obtenerPorId(idLimpio);
     if (!usuarioExistente) {
       throw new UsuarioNoEncontradoException(idLimpio);
+    }
+
+    if (esSuperAdmin(usuarioExistente.email)) {
+      throw new DomainException('El usuario Super Administrador es un registro base del sistema y no puede ser desactivado.');
     }
 
     await this.usuarioRepo.desactivar(idLimpio);

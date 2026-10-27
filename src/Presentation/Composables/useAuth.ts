@@ -168,9 +168,15 @@ export function useAuth(
           apellidos: apellidos.value.trim(),
           cedula: cedula.value.trim(),
         });
-        mensajeExito.value = '¡Cuenta registrada con éxito! Ya puedes iniciar sesión';
-        isRegistering.value = false;
-        password.value = '';
+        mensajeExito.value = '¡Cuenta registrada con éxito!';
+
+        try {
+          await authStore.login(email.value.trim(), password.value);
+        } catch {
+          mensajeExito.value = '¡Cuenta registrada con éxito! Ya puedes iniciar sesión';
+          isRegistering.value = false;
+          password.value = '';
+        }
       } else {
         await authStore.login(email.value.trim(), password.value);
         mensajeExito.value = 'Inicio de sesión exitoso';

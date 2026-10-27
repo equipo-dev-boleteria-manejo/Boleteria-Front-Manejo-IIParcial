@@ -15,6 +15,8 @@ export interface UserProfile {
   cooperativaId?: number | null;
 }
 
+const STORAGE_KEY = 'boleteria_auth_user_profile';
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserProfile | null>(null);
   const loading = ref(false);
@@ -43,6 +45,9 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const sesion = await loginUseCase.execute({ email, password });
       user.value = mapUsuarioToProfile(sesion.usuario);
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
+      }
       return sesion;
     } catch (err: any) {
       error.value = err.message || 'Error al iniciar sesión';
@@ -58,6 +63,9 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await loginUseCase.logout();
       user.value = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     } catch (err: any) {
       error.value = err.message || 'Error al cerrar sesión';
     } finally {
@@ -70,11 +78,38 @@ export const useAuthStore = defineStore('auth', () => {
       const currentUser = await loginUseCase.getCurrentUser();
       if (currentUser) {
         user.value = mapUsuarioToProfile(currentUser);
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
+        }
+      } else if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            user.value = JSON.parse(stored);
+          } catch {
+            user.value = null;
+          }
+        } else {
+          user.value = null;
+        }
       } else {
         user.value = null;
       }
     } catch {
-      user.value = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+          try {
+            user.value = JSON.parse(stored);
+          } catch {
+            user.value = null;
+          }
+        } else {
+          user.value = null;
+        }
+      } else {
+        user.value = null;
+      }
     } finally {
       ready.value = true;
     }
