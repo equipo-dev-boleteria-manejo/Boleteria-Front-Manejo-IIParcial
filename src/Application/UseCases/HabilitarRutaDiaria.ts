@@ -12,7 +12,13 @@ import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import type { IFrecuenciaRepository } from '../../Domain/Repositories/IFrecuenciaRepository';
 import { Ruta } from '../../Domain/Entities/Ruta';
 import { EstadoBus, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
-import { DomainException } from '../../Domain/Exceptions/DomainException';
+import {
+  FechaRutaInvalidaException,
+  FrecuenciaNoDisponibleParaRutaException,
+  FrecuenciaFueraDeDiaException,
+  BusNoDisponibleParaRutaException,
+  BusNoActivoParaRutaException,
+} from '../../Domain/Exceptions/RutaException';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
@@ -42,13 +48,16 @@ export class HabilitarRutaDiaria {
 
     // 1. Validar fecha
     if (!fecha || Number.isNaN(Date.parse(fecha)) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) {
-      throw new DomainException('La fecha proporcionada para la ruta diaria no es válida.');
+      throw new FechaRutaInvalidaException('La fecha proporcionada para la ruta diaria no es válida.');
     }
 
     // 2. Validar frecuencia existente y activa
     const frecuenciaExistente = await this.frecuenciaRepo.obtenerPorId(frecuenciaId);
     if (!frecuenciaExistente || !frecuenciaExistente.activa) {
-      throw new DomainException(`La frecuencia con ID ${frecuenciaId} no existe o no se encuentra activa.`);
+      throw new FrecuenciaNoDisponibleParaRutaException(
+        frecuenciaId,
+        `La frecuencia con ID ${frecuenciaId} no existe o no se encuentra activa.`
+      );
     }
 
     // 3. Validar día de operación de la frecuencia
@@ -57,20 +66,22 @@ export class HabilitarRutaDiaria {
     // 4. Validar bus existente y en estado Activo
     const busExistente = await this.busRepo.obtenerPorId(busId);
     if (!busExistente || busExistente.estado !== EstadoBus.ACTIVO) {
-      throw new DomainException(`El bus con ID ${busId} no existe o no está en estado Activo.`);
+      throw new BusNoActivoParaRutaException(
+        busId,
+        `El bus con ID ${busId} no existe o no está en estado Activo.`
+      );
     }
 
-    // 5. Validar disponibilidad del bus en la fecha indicada
-    let esBusDisponible = true;
-    if (typeof (this.rutaRepo as any).verificarBusDisponible === 'function') {
-      esBusDisponible = await (this.rutaRepo as any).verificarBusDisponible(busId, fecha, frecuenciaId);
-    } else {
-      const rutasExistentes = await this.rutaRepo.obtenerPorBusYFecha(busId, fecha);
-      esBusDisponible = !rutasExistentes.some((r) => r.estado !== EstadoRuta.CANCELADA);
-    }
+    // 5. Validar disponibilidad del bus en la fecha indicada mediante el contrato oficial
+    const rutasExistentes = await this.rutaRepo.obtenerPorBusYFecha(busId, fecha);
+    const esBusDisponible = !rutasExistentes.some((r) => r.estado !== EstadoRuta.CANCELADA);
 
     if (!esBusDisponible) {
-      throw new DomainException(`El bus con ID ${busId} ya se encuentra asignado a una ruta activa en el mismo horario para la fecha ${fecha}.`);
+      throw new BusNoDisponibleParaRutaException(
+        busId,
+        fecha,
+        `El bus con ID ${busId} ya se encuentra asignado a una ruta activa en el mismo horario para la fecha ${fecha}.`
+      );
     }
 
     // 6. Instanciar la nueva Ruta con estado Programada por defecto
@@ -88,10 +99,6 @@ export class HabilitarRutaDiaria {
     nuevaRuta.esDirecta = input.esDirecta ?? frecuenciaExistente.esDirecto;
     nuevaRuta.observacionChofer = input.observacionChofer;
     nuevaRuta.tiempoViajeMinutos = input.tiempoViajeMinutos;
-
-    if (typeof (this.rutaRepo as any).crearRuta === 'function') {
-      return await (this.rutaRepo as any).crearRuta(nuevaRuta);
-    }
 
     return await this.rutaRepo.crear(nuevaRuta);
   }
@@ -113,7 +120,7 @@ export class HabilitarRutaDiaria {
     const coincide = diasOperacion.some((d) => normalizar(d) === diaBuscado);
 
     if (!coincide) {
-      throw new DomainException(`Esta frecuencia no opera los días ${nombreDia}. Días permitidos: ${diasOperacion.join(', ')}`);
+      throw new FrecuenciaFueraDeDiaException(nombreDia, diasOperacion);
     }
   }
 }

@@ -4,8 +4,8 @@
  * Arquitectura:
  * - Capa de Presentación Desacoplada (Headless).
  * - Reactividad pura (refs, computeds, loading, error, success).
- * - Cero acoplamiento a HTML/CSS.
- * - Soporta inyección de dependencias (DIP) de repositorios.
+ * - Cero lógica de negocio directa: orquesta el caso de uso GestionarViajeRuta.
+ * - Soporta inyección de dependencias (DIP).
  */
 
 import { ref, computed } from 'vue';
@@ -16,6 +16,10 @@ import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import type { IRutaRepository, RutaFiltros } from '../../Domain/Repositories/IRutaRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import type { IFrecuenciaRepository } from '../../Domain/Repositories/IFrecuenciaRepository';
+import {
+  GestionarViajeRuta,
+  gestionarViajeRutaUseCase as defaultGestionarViaje,
+} from '../../Application/UseCases/GestionarViajeRuta';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
@@ -24,7 +28,10 @@ export function useRutas(
   rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
   busRepo: IBusRepository = new SupabaseBusRepository(),
   frecuenciaRepo: IFrecuenciaRepository = new SupabaseFrecuenciaRepository(),
+  gestionarViajeUseCase?: GestionarViajeRuta,
 ) {
+  const viajeUseCase = gestionarViajeUseCase || new GestionarViajeRuta(rutaRepo);
+
   const rutas = ref<Ruta[]>([]);
   const buses = ref<Bus[]>([]);
   const frecuencias = ref<Frecuencia[]>([]);
@@ -62,7 +69,7 @@ export function useRutas(
     error.value = null;
 
     try {
-      const lista = await rutaRepo.obtenerTodas(filtros);
+      const lista = await viajeUseCase.obtenerRutas(filtros);
       rutas.value = lista;
       return lista;
     } catch (err: any) {
@@ -115,7 +122,7 @@ export function useRutas(
     success.value = null;
 
     try {
-      const actualizada = await rutaRepo.cambiarEstado(rutaId, nuevoEstado);
+      const actualizada = await viajeUseCase.cambiarEstado(rutaId, nuevoEstado);
       const index = rutas.value.findIndex((r) => r.id === rutaId);
       if (index !== -1) {
         rutas.value[index] = actualizada;
@@ -131,11 +138,45 @@ export function useRutas(
   }
 
   async function iniciarViaje(rutaId: number): Promise<Ruta> {
-    return cambiarEstado(rutaId, EstadoRuta.EN_CURSO);
+    loading.value = true;
+    error.value = null;
+    success.value = null;
+
+    try {
+      const actualizada = await viajeUseCase.iniciarViaje(rutaId);
+      const index = rutas.value.findIndex((r) => r.id === rutaId);
+      if (index !== -1) {
+        rutas.value[index] = actualizada;
+      }
+      success.value = 'Estado de ruta actualizado a En Curso.';
+      return actualizada;
+    } catch (err: any) {
+      error.value = err.message || 'Error al iniciar viaje.';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function finalizarViaje(rutaId: number): Promise<Ruta> {
-    return cambiarEstado(rutaId, EstadoRuta.FINALIZADA);
+    loading.value = true;
+    error.value = null;
+    success.value = null;
+
+    try {
+      const actualizada = await viajeUseCase.finalizarViaje(rutaId);
+      const index = rutas.value.findIndex((r) => r.id === rutaId);
+      if (index !== -1) {
+        rutas.value[index] = actualizada;
+      }
+      success.value = 'Estado de ruta actualizado a Finalizada.';
+      return actualizada;
+    } catch (err: any) {
+      error.value = err.message || 'Error al finalizar viaje.';
+      throw err;
+    } finally {
+      loading.value = false;
+    }
   }
 
   async function cancelarViaje(rutaId: number, motivo?: string): Promise<Ruta> {
@@ -144,10 +185,7 @@ export function useRutas(
     success.value = null;
 
     try {
-      if (motivo) {
-        await rutaRepo.actualizar(rutaId, { observacionChofer: `Cancelado: ${motivo}` });
-      }
-      const actualizada = await rutaRepo.cambiarEstado(rutaId, EstadoRuta.CANCELADA);
+      const actualizada = await viajeUseCase.cancelarViaje(rutaId, motivo);
       const index = rutas.value.findIndex((r) => r.id === rutaId);
       if (index !== -1) {
         rutas.value[index] = actualizada;
@@ -165,9 +203,10 @@ export function useRutas(
   async function asignarChofer(rutaId: number, choferId: string): Promise<Ruta> {
     loading.value = true;
     error.value = null;
+    success.value = null;
 
     try {
-      const actualizada = await rutaRepo.actualizar(rutaId, { choferId });
+      const actualizada = await viajeUseCase.asignarChofer(rutaId, choferId);
       const index = rutas.value.findIndex((r) => r.id === rutaId);
       if (index !== -1) {
         rutas.value[index] = actualizada;
@@ -187,7 +226,7 @@ export function useRutas(
     error.value = null;
 
     try {
-      await rutaRepo.eliminar(rutaId);
+      await viajeUseCase.eliminarRuta(rutaId);
       rutas.value = rutas.value.filter((r) => r.id !== rutaId);
       success.value = 'Ruta eliminada correctamente.';
     } catch (err: any) {

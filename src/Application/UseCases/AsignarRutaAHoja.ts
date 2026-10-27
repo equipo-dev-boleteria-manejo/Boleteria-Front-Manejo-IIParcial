@@ -14,6 +14,12 @@ import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { HojaRuta } from '../../Domain/Entities/HojaRuta';
 import { Ruta } from '../../Domain/Entities/Ruta';
 import { EstadoBus, EstadoHojaRuta, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
+import {
+  FrecuenciaNoDisponibleParaRutaException,
+  BusNoActivoParaRutaException,
+  RutaSolapadaException,
+} from '../../Domain/Exceptions/RutaException';
+import { HojaRutaYaCerradaException } from '../../Domain/Exceptions/HojaRutaException';
 import { SupabaseHojaRutaRepository } from '../../Infrastructure/Repositories/SupabaseHojaRutaRepository';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
@@ -50,14 +56,20 @@ export class AsignarRutaAHoja {
     // 1. Validar frecuencia activa
     const frecuencia = await this.frecuenciaRepo.obtenerPorId(frecuenciaId);
     if (!frecuencia || !frecuencia.activa) {
-      return { success: false, error: 'Frecuencia no encontrada o inactiva.' };
+      throw new FrecuenciaNoDisponibleParaRutaException(
+        frecuenciaId,
+        'Frecuencia no encontrada o inactiva.'
+      );
     }
 
     // 2. Si se inyectó el repositorio de buses, validar que el bus exista y esté Activo
     if (this.busRepo) {
       const bus = await this.busRepo.obtenerPorId(busId);
       if (!bus || bus.estado !== EstadoBus.ACTIVO) {
-        return { success: false, error: `El bus con ID ${busId} no existe o no está en estado Activo.` };
+        throw new BusNoActivoParaRutaException(
+          busId,
+          `El bus con ID ${busId} no existe o no está en estado Activo.`
+        );
       }
     }
 
@@ -73,7 +85,7 @@ export class AsignarRutaAHoja {
       nuevaHoja.tipoGeneracion = 'Manual';
       hojaRuta = await this.hojaRutaRepo.crear(nuevaHoja);
     } else if (hojaRuta.estado === EstadoHojaRuta.CERRADA) {
-      return { success: false, error: 'La hoja de ruta para esta fecha ya se encuentra cerrada.' };
+      throw new HojaRutaYaCerradaException(hojaRuta.id ?? 0);
     }
 
     // 4. Validar solapamiento de horarios para este bus
@@ -86,8 +98,8 @@ export class AsignarRutaAHoja {
 
     // Obtener rutas del bus para verificar solapamientos
     let rutasDelBus: Ruta[] = [];
-    if ((hojaRuta as any).rutas && Array.isArray((hojaRuta as any).rutas)) {
-      rutasDelBus = (hojaRuta as any).rutas.filter((r: Ruta) => r.busId === busId);
+    if (hojaRuta.rutas && Array.isArray(hojaRuta.rutas)) {
+      rutasDelBus = hojaRuta.rutas.filter((r: Ruta) => r.busId === busId);
     } else {
       const rutasExistentes = await this.rutaRepo.obtenerPorBusYFecha(busId, fecha);
       rutasDelBus = rutasExistentes || [];
@@ -108,10 +120,10 @@ export class AsignarRutaAHoja {
         (nuevaHoraInicio <= existenteInicio && nuevaHoraFin >= existenteFin);
 
       if (seSolapa) {
-        return {
-          success: false,
-          error: `El bus ${busId} ya tiene un trayecto que se solapa con este horario.`,
-        };
+        throw new RutaSolapadaException(
+          busId,
+          `El bus ${busId} ya tiene un trayecto que se solapa con este horario.`
+        );
       }
     }
 
@@ -128,12 +140,7 @@ export class AsignarRutaAHoja {
     nuevaRuta.esDirecta = frecuencia.esDirecto;
     nuevaRuta.choferId = choferId;
 
-    let rutaGuardada: Ruta;
-    if (typeof (this.rutaRepo as any).crearRuta === 'function') {
-      rutaGuardada = await (this.rutaRepo as any).crearRuta(nuevaRuta);
-    } else {
-      rutaGuardada = await this.rutaRepo.crear(nuevaRuta);
-    }
+    const rutaGuardada = await this.rutaRepo.crear(nuevaRuta);
 
     return {
       success: true,

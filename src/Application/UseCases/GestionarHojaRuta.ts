@@ -13,7 +13,7 @@ import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository'
 import { HojaRuta } from '../../Domain/Entities/HojaRuta';
 import type { Frecuencia } from '../../Domain/Entities/Frecuencia';
 import { EstadoHojaRuta, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
-import { DomainException } from '../../Domain/Exceptions/DomainException';
+import { FechaHojaRutaInvalidaException } from '../../Domain/Exceptions/HojaRutaException';
 import { SupabaseHojaRutaRepository } from '../../Infrastructure/Repositories/SupabaseHojaRutaRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
@@ -127,7 +127,7 @@ export class GestionarHojaRuta {
 
   private validarFecha(fecha: string): void {
     if (!fecha || Number.isNaN(Date.parse(fecha)) || !/^\d{4}-\d{2}-\d{2}$/.test(fecha.trim())) {
-      throw new DomainException('La fecha de salida es obligatoria y debe ser válida');
+      throw new FechaHojaRutaInvalidaException('La fecha de salida es obligatoria y debe ser válida');
     }
   }
 }

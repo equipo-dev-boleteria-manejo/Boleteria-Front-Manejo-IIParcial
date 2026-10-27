@@ -8,6 +8,13 @@ import { Bus } from '../../Domain/Entities/Bus';
 import { Frecuencia } from '../../Domain/Entities/Frecuencia';
 import { EstadoBus, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
+import {
+  FechaRutaInvalidaException,
+  FrecuenciaNoDisponibleParaRutaException,
+  FrecuenciaFueraDeDiaException,
+  BusNoDisponibleParaRutaException,
+  BusNoActivoParaRutaException,
+} from '../../Domain/Exceptions/RutaException';
 
 describe('HabilitarRutaDiaria UseCase', () => {
   let habilitarRutaDiaria: HabilitarRutaDiaria;
@@ -98,6 +105,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
       fecha: 'fecha-no-valida',
     };
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(FechaRutaInvalidaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/fecha.*no es válida/i);
     expect(mockFrecuenciaRepo.obtenerPorId).not.toHaveBeenCalled();
@@ -112,6 +120,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
 
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(null);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(FrecuenciaNoDisponibleParaRutaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/frecuencia.*no existe/i);
   });
@@ -128,6 +137,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
 
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuenciaInactiva);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(FrecuenciaNoDisponibleParaRutaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/no se encuentra activa/i);
   });
@@ -143,6 +153,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuencia);
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(null);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(BusNoActivoParaRutaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/bus.*no existe/i);
   });
@@ -160,6 +171,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuencia);
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(busInactivo);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(BusNoActivoParaRutaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/no está en estado Activo/i);
   });
@@ -179,11 +191,13 @@ describe('HabilitarRutaDiaria UseCase', () => {
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(bus);
     vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([rutaExistente]);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(BusNoDisponibleParaRutaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/ya se encuentra asignado/i);
+    expect(mockRutaRepo.obtenerPorBusYFecha).toHaveBeenCalledWith(10, '2026-06-01');
   });
 
-  it('debe soportar verificarBusDisponible cuando el repositorio lo implemente', async () => {
+  it('debe confiar plenamente en el contrato oficial IRutaRepository sin conversiones inseguras', async () => {
     const input: HabilitarRutaInput = {
       frecuenciaId: 1,
       busId: 10,
@@ -192,14 +206,14 @@ describe('HabilitarRutaDiaria UseCase', () => {
 
     const frecuencia = new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FREQ-001');
     const bus = new Bus(1, '001', 'ABC-1234', 40, EstadoBus.ACTIVO);
-
-    (mockRutaRepo as any).verificarBusDisponible = vi.fn().mockResolvedValue(false);
+    const rutaEnCurso = new Ruta(1, 10, '2026-06-01', EstadoRuta.EN_CURSO);
 
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuencia);
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(bus);
+    vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([rutaEnCurso]);
 
-    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
-    expect((mockRutaRepo as any).verificarBusDisponible).toHaveBeenCalledWith(10, '2026-06-01', 1);
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(BusNoDisponibleParaRutaException);
+    expect(mockRutaRepo.obtenerPorBusYFecha).toHaveBeenCalledWith(10, '2026-06-01');
   });
 
   it('debe rechazar si la fecha no coincide con los días de operación de la frecuencia', async () => {
@@ -222,6 +236,7 @@ describe('HabilitarRutaDiaria UseCase', () => {
 
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuencia);
 
+    await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(FrecuenciaFueraDeDiaException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(DomainException);
     await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(/no opera los días Jueves/i);
   });

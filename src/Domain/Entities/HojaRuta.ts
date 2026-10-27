@@ -7,6 +7,7 @@
 
 import { EstadoHojaRuta } from '../Constants/EstadosSistema';
 import { HojaRutaYaCerradaException } from '../Exceptions/HojaRutaException';
+import type { Ruta } from './Ruta';
 
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -15,7 +16,9 @@ export class HojaRuta {
   public usuarioCreadorId?: string;
   public tipoGeneracion: string = 'Manual';
   public observaciones?: string;
+  public rutas?: Ruta[];
   public createdAt?: Date;
+
 
   constructor(
     public fecha: string,

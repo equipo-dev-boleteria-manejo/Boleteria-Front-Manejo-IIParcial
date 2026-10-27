@@ -9,6 +9,13 @@ import { Ruta } from '../../Domain/Entities/Ruta';
 import { Frecuencia } from '../../Domain/Entities/Frecuencia';
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus, EstadoHojaRuta, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
+import { DomainException } from '../../Domain/Exceptions/DomainException';
+import {
+  FrecuenciaNoDisponibleParaRutaException,
+  BusNoActivoParaRutaException,
+  RutaSolapadaException,
+} from '../../Domain/Exceptions/RutaException';
+import { HojaRutaYaCerradaException } from '../../Domain/Exceptions/HojaRutaException';
 
 describe('AsignarRutaAHoja UseCase', () => {
   let useCase: AsignarRutaAHoja;
@@ -77,7 +84,7 @@ describe('AsignarRutaAHoja UseCase', () => {
     const rutaExistente = new Ruta(1, 50, '2026-06-10', EstadoRuta.PROGRAMADA);
     rutaExistente.horaSalida = '07:00';
     rutaExistente.horaLlegada = '10:00';
-    (hojaRuta as any).rutas = [rutaExistente];
+    hojaRuta.rutas = [rutaExistente];
 
     const frecuenciaNueva = new Frecuencia(1, 'Quito', 'Ambato', '12:00', 'FREQ-002');
     frecuenciaNueva.id = 2;
@@ -103,14 +110,14 @@ describe('AsignarRutaAHoja UseCase', () => {
     expect(mockRutaRepo.crear).toHaveBeenCalled();
   });
 
-  it('debe fallar si la nueva ruta se solapa con una existente para el mismo bus', async () => {
+  it('debe fallar y lanzar excepción de dominio si la nueva ruta se solapa con una existente para el mismo bus', async () => {
     const hojaRuta = new HojaRuta('2026-06-10', EstadoHojaRuta.BORRADOR);
     hojaRuta.id = 1;
 
     const rutaExistente = new Ruta(1, 50, '2026-06-10', EstadoRuta.PROGRAMADA);
     rutaExistente.horaSalida = '07:00';
     rutaExistente.horaLlegada = '10:00';
-    (hojaRuta as any).rutas = [rutaExistente];
+    hojaRuta.rutas = [rutaExistente];
 
     const frecuenciaSolapada = new Frecuencia(1, 'Quito', 'Latacunga', '08:00', 'FREQ-003');
     frecuenciaSolapada.id = 3;
@@ -119,14 +126,21 @@ describe('AsignarRutaAHoja UseCase', () => {
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuenciaSolapada);
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '050', 'ABC-5050', 40, EstadoBus.ACTIVO));
 
-    const result = await useCase.ejecutar({
-      busId: 50,
-      frecuenciaId: 3,
-      fecha: '2026-06-10',
-    });
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 3,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(RutaSolapadaException);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('solapa');
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 3,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(/solapa/i);
   });
 
   it('debe permitir asignar si el horario coincide pero es para un bus diferente', async () => {
@@ -136,7 +150,7 @@ describe('AsignarRutaAHoja UseCase', () => {
     const rutaBus51 = new Ruta(1, 51, '2026-06-10', EstadoRuta.PROGRAMADA);
     rutaBus51.horaSalida = '07:00';
     rutaBus51.horaLlegada = '10:00';
-    (hojaRuta as any).rutas = [rutaBus51];
+    hojaRuta.rutas = [rutaBus51];
 
     const frecuencia = new Frecuencia(1, 'Quito', 'Latacunga', '08:00', 'FREQ-003');
     frecuencia.id = 3;
@@ -195,27 +209,41 @@ describe('AsignarRutaAHoja UseCase', () => {
     );
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '050', 'ABC-5050', 40, EstadoBus.ACTIVO));
 
-    const result = await useCase.ejecutar({
-      busId: 50,
-      frecuenciaId: 1,
-      fecha: '2026-06-10',
-    });
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 1,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(HojaRutaYaCerradaException);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('cerrada');
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 1,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(DomainException);
   });
 
   it('debe rechazar si la frecuencia no existe o está inactiva', async () => {
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(null);
 
-    const result = await useCase.ejecutar({
-      busId: 50,
-      frecuenciaId: 999,
-      fecha: '2026-06-10',
-    });
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 999,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(FrecuenciaNoDisponibleParaRutaException);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('Frecuencia no encontrada o inactiva');
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 999,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(/Frecuencia no encontrada o inactiva/i);
   });
 
   it('debe rechazar si el bus no está Activo', async () => {
@@ -225,13 +253,20 @@ describe('AsignarRutaAHoja UseCase', () => {
     vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(frecuencia);
     vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(busInactivo);
 
-    const result = await useCase.ejecutar({
-      busId: 50,
-      frecuenciaId: 1,
-      fecha: '2026-06-10',
-    });
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 1,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(BusNoActivoParaRutaException);
 
-    expect(result.success).toBe(false);
-    expect(result.error).toContain('no está en estado Activo');
+    await expect(
+      useCase.ejecutar({
+        busId: 50,
+        frecuenciaId: 1,
+        fecha: '2026-06-10',
+      })
+    ).rejects.toThrow(/no está en estado Activo/i);
   });
 });

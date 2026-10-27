@@ -27,3 +27,10 @@ export class HojaRutaYaCerradaException extends HojaRutaException {
     super(`La hoja de ruta ${id} ya se encuentra cerrada y no permite modificaciones`, 'HOJA_RUTA_ALREADY_CLOSED');
   }
 }
+
+export class FechaHojaRutaInvalidaException extends HojaRutaException {
+  constructor(mensaje: string = 'La fecha de salida es obligatoria y debe ser válida') {
+    super(mensaje, 'FECHA_HOJA_RUTA_INVALIDA');
+  }
+}
+

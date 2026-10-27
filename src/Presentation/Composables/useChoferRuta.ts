@@ -4,7 +4,7 @@
  * Arquitectura:
  * - Capa de Presentación Desacoplada (Headless).
  * - Reactividad pura (refs, computeds, loading, error, success, historial).
- * - Cero acoplamiento a HTML/CSS.
+ * - Cero lógica de negocio directa: orquesta GestionarViajeRuta y ValidarBoletoRuta.
  * - Soporta inyección de dependencias (DIP).
  */
 
@@ -14,6 +14,14 @@ import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
+import {
+  GestionarViajeRuta,
+  gestionarViajeRutaUseCase as defaultGestionarViaje,
+} from '../../Application/UseCases/GestionarViajeRuta';
+import {
+  ValidarBoletoRuta,
+  validarBoletoRutaUseCase as defaultValidarBoleto,
+} from '../../Application/UseCases/ValidarBoletoRuta';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
@@ -33,7 +41,14 @@ export function useChoferRuta(
   rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
   boletosRepo?: IBoletosRepository,
   busRepo?: IBusRepository,
+  gestionarViajeUseCase?: GestionarViajeRuta,
+  validarBoletoUseCase?: ValidarBoletoRuta,
 ) {
+  const viajeUseCase = gestionarViajeUseCase || new GestionarViajeRuta(rutaRepo);
+  const boletoUseCase =
+    validarBoletoUseCase ||
+    (boletosRepo ? new ValidarBoletoRuta(boletosRepo) : defaultValidarBoleto);
+
   const rutaActual = ref<Ruta | null>(null);
   const loading = ref(false);
   const error = ref<string | null>(null);
@@ -109,14 +124,7 @@ export function useChoferRuta(
         throw new Error('No hay una ruta asignada para iniciar.');
       }
 
-      if (rutaActual.value.estado !== EstadoRuta.PROGRAMADA) {
-        throw new Error('Solo se puede iniciar un viaje en estado Programada.');
-      }
-
-      const actualizada = await rutaRepo.cambiarEstado(
-        rutaActual.value.id,
-        EstadoRuta.EN_CURSO
-      );
+      const actualizada = await viajeUseCase.iniciarViaje(rutaActual.value.id);
       rutaActual.value = actualizada;
       success.value = 'Viaje iniciado correctamente.';
       resultado.value = success.value;
@@ -143,24 +151,10 @@ export function useChoferRuta(
         throw new Error('No hay una ruta asignada para finalizar.');
       }
 
-      if (rutaActual.value.estado !== EstadoRuta.EN_CURSO) {
-        throw new Error('Solo se puede finalizar un viaje que esté en curso.');
-      }
-
-      const ahora = new Date();
-      const horaLlegada = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-
-      const cambios: Partial<Ruta> = { horaLlegada };
-      if (observacion) {
-        cambios.observacionChofer = observacion;
-      }
-
-      await rutaRepo.actualizar(rutaActual.value.id, cambios);
-      const actualizada = await rutaRepo.cambiarEstado(
+      const actualizada = await viajeUseCase.finalizarViaje(
         rutaActual.value.id,
-        EstadoRuta.FINALIZADA
+        observacion
       );
-
       rutaActual.value = actualizada;
       success.value = 'Viaje finalizado correctamente.';
       resultado.value = success.value;
@@ -187,19 +181,10 @@ export function useChoferRuta(
         throw new Error('No hay una ruta activa para registrar emergencia.');
       }
 
-      if (!observacion || !observacion.trim()) {
-        throw new Error('Debe proporcionar un detalle de la emergencia.');
-      }
-
-      const obsActual = rutaActual.value.observacionChofer;
-      const nuevaObs = obsActual
-        ? `${obsActual} | EMERGENCIA: ${observacion.trim()}`
-        : `EMERGENCIA: ${observacion.trim()}`;
-
-      const actualizada = await rutaRepo.actualizar(rutaActual.value.id, {
-        observacionChofer: nuevaObs,
-      });
-
+      const actualizada = await viajeUseCase.registrarEmergencia(
+        rutaActual.value.id,
+        observacion
+      );
       rutaActual.value = actualizada;
       success.value = 'Emergencia registrada correctamente.';
       resultado.value = success.value;
@@ -222,29 +207,13 @@ export function useChoferRuta(
     const codigoLimpio = codigo ? codigo.trim() : '';
 
     try {
-      if (!rutaActual.value) {
-        throw new Error('No hay una ruta asignada para validar boletos.');
-      }
-
-      if (rutaActual.value.estado !== EstadoRuta.EN_CURSO) {
-        throw new Error('La ruta debe encontrarse En Curso para validar boletos.');
-      }
-
-      if (!codigoLimpio) {
-        throw new Error('Debe ingresar un código de boleto válido.');
-      }
+      const res = await boletoUseCase.ejecutar({
+        ruta: rutaActual.value,
+        codigo: codigoLimpio,
+      });
 
       const ahora = new Date();
       const horaStr = `${String(ahora.getHours()).padStart(2, '0')}:${String(ahora.getMinutes()).padStart(2, '0')}`;
-
-      // Si existe repositorio de boletos, validar abordaje
-      if (boletosRepo) {
-        const boleto = await boletosRepo.obtenerPorCodigo(codigoLimpio);
-        if (!boleto) {
-          throw new Error('Boleto no encontrado.');
-        }
-        await boletosRepo.marcarAbordado(boleto.id!);
-      }
 
       historial.value.unshift({
         codigo: codigoLimpio,
@@ -252,7 +221,7 @@ export function useChoferRuta(
         resultado: 'Validado',
       });
 
-      success.value = 'Boleto validado correctamente.';
+      success.value = res.mensaje || 'Boleto validado correctamente.';
       resultado.value = success.value;
 
       return { ok: true, mensaje: success.value };
