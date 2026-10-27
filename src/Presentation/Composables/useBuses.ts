@@ -129,6 +129,10 @@ export function useBuses() {
 		}
 	}
 
+	function limpiarError() {
+		error.value = "";
+	}
+
 	onMounted(cargarBuses);
 
 	return {
@@ -140,5 +144,6 @@ export function useBuses() {
 		registrarBus,
 		guardarBus,
 		reportarIncidenteYRefrescar,
+		limpiarError,
 	};
 }
