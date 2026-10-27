@@ -48,3 +48,10 @@ export class SeatTypeNoActivoException extends SeatTypeException {
     super(`El tipo de asiento ${seatTypeId} no está activo`, 'SEAT_TYPE_NOT_ACTIVE');
   }
 }
+
+// Excepción añadida para cumplir con la auditoría
+export class PorcentajeDescuentoInvalidoException extends SeatTypeException {
+  constructor() {
+    super('El porcentaje de descuento debe estar entre 0 y 100', 'PORCENTAJE_DESCUENTO_INVALIDO');
+  }
+}
