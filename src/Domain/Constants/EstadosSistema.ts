@@ -98,3 +98,6 @@ export const PrioridadCambio = {
   CRITICA: 'Critica',
 } as const
 export type PrioridadCambio = (typeof PrioridadCambio)[keyof typeof PrioridadCambio]
+
+
+
