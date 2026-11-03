@@ -1,19 +1,42 @@
 /// <reference types="vite/client" />
 
-declare global {
-  interface ImportMetaEnv {
-    readonly VITE_SUPABASE_URL: string
-    readonly VITE_SUPABASE_KEY: string
-  }
+interface ImportMetaEnv {
+  readonly VITE_SUPABASE_URL: string
+  readonly VITE_SUPABASE_KEY: string
+  readonly VITE_SUPABASE_ANON_KEY?: string
+  readonly VITE_SUPABASE_PUBLISHABLE_KEY?: string
+  readonly VITE_STRIPE_PUBLISHABLE_KEY?: string
+}
 
-  interface ImportMeta {
-    readonly env: ImportMetaEnv
-  }
+interface ImportMeta {
+  readonly env: ImportMetaEnv
 }
 
 declare module '*.vue' {
-  const component: any
+  import type { DefineComponent } from 'vue'
+  const component: DefineComponent<{}, {}, any>
   export default component
 }
 
-export {}
+declare module 'qrcode' {
+  interface QRCodeRenderOptions {
+    width?: number
+    margin?: number
+    color?: {
+      dark?: string
+      light?: string
+    }
+  }
+
+  interface QRCodeApi {
+    toCanvas(
+      canvas: HTMLCanvasElement,
+      text: string,
+      options?: QRCodeRenderOptions,
+    ): Promise<void>
+    toDataURL(text: string, options?: QRCodeRenderOptions): Promise<string>
+  }
+
+  const QRCode: QRCodeApi
+  export default QRCode
+}

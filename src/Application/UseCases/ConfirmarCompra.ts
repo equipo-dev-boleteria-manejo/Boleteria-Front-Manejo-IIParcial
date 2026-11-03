@@ -1,12 +1,38 @@
-import type { IVentaRepository, VentaPayload } from '../../Domain/Repositories/IVentaRepository';
-import type { IBoletosRepository, BoletoPayload } from '../../Domain/Repositories/IBoletosRepository';
+import type {
+  IVentaRepository,
+  VentaPayload,
+} from '../../Domain/Repositories/IVentaRepository';
+import type {
+  IBoletosRepository,
+  BoletoPayload,
+} from '../../Domain/Repositories/IBoletosRepository';
 import type { IAuditRepository } from '../../Domain/Repositories/IAuditRepository';
-import { EstadoVenta, EstadoBoleto, MetodoPago, TipoPasajero } from '../../Domain/Constants/EstadosSistema';
+import {
+  EstadoVenta,
+  EstadoBoleto,
+  MetodoPago,
+  TipoPasajero,
+} from '../../Domain/Constants/EstadosSistema';
 import { calcularEdad } from '../../Domain/Services/DescuentoService';
 import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
+
+/**
+ * Datos de un pasajero dentro de una compra con varios asientos.
+ * `precioUnitario` permite tarifas distintas por tipo de asiento; si se omite
+ * se usa el precio base de la compra.
+ */
+export type PasajeroCompraInput = {
+  asientoId: number;
+  nombres: string;
+  apellidos: string;
+  cedula: string;
+  fechaNacimiento: string;
+  tieneDiscapacidad?: boolean;
+  precioUnitario?: number;
+};
 
 export type ConfirmInput = {
   ruta: {
@@ -19,12 +45,32 @@ export type ConfirmInput = {
   capturaArchivo?: File | Blob | null;
   metodoPago: 'Transferencia' | 'Tarjeta' | 'Efectivo';
   stripeId?: string;
-  nombres: string;
-  apellidos: string;
-  cedula: string;
-  fechaNacimiento: string;
+  /**
+   * Datos de un único pasajero. Se conservan por compatibilidad con el flujo
+   * anterior; cuando se envían `pasajeros`, estos tienen prioridad.
+   */
+  nombres?: string;
+  apellidos?: string;
+  cedula?: string;
+  fechaNacimiento?: string;
   tieneDiscapacidad?: boolean;
   usuarioId?: string | number | null;
+  /** Un pasajero por asiento, con su propia tarifa y descuento. */
+  pasajeros?: PasajeroCompraInput[];
+};
+
+type DescuentoBoleto = {
+  esMenor: boolean;
+  esDiscapacitado: boolean;
+  esTerceraEdad: boolean;
+  descuentoAplicado: number;
+  precioFinal: number;
+};
+
+type PasajeroTarifado = PasajeroCompraInput & {
+  precioUnitario: number;
+  descuento: DescuentoBoleto;
+  tipoPasajero: TipoPasajero;
 };
 
 export class ConfirmarCompra {
@@ -41,35 +87,40 @@ export class ConfirmarCompra {
       throw new DomainException('Ruta requerida.', 'RUTA_REQUERIDA');
     }
     if (!input.asientos || !input.asientos.length) {
-      throw new DomainException('Debe seleccionar al menos un asiento.', 'ASIENTOS_REQUERIDOS');
-    }
-    if (!input.cedula?.trim()) {
-      throw new DomainException('Cédula del pasajero requerida.', 'CEDULA_REQUERIDA');
-    }
-    if (!input.nombres?.trim()) {
-      throw new DomainException('Nombres del pasajero requeridos.', 'NOMBRES_REQUERIDOS');
-    }
-    if (!input.apellidos?.trim()) {
-      throw new DomainException('Apellidos del pasajero requeridos.', 'APELLIDOS_REQUERIDOS');
-    }
-    if (!input.fechaNacimiento?.trim()) {
-      throw new DomainException('Fecha de nacimiento requerida.', 'FECHA_NACIMIENTO_REQUERIDA');
+      throw new DomainException(
+        'Debe seleccionar al menos un asiento.',
+        'ASIENTOS_REQUERIDOS',
+      );
     }
     if (!input.metodoPago) {
-      throw new DomainException('Método de pago requerido.', 'METODO_PAGO_REQUERIDO');
+      throw new DomainException(
+        'Método de pago requerido.',
+        'METODO_PAGO_REQUERIDO',
+      );
     }
-    if (input.precioUnitario <= 0) {
-      throw new DomainException('El precio del asiento no es válido.', 'PRECIO_INVALIDO');
+    if (!Number.isFinite(input.precioUnitario) || input.precioUnitario <= 0) {
+      throw new DomainException(
+        'El precio del asiento no es válido.',
+        'PRECIO_INVALIDO',
+      );
     }
+
+    const pasajeros = this.normalizarPasajeros(input);
 
     // El comprobante es obligatorio para Transferencia
     if (input.metodoPago === 'Transferencia' && !input.capturaArchivo) {
-      throw new DomainException('Debe adjuntar el comprobante de pago para Transferencia.', 'COMPROBANTE_REQUERIDO');
+      throw new DomainException(
+        'Debe adjuntar el comprobante de pago para Transferencia.',
+        'COMPROBANTE_REQUERIDO',
+      );
     }
 
     // ---- 2. Verificar disponibilidad de cada asiento justo antes de confirmar ----
     for (const asientoId of input.asientos) {
-      const disponible = await this.boletosRepo.verificarAsientoDisponible(input.ruta.id, asientoId);
+      const disponible = await this.boletosRepo.verificarAsientoDisponible(
+        input.ruta.id,
+        asientoId,
+      );
       if (!disponible) {
         throw new DomainException(
           `El asiento ${asientoId} ya no está disponible. Vuelve a buscar la ruta.`,
@@ -84,28 +135,51 @@ export class ConfirmarCompra {
 
     if (input.metodoPago === 'Transferencia' && input.capturaArchivo) {
       const file = input.capturaArchivo as File;
-      const tiposPermitidos = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'application/pdf'];
+      const tiposPermitidos = [
+        'image/png',
+        'image/jpeg',
+        'image/jpg',
+        'image/webp',
+        'application/pdf',
+      ];
       if (file.type && !tiposPermitidos.includes(file.type)) {
-        throw new DomainException('El comprobante debe ser una imagen (PNG/JPG/WEBP) o un PDF.', 'FORMATO_INVALIDO');
+        throw new DomainException(
+          'El comprobante debe ser una imagen (PNG/JPG/WEBP) o un PDF.',
+          'FORMATO_INVALIDO',
+        );
       }
       const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
       if (file.size && file.size > MAX_BYTES) {
-        throw new DomainException('El comprobante supera el tamaño máximo permitido (5 MB).', 'ARCHIVO_EXCEDE_TAMANIO');
+        throw new DomainException(
+          'El comprobante supera el tamaño máximo permitido (5 MB).',
+          'ARCHIVO_EXCEDE_TAMANIO',
+        );
       }
 
       const fileName = file.name || 'comprobante.png';
-      const extension = fileName.includes('.') ? fileName.split('.').pop() : 'png';
-      const uniqueId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
+      const extension = fileName.includes('.')
+        ? fileName.split('.').pop()
+        : 'png';
+      const uniqueId =
+        typeof crypto !== 'undefined' && crypto.randomUUID
+          ? crypto.randomUUID()
+          : Math.random().toString(36).substring(2);
       const filePath = `${input.usuarioId ?? 'anon'}/${Date.now()}-${uniqueId}.${extension}`;
 
       if (this.ventaRepo.uploadComprobante) {
         try {
-          const uploadRes = await this.ventaRepo.uploadComprobante(filePath, file, {
-            contentType: file.type,
-          });
+          const uploadRes = await this.ventaRepo.uploadComprobante(
+            filePath,
+            file,
+            { contentType: file.type },
+          );
           comprobanteUrl = uploadRes.publicUrl;
         } catch (e: any) {
-          throw new DomainException('No se pudo subir el comprobante: ' + (e?.message || 'error desconocido'), 'UPLOAD_ERROR');
+          throw new DomainException(
+            'No se pudo subir el comprobante: ' +
+              (e?.message || 'error desconocido'),
+            'UPLOAD_ERROR',
+          );
         }
       } else {
         comprobanteUrl = `local-upload://${filePath}`;
@@ -117,34 +191,18 @@ export class ConfirmarCompra {
       comprobanteUrl = `STRIPE_ID:${input.stripeId || 'STRIPE_PAYMENT'}`;
     }
 
-    // ---- 4. Calcular descuento y total ----
-    const edadPasajero = calcularEdad(input.fechaNacimiento);
-    const resultadoDescuento = this.calcularDescuentoUseCase.ejecutar({
-      numeroCedula: input.cedula.trim(),
-      edad: edadPasajero >= 0 ? edadPasajero : 0,
-      tieneDiscapacidad: !!input.tieneDiscapacidad,
-      precioBase: input.precioUnitario,
-    });
-
-    // Adaptar el resultado al formato interno que usan los boletos
-    const descuento = {
-      esMenor: resultadoDescuento.categoria === 'MENOR',
-      esDiscapacitado: resultadoDescuento.categoria === 'DISCAPACIDAD',
-      esTerceraEdad: resultadoDescuento.categoria === 'TERCERA_EDAD',
-      descuentoAplicado: resultadoDescuento.porcentajeDescuento,
-      precioFinal: resultadoDescuento.precioFinal,
-    };
-    const total = Number((descuento.precioFinal * input.asientos.length).toFixed(2));
-
-    // Determinar tipo de pasajero según reglas de descuento
-    let tipoPasajero = TipoPasajero.GENERAL;
-    if (descuento.esDiscapacitado) {
-      tipoPasajero = TipoPasajero.DISCAPACITADO;
-    } else if (descuento.esTerceraEdad) {
-      tipoPasajero = TipoPasajero.TERCERA_EDAD;
-    } else if (descuento.esMenor) {
-      tipoPasajero = TipoPasajero.MENOR_EDAD;
-    }
+    // ---- 4. Calcular descuento y total por pasajero ----
+    const pasajerosTarifados = pasajeros.map((pasajero) =>
+      this.calcularTarifaPasajero(pasajero),
+    );
+    const total = Number(
+      pasajerosTarifados
+        .reduce(
+          (acumulado, pasajero) => acumulado + pasajero.descuento.precioFinal,
+          0,
+        )
+        .toFixed(2),
+    );
 
     // ---- 5. Crear la Venta ----
     const estadoVenta =
@@ -153,7 +211,8 @@ export class ConfirmarCompra {
         : EstadoVenta.PENDIENTE;
 
     const ventaPayload: VentaPayload = {
-      UsuarioVendedorId: input.usuarioId != null ? String(input.usuarioId) : null,
+      UsuarioVendedorId:
+        input.usuarioId != null ? String(input.usuarioId) : null,
       RutaId: input.ruta.id,
       CiudadOrigenVenta: input.ruta.origen,
       CiudadDestinoVenta: input.ruta.destino,
@@ -161,41 +220,61 @@ export class ConfirmarCompra {
       Estado: estadoVenta,
       MetodoPago: realMetodoPago,
       ComprobanteUrl: comprobanteUrl,
-      AprobadoPorId: estadoVenta === EstadoVenta.APROBADA_PAGO ? (input.usuarioId ? String(input.usuarioId) : null) : null,
+      AprobadoPorId:
+        estadoVenta === EstadoVenta.APROBADA_PAGO
+          ? input.usuarioId
+            ? String(input.usuarioId)
+            : null
+          : null,
       FechaVenta: new Date().toISOString(),
     };
 
     const ventaId = await this.ventaRepo.crearVenta(ventaPayload);
     if (!ventaId) {
-      throw new DomainException('No se pudo crear el registro de venta.', 'VENTA_CREACION_FALLIDA');
+      throw new DomainException(
+        'No se pudo crear el registro de venta.',
+        'VENTA_CREACION_FALLIDA',
+      );
     }
 
     // ---- 6. Generar e Insertar Boletos ----
-    const boletosInsert: BoletoPayload[] = input.asientos.map((asientoId) => {
-      const unique = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
-      const qrCode = `QR-R${input.ruta.id}-V${ventaId}-A${asientoId}-${unique}`;
-      const barcode = `BC-R${input.ruta.id}-V${ventaId}-A${asientoId}-${unique}`;
+    // Las transferencias quedan pendientes de validación hasta que un
+    // oficinista apruebe el comprobante.
+    const estadoBoleto =
+      input.metodoPago === 'Transferencia'
+        ? EstadoBoleto.PROCESO_VALIDACION
+        : EstadoBoleto.EMITIDO;
 
-      return {
-        VentaId: ventaId,
-        RutaId: input.ruta.id,
-        AsientoId: asientoId,
-        NombresPasajero: input.nombres.trim(),
-        ApellidosPasajero: input.apellidos.trim(),
-        CedulaPasajero: input.cedula.trim(),
-        FechaNacimiento: input.fechaNacimiento,
-        EsMenor: descuento.esMenor,
-        EsDiscapacitado: descuento.esDiscapacitado,
-        EsTerceraEdad: descuento.esTerceraEdad,
-        TipoPasajero: tipoPasajero,
-        DescuentoAplicado: descuento.descuentoAplicado,
-        PrecioFinal: descuento.precioFinal,
-        CodigoQr: qrCode,
-        CodigoBarras: barcode,
-        Estado: EstadoBoleto.EMITIDO,
-        CreatedAt: new Date().toISOString(),
-      };
-    });
+    const boletosInsert: BoletoPayload[] = pasajerosTarifados.map(
+      (pasajero) => {
+        const unique =
+          typeof crypto !== 'undefined' && crypto.randomUUID
+            ? crypto.randomUUID()
+            : Math.random().toString(36).substring(2);
+        const qrCode = `QR-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
+        const barcode = `BC-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
+
+        return {
+          VentaId: ventaId,
+          RutaId: input.ruta.id,
+          AsientoId: pasajero.asientoId,
+          NombresPasajero: pasajero.nombres.trim(),
+          ApellidosPasajero: pasajero.apellidos.trim(),
+          CedulaPasajero: pasajero.cedula.trim(),
+          FechaNacimiento: pasajero.fechaNacimiento,
+          EsMenor: pasajero.descuento.esMenor,
+          EsDiscapacitado: pasajero.descuento.esDiscapacitado,
+          EsTerceraEdad: pasajero.descuento.esTerceraEdad,
+          TipoPasajero: pasajero.tipoPasajero,
+          DescuentoAplicado: pasajero.descuento.descuentoAplicado,
+          PrecioFinal: pasajero.descuento.precioFinal,
+          CodigoQr: qrCode,
+          CodigoBarras: barcode,
+          Estado: estadoBoleto,
+          CreatedAt: new Date().toISOString(),
+        };
+      },
+    );
 
     let boletosRes: any[] = [];
     try {
@@ -208,7 +287,8 @@ export class ConfirmarCompra {
         /* silenciar error secundario de rollback */
       }
       throw new DomainException(
-        'No se pudieron generar los boletos. La compra fue revertida: ' + (e?.message || ''),
+        'No se pudieron generar los boletos. La compra fue revertida: ' +
+          (e?.message || ''),
         'ROLLBACK_COMPRA',
       );
     }
@@ -216,11 +296,13 @@ export class ConfirmarCompra {
     // ---- 7. Auditoría opcional ----
     if (this.auditRepo && input.usuarioId) {
       try {
-        await this.auditRepo.logCambio({
+        await this.auditRepo.registrarEvento({
+          accion: 'COMPRA_BOLETOS',
           usuarioId: String(input.usuarioId),
-          tipoCambio: 'estandar',
-          descripcion: `Compra por ${input.metodoPago}. Venta ID: ${ventaId}.`,
-          referenciaId: ventaId,
+          entidadAfectada: 'Venta',
+          entidadId: String(ventaId),
+          detalle: `Compra por ${input.metodoPago} de ${pasajeros.length} boleto(s). Venta ID: ${ventaId}.`,
+          resultado: 'Exito',
         });
       } catch (e) {
         console.warn('Omitiendo log de auditoría:', e);
@@ -231,8 +313,154 @@ export class ConfirmarCompra {
       ventaId,
       comprobanteUrl,
       total,
-      descuento,
+      descuento: pasajerosTarifados[0]?.descuento ?? null,
+      descuentos: pasajerosTarifados.map((pasajero) => pasajero.descuento),
       boletos: boletosRes,
+    };
+  }
+
+  /**
+   * Si llega `pasajeros`, exige exactamente un pasajero por asiento y sin
+   * asientos repetidos. Si no, expande el pasajero único a todos los asientos
+   * para conservar el comportamiento histórico del flujo de compra.
+   */
+  private normalizarPasajeros(input: ConfirmInput): PasajeroCompraInput[] {
+    const asientos = new Set(input.asientos);
+
+    if (input.pasajeros?.length) {
+      if (input.pasajeros.length !== input.asientos.length) {
+        throw new DomainException(
+          'Debe registrar un pasajero por cada asiento seleccionado.',
+          'PASAJEROS_INCOMPLETOS',
+        );
+      }
+
+      const asientosVistos = new Set<number>();
+      const cedulasVistas = new Set<string>();
+      return input.pasajeros.map((pasajero) => {
+        if (!Number.isInteger(pasajero.asientoId) || !asientos.has(pasajero.asientoId)) {
+          throw new DomainException(
+            `El pasajero está asociado a un asiento no seleccionado (${pasajero.asientoId}).`,
+            'ASIENTO_PASAJERO_INVALIDO',
+          );
+        }
+        if (asientosVistos.has(pasajero.asientoId)) {
+          throw new DomainException(
+            `El asiento ${pasajero.asientoId} tiene más de un pasajero.`,
+            'ASIENTO_DUPLICADO',
+          );
+        }
+        asientosVistos.add(pasajero.asientoId);
+        this.validarDatosPasajero(pasajero);
+
+        const cedulaNormalizada = pasajero.cedula.trim();
+        if (cedulasVistas.has(cedulaNormalizada)) {
+          throw new DomainException(
+            `La cédula ${cedulaNormalizada} no puede repetirse en varios asientos.`,
+            'CEDULA_DUPLICADA',
+          );
+        }
+        cedulasVistas.add(cedulaNormalizada);
+
+        return {
+          ...pasajero,
+          precioUnitario: pasajero.precioUnitario ?? input.precioUnitario,
+        };
+      });
+    }
+
+    const pasajeroUnico: PasajeroCompraInput = {
+      asientoId: input.asientos[0],
+      nombres: input.nombres ?? '',
+      apellidos: input.apellidos ?? '',
+      cedula: input.cedula ?? '',
+      fechaNacimiento: input.fechaNacimiento ?? '',
+      tieneDiscapacidad: input.tieneDiscapacidad,
+      precioUnitario: input.precioUnitario,
+    };
+    this.validarDatosPasajero(pasajeroUnico);
+
+    return input.asientos.map((asientoId) => ({
+      ...pasajeroUnico,
+      asientoId,
+    }));
+  }
+
+  private validarDatosPasajero(pasajero: PasajeroCompraInput): void {
+    if (!pasajero.cedula?.trim()) {
+      throw new DomainException(
+        'Cédula del pasajero requerida.',
+        'CEDULA_REQUERIDA',
+      );
+    }
+    if (!pasajero.nombres?.trim()) {
+      throw new DomainException(
+        'Nombres del pasajero requeridos.',
+        'NOMBRES_REQUERIDOS',
+      );
+    }
+    if (!pasajero.apellidos?.trim()) {
+      throw new DomainException(
+        'Apellidos del pasajero requeridos.',
+        'APELLIDOS_REQUERIDOS',
+      );
+    }
+    if (!pasajero.fechaNacimiento?.trim()) {
+      throw new DomainException(
+        'Fecha de nacimiento requerida.',
+        'FECHA_NACIMIENTO_REQUERIDA',
+      );
+    }
+  }
+
+  private calcularTarifaPasajero(
+    pasajero: PasajeroCompraInput,
+  ): PasajeroTarifado {
+    const precioBase = Number(pasajero.precioUnitario);
+    if (!Number.isFinite(precioBase) || precioBase <= 0) {
+      throw new DomainException(
+        `El precio del asiento ${pasajero.asientoId} no es válido.`,
+        'PRECIO_INVALIDO',
+      );
+    }
+
+    const edadPasajero = calcularEdad(pasajero.fechaNacimiento);
+    if (edadPasajero < 0) {
+      throw new DomainException(
+        `La fecha de nacimiento del asiento ${pasajero.asientoId} no es válida.`,
+        'FECHA_NACIMIENTO_INVALIDA',
+      );
+    }
+
+    const resultadoDescuento = this.calcularDescuentoUseCase.ejecutar({
+      numeroCedula: pasajero.cedula.trim(),
+      edad: edadPasajero,
+      tieneDiscapacidad: !!pasajero.tieneDiscapacidad,
+      precioBase,
+    });
+
+    const descuento: DescuentoBoleto = {
+      esMenor: resultadoDescuento.categoria === 'MENOR',
+      esDiscapacitado: resultadoDescuento.categoria === 'DISCAPACIDAD',
+      esTerceraEdad: resultadoDescuento.categoria === 'TERCERA_EDAD',
+      descuentoAplicado: resultadoDescuento.porcentajeDescuento,
+      precioFinal: resultadoDescuento.precioFinal,
+    };
+
+    let tipoPasajero: TipoPasajero = TipoPasajero.GENERAL;
+    if (descuento.esDiscapacitado) {
+      tipoPasajero = TipoPasajero.DISCAPACITADO;
+    } else if (descuento.esTerceraEdad) {
+      tipoPasajero = TipoPasajero.TERCERA_EDAD;
+    } else if (descuento.esMenor) {
+      tipoPasajero = TipoPasajero.MENOR_EDAD;
+    }
+
+    return {
+      ...pasajero,
+      precioUnitario: precioBase,
+      descuento,
+      tipoPasajero,
     };
   }
 }

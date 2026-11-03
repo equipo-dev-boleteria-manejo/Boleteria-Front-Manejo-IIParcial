@@ -3,7 +3,8 @@ import { ConfirmarCompra, ConfirmInput } from './ConfirmarCompra';
 import type { IVentaRepository } from '../../Domain/Repositories/IVentaRepository';
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
 import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
-import { EstadoVenta } from '../../Domain/Constants/EstadosSistema';
+import type { CalcularDescuentoVentaDto } from '../Dtos/CalcularDescuentoVentaDto';
+import { EstadoBoleto, EstadoVenta } from '../../Domain/Constants/EstadosSistema';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 
 describe('ConfirmarCompra (Caso de Uso)', () => {
@@ -177,5 +178,177 @@ describe('ConfirmarCompra (Caso de Uso)', () => {
     };
 
     await expect(useCase.ejecutar(inputSinCedula)).rejects.toThrow('Cédula del pasajero requerida');
+  });
+
+  it('debe registrar un pasajero distinto por asiento y respetar su tarifa', async () => {
+    vi.mocked(mockCalcularDescuento.ejecutar).mockImplementation(
+      (datos: CalcularDescuentoVentaDto) => ({
+        numeroCedula: datos.numeroCedula,
+        edad: datos.edad,
+        tieneDiscapacidad: datos.tieneDiscapacidad,
+        precioBase: datos.precioBase,
+        categoria: 'SIN_DESCUENTO',
+        porcentajeDescuento: 0,
+        montoDescuento: 0,
+        precioFinal: datos.precioBase,
+      }),
+    );
+
+    const input: ConfirmInput = {
+      ruta: { id: 10, origen: 'Ambato', destino: 'Quito' },
+      asientos: [5, 6],
+      precioUnitario: 10,
+      metodoPago: 'Efectivo',
+      pasajeros: [
+        {
+          asientoId: 5,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+          precioUnitario: 10,
+        },
+        {
+          asientoId: 6,
+          nombres: 'María',
+          apellidos: 'Andrade',
+          cedula: '0926687856',
+          fechaNacimiento: '1992-03-20',
+          precioUnitario: 15,
+        },
+      ],
+      usuarioId: 'usr-456',
+    };
+
+    const resultado = await useCase.ejecutar(input);
+    const boletosInsertados = vi.mocked(mockBoletosRepo.insertarBoletos).mock
+      .calls[0][0] as unknown as Array<Record<string, unknown>>;
+
+    expect(mockVentaRepo.crearVenta).toHaveBeenCalledWith(
+      expect.objectContaining({ Total: 25 }),
+    );
+    expect(resultado.total).toBe(25);
+    expect(boletosInsertados).toHaveLength(2);
+    expect(boletosInsertados[0]).toEqual(
+      expect.objectContaining({
+        AsientoId: 5,
+        CedulaPasajero: '1710034065',
+        PrecioFinal: 10,
+      }),
+    );
+    expect(boletosInsertados[1]).toEqual(
+      expect.objectContaining({
+        AsientoId: 6,
+        CedulaPasajero: '0926687856',
+        PrecioFinal: 15,
+      }),
+    );
+  });
+
+  it('debe rechazar la misma cédula en dos asientos', async () => {
+    const input: ConfirmInput = {
+      ruta: { id: 10, origen: 'Ambato', destino: 'Quito' },
+      asientos: [5, 6],
+      precioUnitario: 10,
+      metodoPago: 'Efectivo',
+      pasajeros: [
+        {
+          asientoId: 5,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+        },
+        {
+          asientoId: 6,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+        },
+      ],
+    };
+
+    await expect(useCase.ejecutar(input)).rejects.toThrow('no puede repetirse');
+    expect(mockVentaRepo.crearVenta).not.toHaveBeenCalled();
+  });
+
+  it('debe exigir exactamente un pasajero por cada asiento', async () => {
+    const input: ConfirmInput = {
+      ruta: { id: 10, origen: 'Ambato', destino: 'Quito' },
+      asientos: [5, 6],
+      precioUnitario: 10,
+      metodoPago: 'Efectivo',
+      pasajeros: [
+        {
+          asientoId: 5,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+        },
+      ],
+    };
+
+    await expect(useCase.ejecutar(input)).rejects.toThrow(
+      'un pasajero por cada asiento',
+    );
+    expect(mockVentaRepo.crearVenta).not.toHaveBeenCalled();
+  });
+
+  it('debe dejar los boletos de transferencia en proceso de validación', async () => {
+    const input: ConfirmInput = {
+      ruta: { id: 10, origen: 'Ambato', destino: 'Quito' },
+      asientos: [5],
+      precioUnitario: 10,
+      metodoPago: 'Transferencia',
+      capturaArchivo: new File(['fake content'], 'recibo.png', { type: 'image/png' }),
+      pasajeros: [
+        {
+          asientoId: 5,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+        },
+      ],
+    };
+
+    await useCase.ejecutar(input);
+    const boletosInsertados = vi.mocked(mockBoletosRepo.insertarBoletos).mock
+      .calls[0][0] as unknown as Array<Record<string, unknown>>;
+
+    expect(mockVentaRepo.crearVenta).toHaveBeenCalledWith(
+      expect.objectContaining({ Estado: EstadoVenta.PENDIENTE }),
+    );
+    expect(boletosInsertados[0].Estado).toBe(EstadoBoleto.PROCESO_VALIDACION);
+  });
+
+  it('debe emitir directamente los boletos pagados con tarjeta', async () => {
+    const input: ConfirmInput = {
+      ruta: { id: 10, origen: 'Ambato', destino: 'Quito' },
+      asientos: [5],
+      precioUnitario: 10,
+      metodoPago: 'Tarjeta',
+      stripeId: 'pi_3MtwBwLkdIwHu7ix28a3tqPa',
+      pasajeros: [
+        {
+          asientoId: 5,
+          nombres: 'Carlos',
+          apellidos: 'Andrade',
+          cedula: '1710034065',
+          fechaNacimiento: '1995-05-15',
+        },
+      ],
+    };
+
+    await useCase.ejecutar(input);
+    const boletosInsertados = vi.mocked(mockBoletosRepo.insertarBoletos).mock
+      .calls[0][0] as unknown as Array<Record<string, unknown>>;
+
+    expect(mockVentaRepo.crearVenta).toHaveBeenCalledWith(
+      expect.objectContaining({ Estado: EstadoVenta.APROBADA_PAGO }),
+    );
+    expect(boletosInsertados[0].Estado).toBe(EstadoBoleto.EMITIDO);
   });
 });

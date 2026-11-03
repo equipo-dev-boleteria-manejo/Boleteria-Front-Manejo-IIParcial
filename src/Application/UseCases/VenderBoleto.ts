@@ -125,7 +125,7 @@ export class VenderBoleto {
       const codigoQr = `QR-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
       const codigoBarras = `BC-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
 
-      let tipo = TipoPasajero.GENERAL;
+      let tipo: TipoPasajero = TipoPasajero.GENERAL;
       if (pasajero.esDiscapacitado) {
         tipo = TipoPasajero.DISCAPACITADO;
       } else if (pasajero.esTerceraEdad) {
