@@ -202,3 +202,4 @@ function getEstadoClass(estado: string): string {
   }
 }
 </script>
+

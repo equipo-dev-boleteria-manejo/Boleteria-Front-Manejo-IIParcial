@@ -29,3 +29,4 @@ export function extraerCodigoBoleto(valorLeido: string): string {
     return valor
   }
 }
+
