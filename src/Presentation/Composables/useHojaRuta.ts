@@ -9,6 +9,9 @@
 
 import { ref } from 'vue';
 import type { HojaRuta } from '../../Domain/Entities/HojaRuta';
+import type { Ruta } from '../../Domain/Entities/Ruta';
+import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
+import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import {
   GestionarHojaRuta,
   gestionarHojaRutaUseCase as defaultGestionarHojaRuta,
@@ -21,6 +24,7 @@ import {
 export function useHojaRuta(
   gestionarUseCase: GestionarHojaRuta = defaultGestionarHojaRuta,
   asignarUseCase: AsignarRutaAHoja = defaultAsignarRutaAHoja,
+  rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
 ) {
   const hojasRuta = ref<HojaRuta[]>([]);
   const hojaActual = ref<HojaRuta | null>(null);
@@ -144,6 +148,27 @@ export function useHojaRuta(
     }
   }
 
+  async function toggleTipoRuta(ruta: Ruta, fecha?: string): Promise<boolean> {
+    if (!ruta.id) return false;
+    loading.value = true;
+    error.value = null;
+
+    try {
+      const nuevoEstadoDirecto = !ruta.esDirecta;
+      await rutaRepo.actualizar(ruta.id, { esDirecta: nuevoEstadoDirecto });
+      ruta.esDirecta = nuevoEstadoDirecto;
+      if (fecha) {
+        await cargarPorFecha(fecha);
+      }
+      return true;
+    } catch (err: any) {
+      error.value = err.message || 'Error al alternar tipo de ruta.';
+      return false;
+    } finally {
+      loading.value = false;
+    }
+  }
+
   function limpiar(): void {
     hojasRuta.value = [];
     hojaActual.value = null;
@@ -162,6 +187,7 @@ export function useHojaRuta(
     iniciarHoja,
     finalizarHoja,
     cancelarHoja,
+    toggleTipoRuta,
     limpiar,
   };
 }
