@@ -19,7 +19,7 @@ describe('useUsuarios Composable - Pruebas Unitarias y de Reactividad', () => {
     new Cedula('1710034065'),
     'Gisselle',
     'Caiza',
-    RolUsuario.ADMINISTRADOR,
+    RolUsuario.ADMIN,
     true
   );
   mockUsuario1.id = 'usr-1';
@@ -181,7 +181,7 @@ describe('useUsuarios Composable - Pruebas Unitarias y de Reactividad', () => {
       id: 'usr-1',
       nombres: 'Gisselle Modificada',
       apellidos: 'Caiza',
-      rol: RolUsuario.ADMINISTRADOR,
+      rol: RolUsuario.ADMIN,
     };
 
     await composable.actualizar(dto);

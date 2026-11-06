@@ -49,11 +49,19 @@ export function useUsuarios(
 
   const usuariosFiltrados = computed(() => {
     return usuarios.value.filter((u) => {
-      // Filtro por Rol
+      // Filtro por Rol (robusto contra valores del enum o texto parcial)
       if (filtroRol.value !== 'Todos') {
-        const rolNormalizado = u.rol.toLowerCase();
-        const filtroNormalizado = filtroRol.value.toLowerCase();
-        if (!rolNormalizado.includes(filtroNormalizado)) {
+        const rolNormalizado = (u.rol || '').toLowerCase().trim();
+        const filtroNormalizado = filtroRol.value.toLowerCase().trim();
+        
+        const coincideExacto = rolNormalizado === filtroNormalizado;
+        const coincideAdmin = (filtroNormalizado === 'admin' || filtroNormalizado.includes('administrador')) &&
+          (rolNormalizado === 'admin' || rolNormalizado.includes('administrador'));
+        const coincideCliente = (filtroNormalizado === 'cliente' || filtroNormalizado.includes('usuario')) &&
+          (rolNormalizado === 'cliente' || rolNormalizado.includes('usuario'));
+        const coincideParcial = rolNormalizado.includes(filtroNormalizado) || filtroNormalizado.includes(rolNormalizado);
+
+        if (!coincideExacto && !coincideAdmin && !coincideCliente && !coincideParcial) {
           return false;
         }
       }
@@ -101,8 +109,8 @@ export function useUsuarios(
 
     try {
       usuarios.value = await getUsuariosService.ejecutar();
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar la lista de usuarios';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al cargar la lista de usuarios';
     } finally {
       loading.value = false;
     }
@@ -117,8 +125,8 @@ export function useUsuarios(
       await cargarUsuarios();
       mensajeExito.value = 'Usuario registrado con éxito.';
       return nuevoUsuario;
-    } catch (err: any) {
-      error.value = err.message || 'Error al registrar el usuario';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al registrar el usuario';
       throw err;
     } finally {
       loading.value = false;
@@ -134,8 +142,8 @@ export function useUsuarios(
       await cargarUsuarios();
       mensajeExito.value = 'Usuario actualizado correctamente.';
       return usuarioActualizado;
-    } catch (err: any) {
-      error.value = err.message || 'Error al actualizar el usuario';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al actualizar el usuario';
       throw err;
     } finally {
       loading.value = false;
@@ -156,8 +164,8 @@ export function useUsuarios(
       await desactivarUsuarioService.ejecutar(id);
       await cargarUsuarios();
       mensajeExito.value = 'Usuario dado de baja exitosamente.';
-    } catch (err: any) {
-      error.value = err.message || 'Error al desactivar el usuario';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al desactivar el usuario';
       throw err;
     } finally {
       loading.value = false;
@@ -180,6 +188,23 @@ export function useUsuarios(
     }).then(() => undefined);
   }
 
+  async function existeCedula(cedula: string): Promise<boolean> {
+    const c = cedula.trim();
+    if (!c) return false;
+    // Si ya tenemos los usuarios cargados en memoria, verificamos localmente primero
+    const local = usuarios.value.some((u) => u.cedula?.valor === c);
+    if (local) return true;
+    // Si no está local, podemos delegar a la carga o usar el caso de uso si fuera necesario
+    return false;
+  }
+
+  async function existeEmail(email: string): Promise<boolean> {
+    const e = email.trim().toLowerCase();
+    if (!e) return false;
+    const local = usuarios.value.some((u) => u.email.toLowerCase() === e);
+    return local;
+  }
+
   return {
     usuarios,
     loading,
@@ -199,5 +224,7 @@ export function useUsuarios(
     actualizar,
     desactivar,
     toggleActivo,
+    existeCedula,
+    existeEmail,
   };
 }

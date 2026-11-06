@@ -1,8 +1,8 @@
 /**
  * ObtenerDashboardResumen.ts - Caso de Uso para Consolidar Métricas y KPIs
  *
- * Transforma métricas de dominio en datos optimizados para el panel de control
- * según el rol del usuario conectado.
+ * Transforma métricas de dominio en datos analíticos optimizados para el panel de control
+ * según el rol del usuario conectado y soporta filtros de fecha.
  */
 
 import type { IDashboardRepository } from '../../Domain/Repositories/IDashboardRepository';
@@ -19,7 +19,22 @@ export class ObtenerDashboardResumen {
   constructor(private readonly dashboardRepo: IDashboardRepository) {}
 
   async execute(contexto: DashboardContextoDto): Promise<DashboardResumenDto> {
-    const metricas = await this.dashboardRepo.obtenerMetricas();
+    let metricas;
+    let dataAvanzada;
+
+    if (typeof this.dashboardRepo.obtenerEstadisticasAvanzadas === 'function') {
+      dataAvanzada = await this.dashboardRepo.obtenerEstadisticasAvanzadas(contexto.filtroFecha);
+      metricas = dataAvanzada.metricas;
+    } else {
+      metricas = await this.dashboardRepo.obtenerMetricas(contexto.filtroFecha);
+      dataAvanzada = {
+        metricas,
+        ventasPorDia: [],
+        metodosPago: [],
+        topRutas: [],
+        estadoFlota: { activos: metricas.totalBusesActivos, mantenimiento: 0, inactivos: 0 },
+      };
+    }
     const rolActual = String(contexto.rol || RolUsuario.CLIENTE).toLowerCase();
 
     let tipoDashboard: TipoDashboard = 'cliente';
@@ -28,7 +43,7 @@ export class ObtenerDashboardResumen {
 
     if (rolActual === RolUsuario.ADMIN) {
       tipoDashboard = 'admin';
-      mensajeRol = 'Panel de Administración General de la Cooperativa';
+      mensajeRol = 'Panel de Control y Analítica de Flota (Geotab Analytics)';
       kpis.push(
         {
           etiqueta: 'Usuarios Totales',
@@ -39,26 +54,20 @@ export class ObtenerDashboardResumen {
         {
           etiqueta: 'Buses Operativos',
           valor: metricas.totalBusesActivos,
-          indicador: 'Flota habilitada para servicio',
+          indicador: `${dataAvanzada.estadoFlota.activos} en ruta, ${dataAvanzada.estadoFlota.mantenimiento} en taller`,
           icono: 'bus',
         },
         {
-          etiqueta: 'Rutas Programadas Hoy',
+          etiqueta: 'Rutas Programadas',
           valor: metricas.totalRutasHoy,
-          indicador: 'Despachos del día',
+          indicador: 'Despachos en el período',
           icono: 'map-pin',
         },
         {
-          etiqueta: 'Ventas de Hoy',
+          etiqueta: 'Ventas del Período',
           valor: `$${metricas.ventasDelDia.toFixed(2)}`,
-          indicador: 'Ingresos brutos del sistema',
+          indicador: `${metricas.boletosEmitidosHoy} boletos emitidos`,
           icono: 'dollar-sign',
-        },
-        {
-          etiqueta: 'Boletos Emitidos Hoy',
-          valor: metricas.boletosEmitidosHoy,
-          indicador: 'Tickets generados',
-          icono: 'ticket',
         }
       );
     } else if (rolActual === RolUsuario.OFICINISTA) {
@@ -66,15 +75,15 @@ export class ObtenerDashboardResumen {
       mensajeRol = 'Módulo Operativo de Boletería y Ventas';
       kpis.push(
         {
-          etiqueta: 'Ventas del Día',
+          etiqueta: 'Ventas en Ventanilla',
           valor: `$${metricas.ventasDelDia.toFixed(2)}`,
-          indicador: 'Recaudación de ventanilla',
+          indicador: 'Recaudación del período',
           icono: 'dollar-sign',
         },
         {
           etiqueta: 'Boletos Emitidos',
           valor: metricas.boletosEmitidosHoy,
-          indicador: 'Pasajes asignados',
+          indicador: 'Tickets procesados',
           icono: 'ticket',
         },
         {
@@ -89,9 +98,9 @@ export class ObtenerDashboardResumen {
       mensajeRol = 'Panel de Turnos y Hojas de Ruta del Conductor';
       kpis.push(
         {
-          etiqueta: 'Viajes de Hoy',
+          etiqueta: 'Viajes Programados',
           valor: metricas.totalRutasHoy,
-          indicador: 'Frecuencias programadas',
+          indicador: 'Frecuencias asignadas',
           icono: 'navigation',
         },
         {
@@ -105,13 +114,13 @@ export class ObtenerDashboardResumen {
       tipoDashboard = 'cliente';
       kpis.push(
         {
-          etiqueta: 'Rutas Activas Hoy',
+          etiqueta: 'Rutas Disponibles',
           valor: metricas.totalRutasHoy,
-          indicador: 'Disponibles para reserva',
+          indicador: 'Listas para reserva',
           icono: 'compass',
         },
         {
-          etiqueta: 'Buses Listos',
+          etiqueta: 'Buses Operativos',
           valor: metricas.totalBusesActivos,
           indicador: 'Unidades con servicio',
           icono: 'check-circle',
@@ -119,19 +128,20 @@ export class ObtenerDashboardResumen {
       );
     }
 
+    const ventasSemana = dataAvanzada.ventasPorDia.map((d) => ({
+      etiqueta: d.etiqueta.slice(-5), // MM-DD
+      valor: d.totalVentas,
+    }));
+
     return {
       tipo: tipoDashboard,
       mensajeRol,
       kpis,
-      ventasSemana: [
-        { etiqueta: 'Lun', valor: Math.round(metricas.ventasDelDia * 0.7) },
-        { etiqueta: 'Mar', valor: Math.round(metricas.ventasDelDia * 0.8) },
-        { etiqueta: 'Mie', valor: Math.round(metricas.ventasDelDia * 0.75) },
-        { etiqueta: 'Jue', valor: Math.round(metricas.ventasDelDia * 0.9) },
-        { etiqueta: 'Vie', valor: Math.round(metricas.ventasDelDia * 1.2) },
-        { etiqueta: 'Sab', valor: Math.round(metricas.ventasDelDia * 1.4) },
-        { etiqueta: 'Dom', valor: metricas.ventasDelDia },
-      ],
+      ventasSemana,
+      ventasDetalladas: dataAvanzada.ventasPorDia,
+      metodosPago: dataAvanzada.metodosPago,
+      topRutas: dataAvanzada.topRutas,
+      estadoFlota: dataAvanzada.estadoFlota,
       metricasGenerales: metricas,
     };
   }

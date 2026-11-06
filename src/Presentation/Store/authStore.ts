@@ -45,12 +45,9 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const sesion = await loginUseCase.execute({ email, password });
       user.value = mapUsuarioToProfile(sesion.usuario);
-      if (typeof window !== 'undefined' && window.localStorage) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
-      }
       return sesion;
-    } catch (err: any) {
-      error.value = err.message || 'Error al iniciar sesión';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al iniciar sesión';
       throw err;
     } finally {
       loading.value = false;
@@ -66,51 +63,34 @@ export const useAuthStore = defineStore('auth', () => {
       if (typeof window !== 'undefined' && window.localStorage) {
         localStorage.removeItem(STORAGE_KEY);
       }
-    } catch (err: any) {
-      error.value = err.message || 'Error al cerrar sesión';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al cerrar sesión';
     } finally {
       loading.value = false;
     }
   };
 
   const initializeAuth = async () => {
+    loading.value = true;
     try {
       const currentUser = await loginUseCase.getCurrentUser();
       if (currentUser) {
         user.value = mapUsuarioToProfile(currentUser);
-        if (typeof window !== 'undefined' && window.localStorage) {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(user.value));
-        }
-      } else if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          try {
-            user.value = JSON.parse(stored);
-          } catch {
-            user.value = null;
-          }
-        } else {
-          user.value = null;
-        }
       } else {
+        // Principio Fail-Closed: Sin sesión legítima en Supabase Auth, corte inmediato.
+        // Se destruye cualquier perfil previo o servilleta en localStorage.
         user.value = null;
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
     } catch {
+      user.value = null;
       if (typeof window !== 'undefined' && window.localStorage) {
-        const stored = localStorage.getItem(STORAGE_KEY);
-        if (stored) {
-          try {
-            user.value = JSON.parse(stored);
-          } catch {
-            user.value = null;
-          }
-        } else {
-          user.value = null;
-        }
-      } else {
-        user.value = null;
+        localStorage.removeItem(STORAGE_KEY);
       }
     } finally {
+      loading.value = false;
       ready.value = true;
     }
   };

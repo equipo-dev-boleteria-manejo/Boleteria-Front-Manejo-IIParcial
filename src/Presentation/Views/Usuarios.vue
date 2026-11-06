@@ -1,62 +1,7 @@
 <template>
-  <div class="space-y-6 max-w-7xl mx-auto font-sans">
-    <!-- Encabezado Principal y Acciones (Estilo IHC-Grupo2) -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-      <div>
-        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Gestión de Usuarios y Personal</h1>
-        <p class="text-xs text-slate-500 mt-1">
-          Administración de cuentas, choferes, personal de ventanilla y pasajeros con control de roles (RBAC).
-        </p>
-      </div>
-      <div>
-        <button
-          type="button"
-          @click="abrirModalCrear"
-          class="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-blue-700 active:scale-95 transition-all cursor-pointer"
-        >
-          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Registrar Nuevo Usuario</span>
-        </button>
-      </div>
-    </div>
-
-    <!-- Banner de Éxito -->
-    <div
-      v-if="mensajeExito"
-      class="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-800 flex items-center justify-between shadow-xs"
-      role="status"
-    >
-      <div class="flex items-center gap-2.5">
-        <svg class="h-5 w-5 text-emerald-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <span>{{ mensajeExito }}</span>
-      </div>
-      <button type="button" @click="limpiarMensajes" class="text-emerald-700 hover:text-emerald-950 font-bold p-1">✕</button>
-    </div>
-
-    <!-- Banner de Error -->
-    <div
-      v-if="error"
-      class="p-4 rounded-2xl bg-rose-50 border border-rose-200 text-xs font-semibold text-rose-800 flex items-center justify-between shadow-xs"
-      role="alert"
-    >
-      <div class="flex items-center gap-2.5">
-        <svg class="h-5 w-5 text-rose-600 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-        </svg>
-        <span>{{ error }}</span>
-      </div>
-      <div class="flex items-center gap-3">
-        <button type="button" @click="cargarUsuarios" class="underline font-bold text-rose-700 hover:text-rose-900 cursor-pointer">Reintentar</button>
-        <button type="button" @click="limpiarMensajes" class="text-rose-500 hover:text-rose-800 font-bold p-1">✕</button>
-      </div>
-    </div>
-
-    <!-- Barra de Filtros y Búsqueda (Estilo IHC-Grupo2) -->
-    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+  <div class="space-y-3 max-w-7xl mx-auto font-sans">
+    <!-- Barra de Filtros, Búsqueda y Registro Rápido -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="w-full md:w-80">
         <InputBase
           v-model="busqueda"
@@ -71,32 +16,44 @@
         </InputBase>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Rol:</label>
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Rol:</label>
           <select
             v-model="filtroRol"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
           >
             <option value="Todos">Todos los roles</option>
-            <option value="Administrador">Administrador</option>
-            <option value="Oficinista">Oficinista</option>
-            <option value="Chofer">Chofer</option>
-            <option value="Usuario Final">Usuario Final / Cliente</option>
+            <option :value="RolUsuario.ADMIN">Administrador</option>
+            <option :value="RolUsuario.ENCARGADO">Encargado</option>
+            <option :value="RolUsuario.OFICINISTA">Oficinista</option>
+            <option :value="RolUsuario.CHOFER">Chofer</option>
+            <option :value="RolUsuario.CLIENTE">Usuario Final / Cliente</option>
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Mostrar:</label>
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Mostrar:</label>
           <select
             v-model="registrosPorPagina"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
           >
             <option :value="5">5 filas</option>
             <option :value="10">10 filas</option>
             <option :value="20">20 filas</option>
           </select>
         </div>
+
+        <button
+          type="button"
+          @click="abrirModalCrear"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer ml-1"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>Registrar Nuevo Usuario</span>
+        </button>
       </div>
     </div>
 
@@ -134,11 +91,11 @@
         <table class="w-full text-left text-sm border-collapse" aria-label="Lista de usuarios registrados">
           <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
             <tr>
-              <th scope="col" class="px-6 py-4">Usuario</th>
-              <th scope="col" class="px-6 py-4">Cédula</th>
-              <th scope="col" class="px-6 py-4">Rol Asignado</th>
-              <th scope="col" class="px-6 py-4 text-center">Estado</th>
-              <th scope="col" class="px-6 py-4 text-right">Acciones</th>
+              <th scope="col" class="px-6 py-3.5">Usuario</th>
+              <th scope="col" class="px-6 py-3.5">Cédula</th>
+              <th scope="col" class="px-6 py-3.5">Rol Asignado</th>
+              <th scope="col" class="px-6 py-3.5 text-center">Estado</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Acciones</th>
             </tr>
           </thead>
           <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
@@ -147,25 +104,25 @@
               :key="u.id"
               class="hover:bg-blue-50/50 transition-colors"
             >
-              <td class="px-6 py-4">
+              <td class="px-6 py-3">
                 <div class="flex items-center gap-3">
                   <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-700 font-bold text-xs ring-1 ring-slate-200">
                     {{ (u.nombres || u.email || 'U').charAt(0).toUpperCase() }}
                   </div>
                   <div>
-                    <div class="font-bold text-slate-900 text-sm">
+                    <div class="font-bold text-slate-900 text-sm leading-tight">
                       {{ u.nombres }} {{ u.apellidos }}
                     </div>
                     <div class="text-slate-400 text-xs">{{ u.email }}</div>
                   </div>
                 </div>
               </td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-3">
                 <span class="font-mono text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/80 inline-block">
                   {{ u.cedula?.valor || 'N/D' }}
                 </span>
               </td>
-              <td class="px-6 py-4">
+              <td class="px-6 py-3">
                 <span
                   class="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-2xs"
                   :class="rolBadgeClass(u.rol)"
@@ -173,7 +130,7 @@
                   {{ u.rol }}
                 </span>
               </td>
-              <td class="px-6 py-4 text-center">
+              <td class="px-6 py-3 text-center">
                 <!-- Super Admin base: estado inmutable y protegido -->
                 <span
                   v-if="esSuperAdmin(u.email) || esSuperAdmin(u.cedula?.valor)"
@@ -197,7 +154,7 @@
                   <span>{{ u.activo ? 'Activo' : 'Inactivo' }}</span>
                 </button>
               </td>
-              <td class="px-6 py-4 text-right">
+              <td class="px-6 py-3 text-right">
                 <div class="flex items-center justify-end gap-2">
                   <button
                     type="button"
@@ -254,14 +211,17 @@
     <ModalBase
       v-model="modalAbierto"
       :title="esEdicion ? 'Actualizar Información de Usuario' : 'Registrar Nuevo Usuario'"
-      max-width="lg"
+      max-width="xl"
+      :close-on-click-outside="false"
+      :close-on-esc="false"
     >
-      <form @submit.prevent="guardar" class="space-y-4">
-        <div v-if="errorFormulario" class="p-3.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200">
-          {{ errorFormulario }}
+      <form @submit.prevent="guardar" class="space-y-3.5">
+        <div v-if="errorFormulario" class="p-2.5 rounded-xl bg-rose-50 text-rose-700 text-xs font-bold border border-rose-200 flex items-center gap-2">
+          <span>⚠️</span>
+          <span>{{ errorFormulario }}</span>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3">
           <InputBase
             v-model="formulario.nombres"
             label="Nombres"
@@ -274,57 +234,179 @@
             required
             placeholder="Ej. Gómez Silva"
           />
-        </div>
 
-        <InputBase
-          v-model="formulario.email"
-          label="Correo Electrónico"
-          type="email"
-          :disabled="esEdicion"
-          required
-          placeholder="usuario@cooperativa.ec"
-        />
-
-        <div class="space-y-1">
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Cédula Ecuatoriana <span class="text-rose-500">*</span>
-          </label>
-          <input
-            v-model="formulario.cedula"
-            :disabled="esEdicion"
+          <InputBase
+            v-model="cedula"
+            label="Cédula Ecuatoriana"
+            required
             maxlength="10"
-            required
+            :disabled="esEdicion"
+            :error="errorCedula"
+            :helper-text="!errorCedula ? helperCedula : ''"
             placeholder="1710034065"
-            class="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none font-mono transition-all focus:outline-none focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
-            :class="errorCedulaForm ? 'border-rose-400 focus:ring-rose-200' : 'border-slate-300 focus:border-blue-500'"
-            @input="validarCedulaForm"
+            @input="validateCedulaOnInput"
+            @blur="validateCedula"
           />
-          <p v-if="errorCedulaForm" class="text-xs font-semibold text-rose-600">
-            {{ errorCedulaForm }}
-          </p>
-        </div>
 
-        <div class="space-y-1.5">
-          <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Rol del Sistema <span class="text-rose-500">*</span>
-          </label>
-          <select
-            v-model="formulario.rol"
-            :disabled="esEdicion && (esSuperAdmin(formulario.email) || esSuperAdmin(formulario.cedula))"
+          <InputBase
+            v-model="email"
+            label="Correo Electrónico"
+            type="email"
+            :disabled="esEdicion"
+            :error="errorEmail"
+            :helper-text="!errorEmail ? helperEmail : ''"
             required
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500 transition-all"
-          >
-            <option value="Administrador">Administrador</option>
-            <option value="Oficinista">Oficinista</option>
-            <option value="Chofer">Chofer</option>
-            <option value="Usuario Final">Usuario Final / Cliente</option>
-          </select>
+            placeholder="usuario@cooperativa.ec"
+            @input="validateEmailOnInput"
+            @blur="validateEmail"
+          />
+
+          <!-- Credenciales solo en Creación -->
+          <template v-if="!esEdicion">
+            <InputBase
+              v-model="password"
+              label="Contraseña Inicial"
+              :type="showPassword ? 'text' : 'password'"
+              :error="errorPassword"
+              required
+              autocomplete="new-password"
+              placeholder="••••••••"
+              @blur="validatePassword"
+            >
+              <template #suffix>
+                <button
+                  type="button"
+                  tabindex="-1"
+                  @click.stop.prevent="showPassword = !showPassword"
+                  class="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer select-none"
+                >
+                  {{ showPassword ? 'Ocultar' : 'Ver' }}
+                </button>
+              </template>
+            </InputBase>
+
+            <InputBase
+              v-model="confirmPassword"
+              label="Confirmar Contraseña"
+              :type="showConfirmPassword ? 'text' : 'password'"
+              :error="errorConfirmPassword"
+              required
+              autocomplete="new-password"
+              placeholder="••••••••"
+              @blur="validateConfirmPassword"
+            >
+              <template #suffix>
+                <button
+                  type="button"
+                  tabindex="-1"
+                  @click.stop.prevent="showConfirmPassword = !showConfirmPassword"
+                  class="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer select-none"
+                >
+                  {{ showConfirmPassword ? 'Ocultar' : 'Ver' }}
+                </button>
+              </template>
+            </InputBase>
+
+            <!-- Medidor de Requisitos Compacto -->
+            <div class="sm:col-span-2 rounded-xl bg-slate-50 border border-slate-200/80 px-3 py-2 space-y-1.5">
+              <div class="flex items-center justify-between text-[11px] font-bold text-slate-600">
+                <span>Seguridad de contraseña</span>
+                <span class="text-blue-600 font-black">{{ completedRequirements }}/4</span>
+              </div>
+              <div class="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
+                <div
+                  class="h-full bg-blue-600 transition-all duration-300"
+                  :style="{ width: `${(completedRequirements / 4) * 100}%` }"
+                ></div>
+              </div>
+              <div class="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[10px]">
+                <span
+                  v-for="req in passwordRequirements"
+                  :key="req.label"
+                  class="flex items-center gap-1 font-semibold"
+                  :class="req.isValid ? 'text-emerald-700' : 'text-slate-400'"
+                >
+                  <span>{{ req.isValid ? '✓' : '•' }}</span>
+                  <span>{{ req.label }}</span>
+                </span>
+              </div>
+            </div>
+          </template>
+
+          <!-- Rol del Sistema -->
+          <div class="sm:col-span-2 space-y-1.5">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+              Rol del Sistema <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select
+                v-model="formulario.rol"
+                :disabled="esEdicion && (esSuperAdmin(email) || esSuperAdmin(cedula))"
+                required
+                class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed appearance-none pr-10"
+              >
+                <option :value="RolUsuario.ADMIN">Administrador</option>
+                <option :value="RolUsuario.ENCARGADO">Encargado</option>
+                <option :value="RolUsuario.OFICINISTA">Oficinista</option>
+                <option :value="RolUsuario.CHOFER">Chofer</option>
+                <option :value="RolUsuario.CLIENTE">Usuario Final / Cliente</option>
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+          </div>
+          <!-- Estado de la Cuenta (Solo en Edición) -->
+          <div v-if="esEdicion" class="sm:col-span-2 space-y-1.5 pt-1">
+            <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+              Estado de la Cuenta
+            </label>
+            <div class="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50">
+              <div class="flex items-center gap-2.5">
+                <span
+                  class="h-3 w-3 rounded-full"
+                  :class="formulario.activo ? 'bg-emerald-500' : 'bg-slate-400'"
+                ></span>
+                <div>
+                  <div class="text-xs font-bold text-slate-800">
+                    {{ formulario.activo ? 'Usuario Activo' : 'Usuario Inactivo (Dado de baja)' }}
+                  </div>
+                  <div class="text-[11px] text-slate-500">
+                    {{ formulario.activo ? 'Tiene acceso al sistema según sus permisos de rol.' : 'Su acceso al sistema se encuentra restringido.' }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Switch o Botón de Reactivación / Desactivación -->
+              <button
+                v-if="!esSuperAdmin(email) && !esSuperAdmin(cedula)"
+                type="button"
+                @click="formulario.activo = !formulario.activo"
+                class="px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-xs"
+                :class="
+                  formulario.activo
+                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                    : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-200'
+                "
+              >
+                {{ formulario.activo ? 'Desactivar Cuenta' : 'Reactivar Cuenta' }}
+              </button>
+              <span
+                v-else
+                class="text-[10px] font-bold text-slate-500 bg-slate-200 px-2.5 py-1 rounded-lg"
+              >
+                Protegido
+              </span>
+            </div>
+          </div>
         </div>
 
-        <div class="flex items-center justify-end gap-2.5 pt-4 border-t border-slate-100">
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
           <button
             type="button"
-            class="rounded-xl border border-slate-300 px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            class="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
             @click="modalAbierto = false"
           >
             Cancelar
@@ -332,7 +414,7 @@
           <button
             type="submit"
             :disabled="guardando"
-            class="rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
+            class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer"
           >
             {{ esEdicion ? 'Guardar Cambios' : 'Crear Usuario' }}
           </button>
@@ -344,8 +426,11 @@
 
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
+import { useUiStore } from '../Store/uiStore'
 import { useUsuarios } from '../Composables/useUsuarios'
-import { Cedula } from '../../Domain/ValueObjects/Cedula'
+import { usePasswordValidation } from '../Composables/usePasswordValidation'
+import { useCedulaValidation } from '../Composables/useCedulaValidation'
+import { useEmailValidation } from '../Composables/useEmailValidation'
 import { RolUsuario } from '../../Domain/Constants/EstadosSistema'
 import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
@@ -353,6 +438,8 @@ import ButtonBase from '../Components/ButtonBase.vue'
 import InputBase from '../Components/InputBase.vue'
 import ModalBase from '../Components/ModalBase.vue'
 import PaginationControls from '../Components/PaginationControls.vue'
+
+const uiStore = useUiStore()
 
 const {
   usuarios,
@@ -373,7 +460,42 @@ const {
   actualizar,
   desactivar,
   toggleActivo,
+  existeCedula,
+  existeEmail,
 } = useUsuarios()
+
+const {
+  password,
+  confirmPassword,
+  showPassword,
+  showConfirmPassword,
+  errorPassword,
+  errorConfirmPassword,
+  passwordRequirements,
+  completedRequirements,
+  validatePassword,
+  validateConfirmPassword,
+  validateAll: validatePasswordAll,
+  resetPasswordFields,
+} = usePasswordValidation()
+
+const {
+  cedula,
+  errorCedula,
+  helperCedula,
+  validateCedulaOnInput,
+  validateCedula,
+  resetCedula,
+} = useCedulaValidation(existeCedula)
+
+const {
+  email,
+  errorEmail,
+  helperEmail,
+  validateEmailOnInput,
+  validateEmail,
+  resetEmail,
+} = useEmailValidation(existeEmail)
 
 onMounted(() => {
   cargarUsuarios()
@@ -384,15 +506,13 @@ const modalAbierto = ref(false)
 const esEdicion = ref(false)
 const guardando = ref(false)
 const errorFormulario = ref<string | null>(null)
-const errorCedulaForm = ref<string | null>(null)
 
 const formulario = ref({
   id: '',
   nombres: '',
   apellidos: '',
-  email: '',
-  cedula: '',
   rol: RolUsuario.OFICINISTA as RolUsuario,
+  activo: true,
 })
 
 watch([busqueda, filtroRol, registrosPorPagina], () => {
@@ -405,30 +525,19 @@ function resetFiltros() {
   paginaActual.value = 1
 }
 
-function validarCedulaForm() {
-  if (formulario.value.cedula.length < 10) {
-    errorCedulaForm.value = 'Deben ser 10 dígitos'
-    return
-  }
-  if (!Cedula.validar(formulario.value.cedula)) {
-    errorCedulaForm.value = 'Cédula inválida (Algoritmo Módulo 10)'
-    return
-  }
-  errorCedulaForm.value = null
-}
-
 function abrirModalCrear() {
   esEdicion.value = false
   formulario.value = {
     id: '',
     nombres: '',
     apellidos: '',
-    email: '',
-    cedula: '',
     rol: RolUsuario.OFICINISTA,
+    activo: true,
   }
+  resetCedula()
+  resetEmail()
+  resetPasswordFields()
   errorFormulario.value = null
-  errorCedulaForm.value = null
   modalAbierto.value = true
 }
 
@@ -438,12 +547,15 @@ function abrirModalEditar(u: Usuario) {
     id: u.id || '',
     nombres: u.nombres,
     apellidos: u.apellidos,
-    email: u.email,
-    cedula: u.cedula?.valor || '',
     rol: u.rol,
+    activo: u.activo,
   }
+  cedula.value = u.cedula?.valor || ''
+  errorCedula.value = null
+  email.value = u.email || ''
+  errorEmail.value = null
+  resetPasswordFields()
   errorFormulario.value = null
-  errorCedulaForm.value = null
   modalAbierto.value = true
 }
 
@@ -451,9 +563,19 @@ async function guardar() {
   errorFormulario.value = null
 
   if (!esEdicion.value) {
-    validarCedulaForm()
-    if (errorCedulaForm.value) {
-      errorFormulario.value = 'Por favor ingresa una cédula válida.'
+    const cedulaOk = await validateCedula()
+    if (!cedulaOk || errorCedula.value) {
+      errorFormulario.value = errorCedula.value || 'Por favor ingresa una cédula válida.'
+      return
+    }
+    const emailOk = await validateEmail()
+    if (!emailOk || errorEmail.value) {
+      errorFormulario.value = errorEmail.value || 'Por favor ingresa un correo electrónico válido.'
+      return
+    }
+    const passwordOk = validatePasswordAll()
+    if (!passwordOk) {
+      errorFormulario.value = 'Por favor completa y verifica los requisitos de la contraseña.'
       return
     }
   }
@@ -466,19 +588,25 @@ async function guardar() {
         nombres: formulario.value.nombres,
         apellidos: formulario.value.apellidos,
         rol: formulario.value.rol,
+        activo: formulario.value.activo,
       })
+      uiStore.showToast(`Usuario ${formulario.value.nombres} actualizado con éxito.`, 'success', 3000)
     } else {
       await crear({
-        email: formulario.value.email,
-        cedula: formulario.value.cedula,
+        email: email.value,
+        cedula: cedula.value,
         nombres: formulario.value.nombres,
         apellidos: formulario.value.apellidos,
         rol: formulario.value.rol,
+        password: password.value,
       })
+      uiStore.showToast(`Usuario ${formulario.value.nombres} registrado con éxito.`, 'success', 3000)
     }
     modalAbierto.value = false
-  } catch (err: any) {
-    errorFormulario.value = err.message || 'Error al procesar la solicitud'
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Error al procesar la solicitud'
+    errorFormulario.value = msg
+    uiStore.showToast(msg, 'error', 3000)
   } finally {
     guardando.value = false
   }
@@ -487,12 +615,30 @@ async function guardar() {
 async function confirmarBaja(u: Usuario) {
   if (!u.id) return
   if (esSuperAdmin(u.email) || esSuperAdmin(u.cedula?.valor)) {
-    window.alert('El usuario Super Administrador es un registro base del sistema y no puede ser dado de baja.')
+    uiStore.showAlert({
+      title: 'Acción Bloqueada',
+      message: 'El usuario Super Administrador es un registro base del sistema y no puede ser dado de baja.',
+      type: 'warning',
+    })
     return
   }
-  const confirmacion = window.confirm(`¿Confirmas dar de baja lógica al usuario ${u.nombres} ${u.apellidos}?`)
-  if (confirmacion) {
-    await desactivar(u.id)
+
+  const confirmado = await uiStore.showConfirm({
+    title: 'Confirmación de Baja',
+    message: `¿Estás seguro de que deseas dar de baja lógica al usuario "${u.nombres} ${u.apellidos}"? El usuario perderá acceso inmediato a la plataforma.`,
+    type: 'warning',
+    confirmText: 'Sí, dar de baja',
+    cancelText: 'Cancelar',
+  })
+
+  if (confirmado) {
+    try {
+      await desactivar(u.id)
+      uiStore.showToast(`Usuario ${u.nombres} ${u.apellidos} dado de baja exitosamente.`, 'success', 3000)
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'No se pudo desactivar el usuario.'
+      uiStore.showToast(msg, 'error', 3000)
+    }
   }
 }
 

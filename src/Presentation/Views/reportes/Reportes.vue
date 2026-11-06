@@ -1,28 +1,5 @@
 <template>
-  <div class="space-y-6 max-w-7xl mx-auto font-sans">
-    <!-- Encabezado Principal y Acciones (Estilo IHC-Grupo2) -->
-    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-      <div>
-        <h1 class="text-2xl font-black text-slate-900 tracking-tight">Auditoría y Trazabilidad del Sistema</h1>
-        <p class="text-xs text-slate-500 mt-1">
-          Registro inmutable de eventos, gestión de cambios CCB y control operativo de la plataforma.
-        </p>
-      </div>
-      <div>
-        <button
-          type="button"
-          :disabled="loading.auditoria || loading.cambios"
-          @click="recargarTodo"
-          class="inline-flex items-center gap-2 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-4 py-2.5 text-xs font-bold text-slate-700 shadow-xs transition-all cursor-pointer disabled:opacity-50"
-        >
-          <svg class="h-4 w-4 text-slate-500" :class="loading.auditoria ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-          <span>Actualizar Registros</span>
-        </button>
-      </div>
-    </div>
-
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
     <!-- Banner de Error si falla la carga -->
     <div
       v-if="error.auditoria || error.cambios"
@@ -38,63 +15,63 @@
       <button type="button" @click="recargarTodo" class="underline font-bold text-rose-700 hover:text-rose-900 cursor-pointer">Reintentar</button>
     </div>
 
-    <!-- Sección de KPIs: Resumen de Gestión de Cambios CCB (Estilo IHC-Grupo2) -->
+    <!-- Sección de KPIs: Métricas de Trazabilidad y Auditoría de Sistema -->
     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between text-slate-500">
-          <span class="text-xs font-bold uppercase tracking-wide">Total Cambios CCB</span>
+          <span class="text-xs font-bold uppercase tracking-wide">Total Eventos</span>
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-            📊
+            📋
           </div>
         </div>
         <p class="text-3xl font-extrabold text-slate-900 mt-3 tracking-tight">
-          {{ resumenCambios?.total ?? 0 }}
+          {{ metricasAuditoria.total }}
         </p>
-        <p class="text-[11px] text-slate-400 mt-1">Control de configuración y versiones</p>
+        <p class="text-[11px] text-slate-400 mt-1">Trazabilidad general del sistema</p>
+      </article>
+
+      <article class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-emerald-800">
+          <span class="text-xs font-bold uppercase tracking-wide">Operaciones Exitosas</span>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
+            ✅
+          </div>
+        </div>
+        <p class="text-3xl font-extrabold text-emerald-700 mt-3 tracking-tight">
+          {{ metricasAuditoria.exitos }}
+        </p>
+        <p class="text-[11px] text-emerald-700 mt-1">Transacciones ejecutadas correctamente</p>
+      </article>
+
+      <article class="rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
+        <div class="flex items-center justify-between text-rose-800">
+          <span class="text-xs font-bold uppercase tracking-wide">Alertas y Fallos</span>
+          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-800">
+            🚨
+          </div>
+        </div>
+        <p class="text-3xl font-extrabold text-rose-700 mt-3 tracking-tight">
+          {{ metricasAuditoria.fallos }}
+        </p>
+        <p class="text-[11px] text-rose-700 mt-1">Errores, bloqueos o rechazos</p>
       </article>
 
       <article class="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
         <div class="flex items-center justify-between text-blue-800">
-          <span class="text-xs font-bold uppercase tracking-wide">Cambios Estándar</span>
+          <span class="text-xs font-bold uppercase tracking-wide">Eventos de Seguridad</span>
           <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-800">
-            ⚙️
+            🛡️
           </div>
         </div>
         <p class="text-3xl font-extrabold text-blue-700 mt-3 tracking-tight">
-          {{ resumenCambios?.estandar ?? 0 }}
+          {{ metricasAuditoria.seguridad }}
         </p>
-        <p class="text-[11px] text-blue-600 mt-1">Pre-aprobados y de bajo riesgo</p>
-      </article>
-
-      <article class="rounded-2xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-indigo-800">
-          <span class="text-xs font-bold uppercase tracking-wide">Cambios Normales</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 text-indigo-800">
-            📋
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-indigo-700 mt-3 tracking-tight">
-          {{ resumenCambios?.normal ?? 0 }}
-        </p>
-        <p class="text-[11px] text-indigo-600 mt-1">Revisados por comité técnico</p>
-      </article>
-
-      <article class="rounded-2xl border border-amber-200 bg-amber-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-amber-900">
-          <span class="text-xs font-bold uppercase tracking-wide">Emergencias</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-900">
-            🚨
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-amber-700 mt-3 tracking-tight">
-          {{ resumenCambios?.emergencia ?? 0 }}
-        </p>
-        <p class="text-[11px] text-amber-800 mt-1">Incidentes operativos resueltos</p>
+        <p class="text-[11px] text-blue-700 mt-1">Logins, accesos y operaciones de cuenta</p>
       </article>
     </section>
 
     <!-- Barra de Filtros y Búsqueda de Auditoría -->
-    <div class="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+    <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="w-full md:w-80">
         <InputBase
           v-model="busqueda"
@@ -109,12 +86,12 @@
         </InputBase>
       </div>
 
-      <div class="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Resultado:</label>
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Resultado:</label>
           <select
             v-model="filtroResultado"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
           >
             <option value="Todos">Todos</option>
             <option value="Exito">Éxito</option>
@@ -122,17 +99,29 @@
           </select>
         </div>
 
-        <div class="flex items-center gap-2">
-          <label class="text-xs font-bold text-slate-600 uppercase tracking-wider">Filas:</label>
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Filas:</label>
           <select
             v-model="itemsPerPage"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
           >
-            <option :value="10">10 por página</option>
-            <option :value="20">20 por página</option>
-            <option :value="50">50 por página</option>
+            <option :value="10">10 filas</option>
+            <option :value="20">20 filas</option>
+            <option :value="50">50 filas</option>
           </select>
         </div>
+
+        <button
+          type="button"
+          :disabled="loading.auditoria || loading.cambios"
+          @click="recargarTodo"
+          class="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-xs transition-all cursor-pointer disabled:opacity-50 ml-1"
+        >
+          <svg class="h-3.5 w-3.5 text-slate-500" :class="loading.auditoria ? 'animate-spin' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span>Actualizar Registros</span>
+        </button>
       </div>
     </div>
 
@@ -153,7 +142,7 @@
 
     <!-- Estado 2: VACÍO -->
     <div
-      v-else-if="eventosFiltrados.length === 0"
+      v-else-if="totalEventos === 0"
       class="rounded-2xl bg-white border border-slate-200 p-16 text-center shadow-sm space-y-3"
     >
       <div class="text-4xl text-slate-300">📋</div>
@@ -240,71 +229,29 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { onMounted } from 'vue'
 import { useReportes } from '../../Composables/useReportes'
 import InputBase from '../../Components/InputBase.vue'
 import PaginationControls from '../../Components/PaginationControls.vue'
 
 const {
-  eventosAuditoria,
-  resumenCambios,
+  metricasAuditoria,
+  busqueda,
+  filtroResultado,
+  currentPage,
+  itemsPerPage,
+  eventosFiltrados,
+  eventosPaginados,
+  totalEventos,
+  totalPages,
   loading,
   error,
-  cargarAuditoria,
-  cargarResumenCambios,
+  limpiarFiltros,
+  recargarTodo,
 } = useReportes()
 
-const busqueda = ref('')
-const filtroResultado = ref('Todos')
-const currentPage = ref(1)
-const itemsPerPage = ref(10)
-
 onMounted(() => {
-  cargarAuditoria()
-  cargarResumenCambios()
-})
-
-function recargarTodo() {
-  cargarAuditoria()
-  cargarResumenCambios()
-}
-
-watch([busqueda, filtroResultado, itemsPerPage], () => {
-  currentPage.value = 1
-})
-
-function limpiarFiltros() {
-  busqueda.value = ''
-  filtroResultado.value = 'Todos'
-  currentPage.value = 1
-}
-
-const eventosFiltrados = computed(() => {
-  return eventosAuditoria.value.filter((e) => {
-    if (filtroResultado.value !== 'Todos') {
-      const res = (e.resultado || '').toLowerCase()
-      if (res !== filtroResultado.value.toLowerCase()) return false
-    }
-
-    if (busqueda.value.trim() !== '') {
-      const q = busqueda.value.trim().toLowerCase()
-      const accion = (e.accion || '').toLowerCase()
-      const detalle = (e.detalle || '').toLowerCase()
-      const entidad = (e.entidadAfectada || '').toLowerCase()
-
-      return accion.includes(q) || detalle.includes(q) || entidad.includes(q)
-    }
-
-    return true
-  })
-})
-
-const totalEventos = computed(() => eventosFiltrados.value.length)
-const totalPages = computed(() => Math.max(1, Math.ceil(totalEventos.value / itemsPerPage.value)))
-
-const eventosPaginados = computed(() => {
-  const inicio = (currentPage.value - 1) * itemsPerPage.value
-  return eventosFiltrados.value.slice(inicio, inicio + itemsPerPage.value)
+  recargarTodo()
 })
 
 function formatFecha(fecha?: Date | string): string {

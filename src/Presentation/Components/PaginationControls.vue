@@ -1,5 +1,5 @@
 <template>
-  <div class="bg-slate-50/70 border-t border-slate-100 p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4">
+  <div class="bg-slate-50/70 border-t border-slate-100 px-4 py-2.5 sm:px-6 sm:py-3 flex flex-wrap items-center justify-between gap-3">
     <div class="flex items-center gap-3">
       <p class="text-xs font-semibold text-slate-500">
         Mostrando página <span class="font-bold text-slate-900">{{ currentPage }}</span> de <span class="font-bold text-slate-900">{{ totalPages }}</span>
@@ -12,7 +12,7 @@
         type="button"
         @click="$emit('prev')"
         :disabled="!hasPrevPage"
-        class="h-9 px-3 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-sm"
+        class="h-8 px-2.5 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-xs"
       >
         ← Anterior
       </button>
@@ -23,10 +23,10 @@
           :key="page"
           type="button"
           @click="$emit('setPage', page)"
-          class="h-9 min-w-9 px-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center"
+          class="h-8 min-w-8 px-2 rounded-xl text-xs font-black transition-all active:scale-95 flex items-center justify-center"
           :class="page === currentPage
             ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-sm'"
+            : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 shadow-xs'"
         >
           {{ page }}
         </button>
@@ -36,7 +36,7 @@
         type="button"
         @click="$emit('next')"
         :disabled="!hasNextPage"
-        class="h-9 px-3 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-sm"
+        class="h-8 px-2.5 flex items-center justify-center rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 transition-all hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:pointer-events-none shadow-xs"
       >
         Siguiente →
       </button>

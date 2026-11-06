@@ -7,11 +7,10 @@
  * - Mapeo desacoplado hacia la Entidad de Dominio Usuario.
  */
 
-import { supabase } from '../Api/supabaseClient';
+import { supabase, authIsolatedClient } from '../Api/supabaseClient';
 import { Usuario } from '../../Domain/Entities/Usuario';
 import { Cedula } from '../../Domain/ValueObjects/Cedula';
 import { RolUsuario } from '../../Domain/Constants/EstadosSistema';
-import { SUPER_ADMIN_CONFIG, esSuperAdmin } from '../../Domain/Constants/SuperAdmin';
 import type {
   IAuthRepository,
   SesionAuth,
@@ -22,111 +21,59 @@ import {
   CredencialesInvalidasException,
 } from '../../Domain/Exceptions/UsuarioException';
 
+interface UsuarioRow {
+  Id: string;
+  Email: string;
+  Cedula: string;
+  Nombres: string;
+  Apellidos: string;
+  Rol: string;
+  Activo: boolean;
+  CooperativaId: number | null;
+  CreatedAt: string | null;
+}
+
 export class SupabaseAuthRepository implements IAuthRepository {
   private readonly TABLA_USUARIOS = 'Usuarios';
 
   async iniciarSesion(email: string, password: string): Promise<SesionAuth> {
     const emailNormalizado = email.trim().toLowerCase();
 
-    // 1. Verificación prioritaria de Super Administrador base
-    if (esSuperAdmin(emailNormalizado)) {
-      if (password === SUPER_ADMIN_CONFIG.DEFAULT_PASSWORD) {
-        // Garantizar que exista en la tabla Usuarios de Supabase
-        const { data: adminExistente } = await supabase
-          .from(this.TABLA_USUARIOS)
-          .select('*')
-          .or(`Email.eq.${emailNormalizado},Cedula.eq.${SUPER_ADMIN_CONFIG.CEDULA}`)
-          .maybeSingle();
+    // 1. Autenticación estricta con el proveedor de identidad (Supabase Auth)
+    const { data: authData, error: authError } =
+      await supabase.auth.signInWithPassword({
+        email: emailNormalizado,
+        password,
+      });
 
-        if (adminExistente) {
-          const usuarioAdmin = this.mapRowToEntity(adminExistente);
-          return {
-            usuario: usuarioAdmin,
-            token: 'session-superadmin-token',
-          };
-        }
-
-        // Si no existiera en la BD, se siembra de forma automática
-        const rowAdmin = {
-          Email: SUPER_ADMIN_CONFIG.EMAIL_PRIMARY,
-          Cedula: SUPER_ADMIN_CONFIG.CEDULA,
-          Nombres: SUPER_ADMIN_CONFIG.NOMBRES,
-          Apellidos: SUPER_ADMIN_CONFIG.APELLIDOS,
-          Rol: SUPER_ADMIN_CONFIG.ROL,
-          Activo: true,
-          CooperativaId: null,
-        };
-
-        const { data: nuevoAdmin, error: errorInsert } = await supabase
-          .from(this.TABLA_USUARIOS)
-          .insert(rowAdmin)
-          .select('*')
-          .single();
-
-        if (nuevoAdmin) {
-          return {
-            usuario: this.mapRowToEntity(nuevoAdmin),
-            token: 'session-superadmin-token',
-          };
-        }
-        if (errorInsert) {
-          console.warn('Advertencia al sembrar Super Admin:', errorInsert.message);
-        }
-      } else {
-        throw new CredencialesInvalidasException();
+    // Fail-fast: si el Identity Provider rechaza las credenciales o no emite sesión, corte inmediato
+    if (authError || !authData.user || !authData.session?.access_token) {
+      if (authError?.message?.toLowerCase().includes('email not confirmed')) {
+        throw new UsuarioException('El correo aún no ha sido confirmado en Supabase Auth.');
       }
+      throw new CredencialesInvalidasException();
     }
 
-    // 2. Intento de inicio de sesión con Supabase Auth oficial
-    let authUserId: string | null = null;
-    let authToken: string | undefined = undefined;
-
-    try {
-      const { data: authData, error: authError } =
-        await supabase.auth.signInWithPassword({
-          email: emailNormalizado,
-          password,
-        });
-
-      if (!authError && authData.user) {
-        authUserId = authData.user.id;
-        authToken = authData.session?.access_token;
-      }
-    } catch {
-      // Continuar con validación en la tabla Usuarios en caso de error de red o Auth
-    }
-
-    // 3. Consulta de perfil en la tabla Usuarios
-    let query = supabase.from(this.TABLA_USUARIOS).select('*');
-    if (authUserId) {
-      query = query.or(`Id.eq.${authUserId},Email.eq.${emailNormalizado}`);
-    } else {
-      query = query.eq('Email', emailNormalizado);
-    }
-
-    const { data: perfilData, error: perfilError } = await query.maybeSingle();
+    // 2. Hidratación de perfil de dominio para el usuario autenticado
+    const { data: perfilData, error: perfilError } = await supabase
+      .from(this.TABLA_USUARIOS)
+      .select('*')
+      .or(`Id.eq.${authData.user.id},Email.eq.${emailNormalizado}`)
+      .maybeSingle();
 
     if (perfilError || !perfilData) {
-      throw new CredencialesInvalidasException();
+      throw new UsuarioException('No se pudo cargar el perfil de usuario asociado a la cuenta');
     }
 
     if (!perfilData.Activo) {
-      if (authUserId) {
-        await supabase.auth.signOut().catch(() => {});
-      }
+      await supabase.auth.signOut().catch(() => {});
       throw new UsuarioDesactivadoException(emailNormalizado);
     }
 
-    // Si no vino de Supabase Auth (ej. usuario de prueba registrado localmente),
-    // validar que la contraseña cumpla los requisitos mínimos para autorizar
-    if (!authUserId && password.length < 8) {
-      throw new CredencialesInvalidasException();
-    }
-
-    const usuario = this.mapRowToEntity(perfilData);
+    const usuario = this.mapRowToEntity(perfilData as UsuarioRow);
     return {
       usuario,
-      token: authToken || `session-${perfilData.Id}`,
+      token: authData.session.access_token,
     };
   }
 
@@ -149,7 +96,7 @@ export class SupabaseAuthRepository implements IAuthRepository {
           .maybeSingle();
 
         if (perfilData) {
-          return this.mapRowToEntity(perfilData);
+          return this.mapRowToEntity(perfilData as UsuarioRow);
         }
       }
     } catch {
@@ -168,39 +115,35 @@ export class SupabaseAuthRepository implements IAuthRepository {
   async registrarse(usuario: Usuario, password: string): Promise<Usuario> {
     const emailNormalizado = usuario.email.trim().toLowerCase();
 
-    // Verificar si el usuario ya existe en la tabla Usuarios
+    // Verificar si el correo o la cédula ya existen en la tabla Usuarios
     const { data: existente } = await supabase
       .from(this.TABLA_USUARIOS)
-      .select('Id')
-      .eq('Email', emailNormalizado)
+      .select('Id, Email, Cedula')
+      .or(`Email.eq.${emailNormalizado},Cedula.eq.${usuario.cedula.valor}`)
       .maybeSingle();
 
     if (existente) {
-      throw new UsuarioException(`Ya existe una cuenta registrada con el correo '${emailNormalizado}'`);
-    }
-
-    // Intentar registrar en Supabase Auth
-    let authUserId: string | null = null;
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: emailNormalizado,
-        password,
-      });
-
-      if (authData?.user) {
-        authUserId = authData.user.id;
-      } else if (authError) {
-        console.warn('Aviso Supabase Auth al registrar:', authError.message);
+      if (existente.Email?.toLowerCase() === emailNormalizado) {
+        throw new UsuarioException(`Ya existe una cuenta registrada con el correo '${emailNormalizado}'`);
       }
-    } catch (err: any) {
-      console.warn('Excepción en Supabase Auth signUp:', err?.message);
+      throw new UsuarioException(`Ya existe una cuenta registrada con la cédula '${usuario.cedula.valor}'`);
     }
 
-    // Si Supabase Auth rechaza correos de prueba o excede rate-limit, generamos un UUID válido
-    const idUsuario = authUserId || crypto.randomUUID();
+    // Intentar registrar en Supabase Auth mediante cliente aislado para no alterar la sesión activa
+    const authClient = authIsolatedClient ?? supabase;
+    const { data: authData, error: authError } = await authClient.auth.signUp({
+      email: emailNormalizado,
+      password,
+    });
+
+    if (authError || !authData?.user) {
+      throw new UsuarioException(
+        `Error al registrar credenciales en el proveedor de autenticación: ${authError?.message || 'No se pudo crear la cuenta'}`
+      );
+    }
 
     const row = {
-      Id: idUsuario,
+      Id: authData.user.id,
       Email: emailNormalizado,
       Cedula: usuario.cedula.valor,
       Nombres: usuario.nombres.trim(),
@@ -220,17 +163,11 @@ export class SupabaseAuthRepository implements IAuthRepository {
       throw new UsuarioException(`Error al guardar perfil de usuario: ${perfilError.message}`);
     }
 
-    return this.mapRowToEntity(perfilData);
+    return this.mapRowToEntity(perfilData as UsuarioRow);
   }
 
-  private mapRowToEntity(row: any): Usuario {
-    let cedulaObj: Cedula;
-    try {
-      cedulaObj = Cedula.crear(row.Cedula);
-    } catch {
-      cedulaObj = Object.create(Cedula.prototype);
-      Object.defineProperty(cedulaObj, '_valor', { value: row.Cedula, writable: false });
-    }
+  private mapRowToEntity(row: UsuarioRow): Usuario {
+    const cedulaObj = Cedula.crear(row.Cedula);
 
     const usuario = new Usuario(
       row.Email,

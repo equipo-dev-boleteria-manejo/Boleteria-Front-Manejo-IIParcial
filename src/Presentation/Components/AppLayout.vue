@@ -202,7 +202,7 @@
       </header>
 
       <!-- Área de Contenido Principal -->
-      <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-slate-50/70">
+      <main class="flex-1 overflow-y-auto p-4 sm:p-5 lg:p-6 bg-slate-50/70">
         <slot />
       </main>
     </div>
@@ -210,7 +210,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, h } from 'vue'
+import { ref, computed, h, type Component } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../Store/authStore'
 import { useUiStore } from '../Store/uiStore'
@@ -312,7 +312,7 @@ interface NavItem {
   to: string
   label: string
   desc: string
-  iconComponent: any
+  iconComponent: Component
   roles?: string[]
 }
 
