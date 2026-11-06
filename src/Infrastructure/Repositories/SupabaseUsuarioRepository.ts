@@ -168,14 +168,7 @@ export class SupabaseUsuarioRepository implements IUsuarioRepository {
   }
 
   private mapRowToEntity(row: UsuarioRow): Usuario {
-    let cedulaObj: Cedula;
-    try {
-      cedulaObj = Cedula.crear(row.Cedula);
-    } catch {
-      // Fallback tolerante si en BD hubiera datos preexistentes
-      cedulaObj = Object.create(Cedula.prototype);
-      Object.defineProperty(cedulaObj, '_valor', { value: row.Cedula, writable: false });
-    }
+    const cedulaObj = Cedula.crear(row.Cedula);
 
     const usuario = new Usuario(
       row.Email,

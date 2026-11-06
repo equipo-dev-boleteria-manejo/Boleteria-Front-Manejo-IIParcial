@@ -39,15 +39,15 @@ describe('useAuth Composable', () => {
     } as unknown as LoginUseCase;
   });
 
-  it('debe validar la cédula usando el algoritmo Módulo 10 ecuatoriano', () => {
+  it('debe validar la cédula usando el algoritmo Módulo 10 ecuatoriano', async () => {
     const composable = useAuth(mockSignUpService, mockLoginService);
 
     composable.cedula.value = '12345';
-    expect(composable.validateCedula()).toBe(false);
+    expect(await composable.validateCedula()).toBe(false);
     expect(composable.errorCedula.value).toContain('no es válida según el estándar ecuatoriano');
 
     composable.cedula.value = '1710034065';
-    expect(composable.validateCedula()).toBe(true);
+    expect(await composable.validateCedula()).toBe(true);
     expect(composable.errorCedula.value).toBe('');
   });
 
