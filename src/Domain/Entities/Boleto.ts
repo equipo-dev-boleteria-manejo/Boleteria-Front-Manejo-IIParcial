@@ -16,6 +16,11 @@ export class Boleto {
   public codigoBarras?: string | null;
   public subRutaOrigen?: string | null;
   public subRutaDestino?: string | null;
+  public fechaNacimiento?: string | null;
+  public esMenor?: boolean;
+  public esDiscapacitado?: boolean;
+  public esTerceraEdad?: boolean;
+  public descuentoAplicado?: number;
   public createdAt?: Date;
 
   constructor(
