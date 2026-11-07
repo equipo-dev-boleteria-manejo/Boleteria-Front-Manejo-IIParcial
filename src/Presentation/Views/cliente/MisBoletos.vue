@@ -201,7 +201,7 @@ interface ContextoComprobanteVista {
 }
 
 const authStore = useAuthStore()
-const { boletos, loading, cargarHistorial } = useTickets()
+const { boletos, loading, gruposPorVenta, totalBoletos, cargarHistorial } = useTickets()
 const {
   rutas,
   buses,
@@ -226,45 +226,12 @@ const rutasPorId = computed(() => {
   return mapa
 })
 
-const grupos = computed<GrupoBoletos[]>(() => {
-  const porVenta = new Map<number, Boleto[]>()
-
-  boletos.value.forEach((boleto) => {
-    const lista = porVenta.get(boleto.ventaId) ?? []
-    lista.push(boleto)
-    porVenta.set(boleto.ventaId, lista)
-  })
-
-  return Array.from(porVenta.entries())
-    .map(([ventaId, lista]) => {
-      const ordenados = [...lista].sort((a, b) => a.asientoId - b.asientoId)
-      const primero = ordenados[0]
-      const ruta = rutasPorId.value.get(primero.rutaId) ?? null
-      const estados = new Set(ordenados.map((boleto) => boleto.estado))
-      const creadoEn = Math.max(
-        ...ordenados.map((boleto) =>
-          boleto.createdAt ? new Date(boleto.createdAt).getTime() : 0,
-        ),
-      )
-
-      return {
-        ventaId,
-        rutaId: primero.rutaId,
-        boletos: ordenados,
-        total: Number(
-          ordenados
-            .reduce((acumulado, boleto) => acumulado + Number(boleto.precioFinal ?? 0), 0)
-            .toFixed(2),
-        ),
-        estado: estados.size === 1 ? primero.estado : 'Estados variados',
-        creadoEn: Number.isFinite(creadoEn) ? creadoEn : 0,
-        ruta,
-      }
-    })
-    .sort((a, b) => b.creadoEn - a.creadoEn)
-})
-
-const totalBoletos = computed(() => boletos.value.length)
+const grupos = computed<GrupoBoletos[]>(() =>
+  gruposPorVenta.value.map((grupo) => ({
+    ...grupo,
+    ruta: rutasPorId.value.get(grupo.rutaId) ?? null,
+  })),
+)
 
 const boletosEmitidos = computed(
   () =>

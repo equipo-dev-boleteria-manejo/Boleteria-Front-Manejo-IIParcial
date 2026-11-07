@@ -367,7 +367,7 @@ import ComprobanteBoletoModal from '../../Components/ComprobanteBoletoModal.vue'
 import { useAuthStore } from '../../Store/authStore'
 import { useRutas } from '../../Composables/useRutas'
 import { useSeleccionCompra } from '../../Composables/useSeleccionCompra'
-import { useVentaDescuento } from '../../Composables/useVentaDescuento'
+import { useCompraOnline } from '../../Composables/useCompraOnline'
 import {
   construirRutasDisponibles,
   formatearFechaRuta,
@@ -415,6 +415,7 @@ const {
   cantidadSeleccionada,
   totalBase,
   totalConDescuentos,
+  ahorro,
   pasajerosCalculados,
   pasajerosValidos,
   cedulasDuplicadas,
@@ -425,7 +426,7 @@ const {
   limpiarSeleccion,
   pasajerosParaConfirmar,
 } = useSeleccionCompra()
-const { confirmar: confirmarCompra } = useVentaDescuento()
+const { comprar: procesarCompraOnline, loading: enviando } = useCompraOnline()
 
 const hoy = new Date().toISOString().slice(0, 10)
 const filtroOrigen = ref('')
@@ -437,8 +438,7 @@ const rutaSeleccionada = ref<RutaDisponible | null>(null)
 const metodoPago = ref<MetodoPagoOnline>('Transferencia')
 const comprobante = ref<File | null>(null)
 const archivoInput = ref<HTMLInputElement | null>(null)
-const stripeForm = ref<{ pagar: () => Promise<string>; reiniciar: () => void } | null>(null)
-const enviando = ref(false)
+const stripeForm = ref<{ pagar: (monto?: number) => Promise<string>; reiniciar: () => void } | null>(null)
 const errorCompra = ref<string | null>(null)
 const errorStripe = ref<string | null>(null)
 const mostrarComprobante = ref(false)
@@ -482,10 +482,6 @@ const rutasFiltradas = computed(() =>
 
 const hayFiltros = computed(
   () => Boolean(filtroOrigen.value.trim() || filtroDestino.value.trim() || filtroFecha.value),
-)
-
-const ahorro = computed(() =>
-  Number((totalBase.value - totalConDescuentos.value).toFixed(2)),
 )
 
 const puedeConfirmar = computed(
@@ -635,28 +631,29 @@ async function confirmar(): Promise<void> {
     return
   }
 
-  enviando.value = true
-
   try {
-    let stripeId: string | undefined
-    if (metodoPago.value === 'Tarjeta') {
-      stripeId = await stripeForm.value!.pagar()
-    }
-
-    const resultado = await confirmarCompra({
-      ruta: {
-        id: actual.ruta.id,
-        origen: actual.origen,
-        destino: actual.destino,
+    const resultado = await procesarCompraOnline(
+      {
+        ruta: {
+          id: actual.ruta.id,
+          origen: actual.origen,
+          destino: actual.destino,
+        },
+        asientos: [...asientosSeleccionados.value],
+        precioUnitario: tarifaBase.value,
+        pasajeros: pasajerosParaConfirmar(),
+        metodoPago: metodoPago.value,
+        capturaArchivo: metodoPago.value === 'Transferencia' ? comprobante.value : null,
+        canal: 'online',
+        usuarioId: authStore.user?.id ?? null,
       },
-      asientos: [...asientosSeleccionados.value],
-      precioUnitario: tarifaBase.value,
-      pasajeros: pasajerosParaConfirmar(),
-      metodoPago: metodoPago.value,
-      capturaArchivo: metodoPago.value === 'Transferencia' ? comprobante.value : null,
-      stripeId,
-      usuarioId: authStore.user?.id ?? null,
-    })
+      async (monto) => {
+        if (!stripeForm.value) {
+          throw new Error('El formulario de pago con tarjeta todavía no está disponible.')
+        }
+        return stripeForm.value.pagar(monto)
+      },
+    )
 
     const esTransferencia = metodoPago.value === 'Transferencia'
     comprobanteBoletos.value = resultado.boletos ?? []
@@ -683,8 +680,6 @@ async function confirmar(): Promise<void> {
       error,
       'No se pudo completar la compra de los boletos.',
     )
-  } finally {
-    enviando.value = false
   }
 }
 

@@ -12,16 +12,16 @@
         <span
           v-for="tipo in tiposDisponibles"
           :key="tipo"
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1"
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5"
         >
           <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: colorTipo(tipo) }" />
           {{ tipo }} · ${{ formatearPrecio(preciosPorTipo[tipo] ?? 0) }}
         </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5">
           <span class="h-2.5 w-2.5 rounded-full bg-slate-300" />
           Ocupado
         </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5">
           <span class="h-2.5 w-2.5 rounded-full bg-blue-600" />
           Seleccionado
         </span>
@@ -41,9 +41,9 @@
       <div
         v-for="piso in pisos"
         :key="piso.numero"
-        class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4"
+        class="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4"
       >
-        <div class="mb-4 flex items-center justify-between">
+        <div class="mb-3 flex items-center justify-between sm:mb-4">
           <span class="text-xs font-bold uppercase tracking-wider text-slate-500">
             {{ pisos.length > 1 ? `Piso ${piso.numero}` : 'Distribución del bus' }}
           </span>
@@ -63,7 +63,7 @@
               v-for="asiento in fila.izquierda"
               :key="asiento.id ?? asiento.numeroAsiento"
               type="button"
-              class="relative flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-all duration-150"
+              class="relative flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-[11px] font-black transition-all duration-150 sm:h-11 sm:text-xs"
               :class="claseAsiento(asiento)"
               :style="estiloAsiento(asiento)"
               :disabled="ocupado(asiento)"
@@ -80,7 +80,7 @@
               v-for="asiento in fila.derecha"
               :key="asiento.id ?? asiento.numeroAsiento"
               type="button"
-              class="relative flex h-11 items-center justify-center rounded-xl border text-xs font-black transition-all duration-150"
+              class="relative flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-[11px] font-black transition-all duration-150 sm:h-11 sm:text-xs"
               :class="claseAsiento(asiento)"
               :style="estiloAsiento(asiento)"
               :disabled="ocupado(asiento)"

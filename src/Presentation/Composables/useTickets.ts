@@ -14,6 +14,15 @@ import {
   verHistorialBoletosUseCase as defaultVerHistorialBoletosUseCase,
 } from '../../Application/UseCases/VerHistorialBoletos';
 
+export interface GrupoBoletosResumen {
+  ventaId: number;
+  rutaId: number;
+  boletos: Boleto[];
+  total: number;
+  estado: string;
+  creadoEn: number;
+}
+
 export function useTickets(
   historialUseCase: VerHistorialBoletos = defaultVerHistorialBoletosUseCase,
 ) {
@@ -24,6 +33,53 @@ export function useTickets(
 
   const tieneBoletos = computed<boolean>(() => boletos.value.length > 0);
   const totalBoletos = computed<number>(() => boletos.value.length);
+  const totalGastado = computed<number>(() =>
+    Number(
+      boletos.value
+        .reduce((total, boleto) => total + Number(boleto.precioFinal ?? 0), 0)
+        .toFixed(2),
+    ),
+  );
+
+  const gruposPorVenta = computed<GrupoBoletosResumen[]>(() => {
+    const porVenta = new Map<number, Boleto[]>();
+
+    boletos.value.forEach((boleto) => {
+      const lista = porVenta.get(boleto.ventaId) ?? [];
+      lista.push(boleto);
+      porVenta.set(boleto.ventaId, lista);
+    });
+
+    return Array.from(porVenta.entries())
+      .map(([ventaId, lista]) => {
+        const ordenados = [...lista].sort((a, b) => a.asientoId - b.asientoId);
+        const primero = ordenados[0];
+        const estados = new Set(ordenados.map((boleto) => boleto.estado));
+        const creadoEn = Math.max(
+          ...ordenados.map((boleto) =>
+            boleto.createdAt ? new Date(boleto.createdAt).getTime() : 0,
+          ),
+        );
+
+        return {
+          ventaId,
+          rutaId: primero.rutaId,
+          boletos: ordenados,
+          total: Number(
+            ordenados
+              .reduce(
+                (acumulado, boleto) =>
+                  acumulado + Number(boleto.precioFinal ?? 0),
+                0,
+              )
+              .toFixed(2),
+          ),
+          estado: estados.size === 1 ? primero.estado : 'Estados variados',
+          creadoEn: Number.isFinite(creadoEn) ? creadoEn : 0,
+        };
+      })
+      .sort((a, b) => b.creadoEn - a.creadoEn);
+  });
 
   /**
    * Carga los boletos asociados a la cédula o identificador del usuario.
@@ -36,8 +92,11 @@ export function useTickets(
       const lista = await historialUseCase.ejecutar(usuarioIdOrCedula);
       boletos.value = lista;
       return lista;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar el historial de boletos.';
+    } catch (err: unknown) {
+      error.value =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Error al cargar el historial de boletos.';
       throw err;
     } finally {
       loading.value = false;
@@ -68,6 +127,8 @@ export function useTickets(
     boletoSeleccionado,
     tieneBoletos,
     totalBoletos,
+    totalGastado,
+    gruposPorVenta,
     cargarHistorial,
     seleccionarBoleto,
     limpiar,

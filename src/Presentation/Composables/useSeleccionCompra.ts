@@ -2,46 +2,23 @@
  * useSeleccionCompra.ts - Composable Headless para el mapa de asientos y
  * captura de pasajeros de una compra.
  *
- * Centraliza la carga del mapa del bus, la disponibilidad real de la ruta, el
- * cálculo de tarifas por pasajero y la transformación a los DTOs que consumen
- * los casos de uso de compra online y venta en ventanilla.
+ * La carga del mapa, las tarifas y el cálculo de descuentos viven en casos de
+ * uso. Este composable solo mantiene estado reactivo y transforma los datos a
+ * los DTOs que consumen los flujos de compra online y venta en ventanilla.
  */
 
 import { computed, ref } from 'vue';
 import type { Asiento } from '../../Domain/Entities/Asiento';
-import type { IAsientoRepository } from '../../Domain/Repositories/IAsientoRepository';
-import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
-import type { ISeatTypeRepository } from '../../Domain/Repositories/ISeatTypeRepository';
 import type { PasajeroCompraInput } from '../../Application/UseCases/ConfirmarCompra';
 import type { PasajeroVentaInput } from '../../Application/UseCases/VenderBoleto';
-import { TipoPasajero } from '../../Domain/Constants/EstadosSistema';
-import { calcularEdad } from '../../Domain/Services/DescuentoService';
-import { CalcularDescuentoVenta } from '../../Application/UseCases/CalcularDescuentoVenta';
-import { SupabaseAsientoRepository } from '../../Infrastructure/Repositories/SupabaseAsientoRepository';
-import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
-import { SupabaseSeatTypeRepository } from '../../Infrastructure/Repositories/SupabaseSeatTypeRepository';
+import { ObtenerMapaAsientos } from '../../Application/UseCases/ObtenerMapaAsientos';
+import { CalcularTarifaPasajero } from '../../Application/UseCases/CalcularTarifaPasajero';
+import type {
+  DatosPasajeroSeleccion,
+  PasajeroCalculado,
+} from '../../Application/Dtos/PasajeroCompraDto';
 
-export interface DatosPasajeroSeleccion {
-  nombres: string;
-  apellidos: string;
-  cedula: string;
-  fechaNacimiento: string;
-  tieneDiscapacidad: boolean;
-}
-
-export interface PasajeroCalculado extends DatosPasajeroSeleccion {
-  asientoId: number;
-  asientoNumero: string;
-  precioBase: number;
-  precioFinal: number;
-  descuentoAplicado: number;
-  esMenor: boolean;
-  esDiscapacitado: boolean;
-  esTerceraEdad: boolean;
-  tipoPasajero: TipoPasajero;
-  valido: boolean;
-  error: string | null;
-}
+export type { DatosPasajeroSeleccion, PasajeroCalculado };
 
 export interface CargarMapaInput {
   rutaId: number;
@@ -60,10 +37,8 @@ const DATOS_VACIOS: DatosPasajeroSeleccion = {
 };
 
 export function useSeleccionCompra(
-  asientoRepo: IAsientoRepository = new SupabaseAsientoRepository(),
-  boletosRepo: IBoletosRepository = new SupabaseBoletosRepository(),
-  seatTypeRepo: ISeatTypeRepository = new SupabaseSeatTypeRepository(),
-  calcularDescuentoUseCase: CalcularDescuentoVenta = new CalcularDescuentoVenta(),
+  obtenerMapa: ObtenerMapaAsientos = new ObtenerMapaAsientos(),
+  calcularTarifa: CalcularTarifaPasajero = new CalcularTarifaPasajero(),
 ) {
   const asientosMapa = ref<Asiento[]>([]);
   const asientosOcupados = ref<number[]>([]);
@@ -97,7 +72,7 @@ export function useSeleccionCompra(
   );
 
   const totalBase = computed<number>(() =>
-    thisRedondear(
+    redondear(
       asientosElegidos.value.reduce(
         (acumulado, asiento) => acumulado + precioDeAsiento(asiento),
         0,
@@ -106,19 +81,21 @@ export function useSeleccionCompra(
   );
 
   const pasajerosCalculados = computed<PasajeroCalculado[]>(() =>
-    asientosElegidos.value.map((asiento) =>
-      calcularPasajero(asiento),
-    ),
+    asientosElegidos.value.map((asiento) => calcularPasajero(asiento)),
   );
 
   const totalConDescuentos = computed<number>(() =>
-    thisRedondear(
+    redondear(
       pasajerosCalculados.value.reduce(
         (acumulado, pasajero) =>
           acumulado + (pasajero.valido ? pasajero.precioFinal : pasajero.precioBase),
         0,
       ),
     ),
+  );
+
+  const ahorro = computed<number>(() =>
+    redondear(totalBase.value - totalConDescuentos.value),
   );
 
   const cedulasDuplicadas = computed<string[]>(() => {
@@ -144,7 +121,7 @@ export function useSeleccionCompra(
       !hayCedulasDuplicadas.value,
   );
 
-  function thisRedondear(valor: number): number {
+  function redondear(valor: number): number {
     return Number(valor.toFixed(2));
   }
 
@@ -157,38 +134,17 @@ export function useSeleccionCompra(
     error.value = null;
 
     try {
-      const [tiposAsiento, asientos, ocupados] = await Promise.all([
-        seatTypeRepo.obtenerActivos(),
-        asientoRepo.asegurarAsientosDeBus(
-          input.busId,
-          input.totalAsientos,
-          input.estructura,
-        ),
-        boletosRepo.obtenerAsientosOcupadosPorRuta(input.rutaId),
-      ]);
-
-      preciosPorTipo.value = tiposAsiento.reduce<Record<string, number>>(
-        (mapa, tipo) => {
-          mapa[tipo.nombre] = tipo.precioBase;
-          return mapa;
-        },
-        {},
-      );
-
-      const precios = Object.values(preciosPorTipo.value);
-      tarifaBase.value =
-        input.tarifaBase && input.tarifaBase > 0
-          ? input.tarifaBase
-          : precios.length
-            ? Math.min(...precios)
-            : 10;
-
-      asientosMapa.value = asientos;
-      asientosOcupados.value = ocupados;
+      const resultado = await obtenerMapa.ejecutar(input);
+      preciosPorTipo.value = resultado.preciosPorTipo;
+      tarifaBase.value = resultado.tarifaBase;
+      asientosMapa.value = resultado.asientos;
+      asientosOcupados.value = resultado.ocupados;
       limpiarSeleccion();
-    } catch (err: any) {
+    } catch (err: unknown) {
       error.value =
-        err?.message || 'Error al cargar el mapa de asientos de la ruta.';
+        err instanceof Error
+          ? err.message
+          : 'Error al cargar el mapa de asientos de la ruta.';
       asientosMapa.value = [];
       asientosOcupados.value = [];
       throw err;
@@ -272,78 +228,11 @@ export function useSeleccionCompra(
   }
 
   function calcularPasajero(asiento: Asiento): PasajeroCalculado {
-    const datos = obtenerDatos(asiento.id!);
-    const precioBase = precioDeAsiento(asiento);
-    const base: PasajeroCalculado = {
-      ...datos,
-      asientoId: asiento.id!,
-      asientoNumero: asiento.numeroAsiento,
-      precioBase,
-      precioFinal: precioBase,
-      descuentoAplicado: 0,
-      esMenor: false,
-      esDiscapacitado: false,
-      esTerceraEdad: false,
-      tipoPasajero: TipoPasajero.GENERAL,
-      valido: false,
-      error: null,
-    };
-
-    if (
-      !datos.nombres.trim() ||
-      !datos.apellidos.trim() ||
-      !datos.cedula.trim() ||
-      !datos.fechaNacimiento
-    ) {
-      return {
-        ...base,
-        error: 'Completa nombres, apellidos, cédula y fecha de nacimiento.',
-      };
-    }
-
-    const edad = calcularEdad(datos.fechaNacimiento);
-    if (edad < 0) {
-      return { ...base, error: 'La fecha de nacimiento no es válida.' };
-    }
-
-    try {
-      const resultado = calcularDescuentoUseCase.ejecutar({
-        numeroCedula: datos.cedula.trim(),
-        edad,
-        tieneDiscapacidad: datos.tieneDiscapacidad,
-        precioBase,
-      });
-
-      const esDiscapacitado = resultado.categoria === 'DISCAPACIDAD';
-      const esTerceraEdad = resultado.categoria === 'TERCERA_EDAD';
-      const esMenor = resultado.categoria === 'MENOR';
-
-      let tipoPasajero: TipoPasajero = TipoPasajero.GENERAL;
-      if (esDiscapacitado) tipoPasajero = TipoPasajero.DISCAPACITADO;
-      else if (esTerceraEdad) tipoPasajero = TipoPasajero.TERCERA_EDAD;
-      else if (esMenor) tipoPasajero = TipoPasajero.MENOR_EDAD;
-
-      return {
-        ...base,
-        precioFinal: resultado.precioFinal,
-        descuentoAplicado: resultado.porcentajeDescuento,
-        esMenor,
-        esDiscapacitado,
-        esTerceraEdad,
-        tipoPasajero,
-        valido: true,
-        error: null,
-      };
-    } catch (err: any) {
-      return {
-        ...base,
-        error: limpiarMensajeError(err?.message || 'Datos del pasajero inválidos.'),
-      };
-    }
-  }
-
-  function limpiarMensajeError(mensaje: string): string {
-    return mensaje.replace(/^\[[^\]]+\]\s*/, '');
+    return calcularTarifa.ejecutar({
+      asiento,
+      datos: obtenerDatos(asiento.id!),
+      precioBase: precioDeAsiento(asiento),
+    });
   }
 
   function pasajerosParaConfirmar(): PasajeroCompraInput[] {
@@ -388,6 +277,7 @@ export function useSeleccionCompra(
     cantidadSeleccionada,
     totalBase,
     totalConDescuentos,
+    ahorro,
     pasajerosCalculados,
     pasajerosValidos,
     cedulasDuplicadas,

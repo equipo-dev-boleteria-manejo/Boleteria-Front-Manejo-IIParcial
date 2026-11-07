@@ -4,25 +4,25 @@
       title="Aprobación de Transferencias"
       subtitle="Valida comprobantes bancarios y emite los boletos pendientes"
     >
-      <div class="flex flex-wrap items-center justify-between gap-4">
-        <div class="flex flex-wrap items-center gap-3">
-          <div class="rounded-2xl bg-amber-50 px-4 py-3 ring-1 ring-amber-200">
+      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div class="grid w-full grid-cols-2 gap-3 sm:w-auto">
+          <div class="rounded-2xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200 sm:px-4 sm:py-3">
             <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700">
               Ventas pendientes
             </p>
-            <p class="text-2xl font-black leading-tight text-amber-800">{{ totalPendientes }}</p>
+            <p class="text-xl font-black leading-tight text-amber-800 sm:text-2xl">{{ totalPendientes }}</p>
           </div>
-          <div class="rounded-2xl bg-slate-50 px-4 py-3 ring-1 ring-slate-200">
+          <div class="rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200 sm:px-4 sm:py-3">
             <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Monto por validar
             </p>
-            <p class="text-2xl font-black leading-tight text-slate-900">
+            <p class="text-xl font-black leading-tight text-slate-900 sm:text-2xl">
               ${{ formatearPrecio(montoPendiente) }}
             </p>
           </div>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
+        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <a
             href="/oficinista/venta-boletos"
             class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-transparent px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
@@ -111,10 +111,10 @@
             </p>
           </div>
 
-          <div class="flex shrink-0 flex-col items-end gap-2">
-            <div class="text-right">
+          <div class="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
+            <div class="flex items-center justify-between gap-3 sm:block sm:text-right">
               <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</p>
-              <p class="text-xl font-black text-slate-900">${{ formatearPrecio(venta.total) }}</p>
+              <p class="text-lg font-black text-slate-900 sm:text-xl">${{ formatearPrecio(venta.total) }}</p>
             </div>
             <ButtonBase
               size="sm"
@@ -163,6 +163,7 @@ const {
   ventasPendientes,
   boletosVenta,
   totalPendientes,
+  montoPendiente,
   loading,
   cargarVentasPendientes,
   cargarBoletosVenta,
@@ -176,10 +177,6 @@ const ventaSeleccionada = ref<Venta | null>(null)
 const cargandoDetalle = ref(false)
 const procesando = ref(false)
 const cargandoLista = computed(() => loading.value && !procesando.value)
-
-const montoPendiente = computed(() =>
-  ventasPendientes.value.reduce((total, venta) => total + Number(venta.total ?? 0), 0),
-)
 
 function formatearPrecio(valor: number): string {
   return Number(valor ?? 0).toFixed(2)

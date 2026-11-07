@@ -380,6 +380,7 @@ const {
   cantidadSeleccionada,
   totalBase,
   totalConDescuentos,
+  ahorro,
   pasajerosCalculados,
   pasajerosValidos,
   cedulasDuplicadas,
@@ -442,10 +443,6 @@ const rutasFiltradas = computed(() =>
 
 const hayFiltros = computed(
   () => Boolean(filtroOrigen.value.trim() || filtroDestino.value.trim() || filtroFecha.value),
-)
-
-const ahorro = computed(() =>
-  Number((totalBase.value - totalConDescuentos.value).toFixed(2)),
 )
 
 const puedeConfirmar = computed(

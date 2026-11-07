@@ -6,6 +6,24 @@
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="comprobante-print space-y-5">
+      <div
+        v-if="generando"
+        class="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-xs font-semibold text-blue-700"
+        role="status"
+      >
+        <span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+        Generando códigos de abordaje…
+      </div>
+
+      <div
+        v-if="errorCodigos"
+        class="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-2.5 text-xs font-semibold text-amber-800"
+        role="alert"
+      >
+        <span aria-hidden="true">⚠️</span>
+        <span>{{ errorCodigos }}</span>
+      </div>
+
       <section
         v-if="contexto?.mensaje"
         class="rounded-2xl border px-4 py-3"
@@ -199,6 +217,8 @@ const emit = defineEmits<{
 
 const refsQr = ref<Array<HTMLCanvasElement | null>>([])
 const refsCodigoBarras = ref<Array<HTMLCanvasElement | null>>([])
+const generando = ref(false)
+const errorCodigos = ref<string | null>(null)
 
 const ventaId = computed<number | undefined>(
   () => props.venta?.id ?? props.contexto?.ventaId ?? props.boletos[0]?.ventaId,
@@ -265,44 +285,58 @@ function asignarRefCodigoBarras(
 }
 
 async function generarCodigos(): Promise<void> {
-  await nextTick()
+  generando.value = true
+  errorCodigos.value = null
+  let fallos = 0
 
-  for (let index = 0; index < props.boletos.length; index++) {
-    const boleto = props.boletos[index]
-    const canvasQr = refsQr.value[index]
-    const canvasBarras = refsCodigoBarras.value[index]
+  try {
+    await nextTick()
 
-    if (canvasQr) {
-      try {
-        await QRCode.toCanvas(
-          canvasQr,
-          boleto.codigoQr || `BOLETO-${boleto.id ?? index}`,
-          {
-            width: 118,
-            margin: 1,
-            color: { dark: '#0f172a', light: '#ffffff' },
-          },
-        )
-      } catch (err) {
-        console.warn('No se pudo generar el código QR del boleto:', err)
+    for (let index = 0; index < props.boletos.length; index++) {
+      const boleto = props.boletos[index]
+      const canvasQr = refsQr.value[index]
+      const canvasBarras = refsCodigoBarras.value[index]
+
+      if (canvasQr) {
+        try {
+          await QRCode.toCanvas(
+            canvasQr,
+            boleto.codigoQr || `BOLETO-${boleto.id ?? index}`,
+            {
+              width: 118,
+              margin: 1,
+              color: { dark: '#0f172a', light: '#ffffff' },
+            },
+          )
+        } catch (err: unknown) {
+          fallos++
+          console.warn('No se pudo generar el código QR del boleto:', err)
+        }
+      }
+
+      if (canvasBarras) {
+        try {
+          JsBarcode(canvasBarras, boleto.codigoBarras || `BOLETO-${boleto.id ?? index}`, {
+            format: 'CODE128',
+            width: 1.3,
+            height: 38,
+            displayValue: false,
+            margin: 0,
+            background: '#f8fafc',
+            lineColor: '#0f172a',
+          })
+        } catch (err: unknown) {
+          fallos++
+          console.warn('No se pudo generar el código de barras del boleto:', err)
+        }
       }
     }
 
-    if (canvasBarras) {
-      try {
-        JsBarcode(canvasBarras, boleto.codigoBarras || `BOLETO-${boleto.id ?? index}`, {
-          format: 'CODE128',
-          width: 1.3,
-          height: 38,
-          displayValue: false,
-          margin: 0,
-          background: '#f8fafc',
-          lineColor: '#0f172a',
-        })
-      } catch (err) {
-        console.warn('No se pudo generar el código de barras del boleto:', err)
-      }
+    if (fallos > 0) {
+      errorCodigos.value = `No se pudieron generar ${fallos} código(s) de abordaje. Puedes cerrar el comprobante e intentarlo de nuevo.`
     }
+  } finally {
+    generando.value = false
   }
 }
 

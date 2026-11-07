@@ -3,6 +3,8 @@ import { useSeleccionCompra } from './useSeleccionCompra';
 import { Asiento } from '../../Domain/Entities/Asiento';
 import { SeatType } from '../../Domain/Entities/SeatType';
 import { CalcularDescuentoVenta } from '../../Application/UseCases/CalcularDescuentoVenta';
+import { ObtenerMapaAsientos } from '../../Application/UseCases/ObtenerMapaAsientos';
+import { CalcularTarifaPasajero } from '../../Application/UseCases/CalcularTarifaPasajero';
 import type { CalcularDescuentoVentaDto } from '../../Application/Dtos/CalcularDescuentoVentaDto';
 import type { IAsientoRepository } from '../../Domain/Repositories/IAsientoRepository';
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
@@ -91,10 +93,8 @@ describe('useSeleccionCompra Composable', () => {
 
   function crearComposable() {
     return useSeleccionCompra(
-      asientoRepo,
-      boletosRepo,
-      seatTypeRepo,
-      calcularDescuento,
+      new ObtenerMapaAsientos(asientoRepo, boletosRepo, seatTypeRepo),
+      new CalcularTarifaPasajero(calcularDescuento),
     );
   }
 

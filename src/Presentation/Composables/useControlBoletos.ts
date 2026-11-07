@@ -43,6 +43,17 @@ export function useControlBoletos(
 
   const totalPendientes = computed<number>(() => ventasPendientes.value.length);
   const tienePendientes = computed<boolean>(() => ventasPendientes.value.length > 0);
+  const montoPendiente = computed<number>(() =>
+    Number(
+      ventasPendientes.value
+        .reduce((total, venta) => total + Number(venta.total ?? 0), 0)
+        .toFixed(2),
+    ),
+  );
+
+  function mensajeError(err: unknown, respaldo: string): string {
+    return err instanceof Error && err.message ? err.message : respaldo;
+  }
 
   /**
    * Carga todas las ventas con pagos pendientes de validación.
@@ -55,8 +66,8 @@ export function useControlBoletos(
       const ventas = await ventaRepo.obtenerVentasPendientes();
       ventasPendientes.value = ventas;
       return ventas;
-    } catch (err: any) {
-      error.value = err.message || 'Error al listar las ventas pendientes.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al listar las ventas pendientes.');
       throw err;
     } finally {
       loading.value = false;
@@ -74,8 +85,8 @@ export function useControlBoletos(
       const boletos = await boletosRepo.obtenerBoletosPorVenta(ventaId);
       boletosVenta.value = boletos;
       return boletos;
-    } catch (err: any) {
-      error.value = err.message || 'Error al obtener los boletos de la venta.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al obtener los boletos de la venta.');
       throw err;
     } finally {
       loading.value = false;
@@ -92,8 +103,8 @@ export function useControlBoletos(
     try {
       await aprobarUseCase.ejecutar(ventaId, aprobadoPorId);
       ventasPendientes.value = ventasPendientes.value.filter((v) => v.id !== ventaId);
-    } catch (err: any) {
-      error.value = err.message || 'Error al aprobar el pago de la venta.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al aprobar el pago de la venta.');
       throw err;
     } finally {
       loading.value = false;
@@ -114,8 +125,8 @@ export function useControlBoletos(
     try {
       await rechazarUseCase.ejecutar(ventaId, aprobadoPorId, observacion);
       ventasPendientes.value = ventasPendientes.value.filter((v) => v.id !== ventaId);
-    } catch (err: any) {
-      error.value = err.message || 'Error al rechazar el pago de la venta.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al rechazar el pago de la venta.');
       throw err;
     } finally {
       loading.value = false;
@@ -131,8 +142,8 @@ export function useControlBoletos(
 
     try {
       return await venderUseCase.ejecutar(input);
-    } catch (err: any) {
-      error.value = err.message || 'Error al registrar la venta en ventanilla.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al registrar la venta en ventanilla.');
       throw err;
     } finally {
       loading.value = false;
@@ -148,8 +159,8 @@ export function useControlBoletos(
   ): Promise<boolean> {
     try {
       return await boletosRepo.verificarAsientoDisponible(rutaId, asientoId);
-    } catch (err: any) {
-      error.value = err.message || 'Error al verificar la disponibilidad del asiento.';
+    } catch (err: unknown) {
+      error.value = mensajeError(err, 'Error al verificar la disponibilidad del asiento.');
       return false;
     }
   }
@@ -167,6 +178,7 @@ export function useControlBoletos(
     ventasPendientes,
     boletosVenta,
     totalPendientes,
+    montoPendiente,
     tienePendientes,
     cargarVentasPendientes,
     cargarBoletosVenta,

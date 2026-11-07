@@ -36,6 +36,7 @@ describe('useControlBoletos Composable', () => {
       obtenerVentasPendientes: vi.fn().mockResolvedValue([]),
       obtenerVentasPorRuta: vi.fn(),
       aprobarVenta: vi.fn(),
+      confirmarVentaTarjeta: vi.fn(),
       rechazarVenta: vi.fn(),
       migrarVentasARuta: vi.fn(),
     };

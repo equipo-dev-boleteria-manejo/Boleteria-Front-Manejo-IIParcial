@@ -37,15 +37,8 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
-import {
-  loadStripe,
-  type Stripe,
-  type StripeCardElement,
-  type StripeElements,
-} from '@stripe/stripe-js'
-import { PrepararPagoStripe } from '../../Application/UseCases/PrepararPagoStripe'
-import { SupabasePaymentRepository } from '../../Infrastructure/Repositories/SupabasePaymentRepository'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { usePagoStripe } from '../Composables/usePagoStripe'
 
 interface Props {
   amount: number
@@ -64,152 +57,37 @@ const emit = defineEmits<{
 }>()
 
 const contenedorTarjeta = ref<HTMLDivElement | null>(null)
-const listo = ref(false)
-const cargando = ref(false)
-const error = ref<string | null>(null)
-const configError = ref<string>('')
+const {
+  listo,
+  cargando,
+  error,
+  configError,
+  montar,
+  pagar: cobrar,
+  reiniciar: reiniciarPago,
+  desmontar,
+} = usePagoStripe()
 
-const llavePublica = String(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY ?? '').trim()
-const prepararPago = new PrepararPagoStripe(new SupabasePaymentRepository())
+watch(error, (mensaje) => {
+  if (mensaje) emit('error', mensaje)
+})
 
-let stripe: Stripe | null = null
-let elements: StripeElements | null = null
-let tarjeta: StripeCardElement | null = null
-let inicializacion: Promise<void> | null = null
-let intencionActual: { amount: number; clientSecret: string } | null = null
-
-function reportarError(mensaje: string): void {
-  error.value = mensaje
-  emit('error', mensaje)
-}
+watch(listo, (estaListo) => {
+  if (estaListo) emit('ready')
+})
 
 async function inicializar(): Promise<void> {
-  if (listo.value) return
-  if (inicializacion) return inicializacion
-
-  if (!llavePublica) {
-    configError.value =
-      'Stripe no está configurado. Agrega VITE_STRIPE_PUBLISHABLE_KEY en el archivo .env para habilitar los pagos con tarjeta.'
-    emit('error', configError.value)
-    return
-  }
-
-  inicializacion = (async () => {
-    try {
-      stripe = await loadStripe(llavePublica)
-
-      if (!stripe) {
-        throw new Error('No se pudo cargar Stripe.js. Revisa tu conexión e inténtalo de nuevo.')
-      }
-
-      elements = stripe.elements({ locale: 'es' })
-      tarjeta = elements.create('card', {
-        hidePostalCode: true,
-        style: {
-          base: {
-            color: '#0f172a',
-            fontFamily: 'ui-sans-serif, system-ui, sans-serif',
-            fontSize: '14px',
-            '::placeholder': { color: '#94a3b8' },
-          },
-          invalid: { color: '#dc2626' },
-        },
-      })
-
-      tarjeta.on('change', (evento) => {
-        error.value = evento.error?.message ?? null
-      })
-
-      await nextTick()
-
-      if (!contenedorTarjeta.value) {
-        throw new Error('No se pudo preparar el formulario de pago con tarjeta.')
-      }
-
-      tarjeta.mount(contenedorTarjeta.value)
-      listo.value = true
-      error.value = null
-      emit('ready')
-    } catch (err: any) {
-      reportarError(
-        err?.message || 'No se pudo inicializar el formulario de pago con tarjeta.',
-      )
-      throw err
-    } finally {
-      inicializacion = null
-    }
-  })()
-
-  return inicializacion
+  await nextTick()
+  await montar(contenedorTarjeta.value)
 }
 
-async function pagar(): Promise<string> {
-  if (configError.value) {
-    reportarError(configError.value)
-    throw new Error(configError.value)
-  }
-
-  if (!Number.isFinite(props.amount) || props.amount <= 0) {
-    const mensaje = 'El total de la compra no es válido para procesar el pago.'
-    reportarError(mensaje)
-    throw new Error(mensaje)
-  }
-
-  cargando.value = true
-  error.value = null
-
-  try {
-    await inicializar()
-
-    if (!stripe || !tarjeta) {
-      throw new Error('El formulario de pago con tarjeta todavía no está disponible.')
-    }
-
-    if (!intencionActual || intencionActual.amount !== props.amount) {
-      const { clientSecret } = await prepararPago.ejecutar(
-        props.amount,
-        props.currency,
-      )
-      intencionActual = { amount: props.amount, clientSecret }
-    }
-
-    const resultado = await stripe.confirmCardPayment(
-      intencionActual.clientSecret,
-      {
-        payment_method: { card: tarjeta },
-      },
-    )
-
-    if (resultado.error) {
-      throw new Error(
-        resultado.error.message || 'Stripe rechazó el pago con la tarjeta.',
-      )
-    }
-
-    const pago = resultado.paymentIntent
-    if (!pago?.id) {
-      throw new Error('Stripe no confirmó el pago. Inténtalo nuevamente.')
-    }
-
-    if (!['succeeded', 'processing', 'requires_capture'].includes(pago.status)) {
-      throw new Error(
-        `El pago quedó en estado "${pago.status}". No se pudo completar la compra.`,
-      )
-    }
-
-    return pago.id
-  } catch (err: any) {
-    reportarError(err?.message || 'No se pudo procesar el pago con tarjeta.')
-    throw err
-  } finally {
-    cargando.value = false
-  }
+async function pagar(monto?: number): Promise<string> {
+  const total = Number.isFinite(monto) && (monto ?? 0) > 0 ? monto! : props.amount
+  return cobrar(total, props.currency)
 }
 
 function reiniciar(): void {
-  intencionActual = null
-  error.value = null
-  tarjeta?.clear()
+  reiniciarPago()
 }
 
 onMounted(() => {
@@ -219,11 +97,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
-  tarjeta?.destroy()
-  tarjeta = null
-  elements = null
-  stripe = null
-  listo.value = false
+  desmontar()
 })
 
 defineExpose({
