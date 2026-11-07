@@ -44,3 +44,12 @@ idempotentes y agregan:
 - Datos de pasajero y descuento en `Boletos`.
 - Índice único parcial `(RutaId, AsientoId)` para boletos activos, que evita
   dobles ventas del mismo asiento.
+
+## Datos de prueba persistentes
+
+El script `npm run seed:test` crea cooperativa, buses, asientos, frecuencias,
+rutas, usuarios y ventas demo directamente en Supabase. Requiere
+`SUPABASE_URL` y `SUPABASE_SERVICE_ROLE_KEY` en `.env` y es idempotente.
+
+Las cuentas, el escenario sembrado y el checklist de las vistas de venta están
+documentados en [`docs/pruebas-manuales-vistas.md`](../docs/pruebas-manuales-vistas.md).
