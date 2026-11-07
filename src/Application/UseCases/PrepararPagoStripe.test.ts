@@ -6,6 +6,8 @@ describe('PrepararPagoStripe (Caso de Uso)', () => {
   it('debe convertir el monto en dólares a centavos y llamar al repositorio de pago', async () => {
     const mockPaymentRepo: IPaymentRepository = {
       createPaymentIntent: vi.fn().mockResolvedValue({ clientSecret: 'sec_test_12345' }),
+      verificarPago: vi.fn(),
+      cancelarPago: vi.fn(),
     };
 
     const useCase = new PrepararPagoStripe(mockPaymentRepo);
@@ -18,6 +20,8 @@ describe('PrepararPagoStripe (Caso de Uso)', () => {
   it('debe lanzar DomainException si el monto es menor o igual a cero', async () => {
     const mockPaymentRepo: IPaymentRepository = {
       createPaymentIntent: vi.fn(),
+      verificarPago: vi.fn(),
+      cancelarPago: vi.fn(),
     };
 
     const useCase = new PrepararPagoStripe(mockPaymentRepo);

@@ -138,8 +138,9 @@ CREATE TABLE IF NOT EXISTS "Ventas" (
     "CiudadDestinoVenta" VARCHAR(100) NOT NULL,
     "Total" NUMERIC(10,2) NOT NULL,
     "Estado" VARCHAR(30) DEFAULT 'Pendiente' CHECK ("Estado" IN ('Pendiente', 'AprobadaPago', 'Cancelada')),
-    "MetodoPago" VARCHAR(30) NOT NULL CHECK ("MetodoPago" IN ('Efectivo', 'Transferencia', 'Deposito')),
+    "MetodoPago" VARCHAR(30) NOT NULL CHECK ("MetodoPago" IN ('Efectivo', 'Transferencia', 'Deposito', 'Tarjeta')),
     "ComprobanteUrl" TEXT,
+    "StripePaymentIntentId" TEXT,
     "AprobadoPorId" UUID REFERENCES "Usuarios"("Id"),
     "FechaVenta" TIMESTAMPTZ DEFAULT NOW()
 );
@@ -152,7 +153,12 @@ CREATE TABLE IF NOT EXISTS "Boletos" (
     "CedulaPasajero" VARCHAR(10) NOT NULL,
     "NombresPasajero" VARCHAR(100) NOT NULL,
     "ApellidosPasajero" VARCHAR(100) NOT NULL,
+    "FechaNacimiento" DATE,
     "TipoPasajero" VARCHAR(30) DEFAULT 'General' CHECK ("TipoPasajero" IN ('General', 'TerceraEdad', 'Discapacitado', 'MenorEdad')),
+    "EsMenor" BOOLEAN DEFAULT FALSE,
+    "EsDiscapacitado" BOOLEAN DEFAULT FALSE,
+    "EsTerceraEdad" BOOLEAN DEFAULT FALSE,
+    "DescuentoAplicado" NUMERIC(5,4) DEFAULT 0,
     "Estado" VARCHAR(30) DEFAULT 'Reservado' CHECK ("Estado" IN ('Reservado', 'Proceso de validacion', 'Aprobado', 'Emitido', 'Cancelado', 'Abordado', 'NoAbordo')),
     "CodigoQr" TEXT,
     "CodigoBarras" TEXT,
@@ -161,6 +167,12 @@ CREATE TABLE IF NOT EXISTS "Boletos" (
     "SubRutaDestino" VARCHAR(100),
     "CreatedAt" TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Un asiento solo puede tener un boleto activo por ruta. Los boletos cancelados
+-- liberan el asiento y quedan fuera del índice parcial.
+CREATE UNIQUE INDEX IF NOT EXISTS "Uq_Boleto_Ruta_Asiento_Activo"
+    ON "Boletos" ("RutaId", "AsientoId")
+    WHERE "Estado" <> 'Cancelado';
 
 CREATE TABLE IF NOT EXISTS "ValidacionesBoleto" (
     "Id" SERIAL PRIMARY KEY,
@@ -196,3 +208,28 @@ VALUES
     ('logos', 'logos', true),
     ('buses', 'buses', true)
 ON CONFLICT (id) DO NOTHING;
+
+-- 10. MIGRACIONES IDEMPOTENTES (bases creadas con versiones anteriores)
+ALTER TABLE "Ventas"
+    ADD COLUMN IF NOT EXISTS "StripePaymentIntentId" TEXT;
+
+ALTER TABLE "Boletos"
+    ADD COLUMN IF NOT EXISTS "FechaNacimiento" DATE,
+    ADD COLUMN IF NOT EXISTS "EsMenor" BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS "EsDiscapacitado" BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS "EsTerceraEdad" BOOLEAN DEFAULT FALSE,
+    ADD COLUMN IF NOT EXISTS "DescuentoAplicado" NUMERIC(5,4) DEFAULT 0;
+
+-- Ampliar el catálogo de métodos de pago sin perder datos existentes.
+ALTER TABLE "Ventas" DROP CONSTRAINT IF EXISTS "Ventas_MetodoPago_check";
+ALTER TABLE "Ventas"
+    ADD CONSTRAINT "Ventas_MetodoPago_check"
+    CHECK ("MetodoPago" IN ('Efectivo', 'Transferencia', 'Deposito', 'Tarjeta'));
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Uq_Boleto_Ruta_Asiento_Activo"
+    ON "Boletos" ("RutaId", "AsientoId")
+    WHERE "Estado" <> 'Cancelado';
+
+CREATE UNIQUE INDEX IF NOT EXISTS "Uq_Venta_Stripe_PaymentIntent"
+    ON "Ventas" ("StripePaymentIntentId")
+    WHERE "StripePaymentIntentId" IS NOT NULL;

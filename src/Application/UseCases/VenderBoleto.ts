@@ -4,6 +4,9 @@ import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { EstadoVenta, EstadoBoleto, TipoPasajero } from '../../Domain/Constants/EstadosSistema';
 import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
+import { ResolverPrecioAsiento } from './ResolverPrecioAsiento';
+import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
+import { calcularEdad } from '../../Domain/Services/DescuentoService';
 
 export interface PasajeroVentaInput {
   asientoId: number;
@@ -17,6 +20,11 @@ export interface PasajeroVentaInput {
   descuentoAplicado: number;
   precioFinal: number;
 }
+
+type PasajeroTarifado = PasajeroVentaInput & {
+  precioBase: number;
+  tipoPasajero: TipoPasajero;
+};
 
 export interface VenderBoletoInput {
   usuarioVendedorId: string;
@@ -44,6 +52,8 @@ export class VenderBoleto {
   constructor(
     private ventaRepo: IVentaRepository = new SupabaseVentasRepository(),
     private boletosRepo: IBoletosRepository = new SupabaseBoletosRepository(),
+    private resolverPrecios: ResolverPrecioAsiento = new ResolverPrecioAsiento(),
+    private calcularDescuentoUseCase: CalcularDescuentoVenta = new CalcularDescuentoVenta(),
   ) {}
 
   async ejecutar(input: VenderBoletoInput): Promise<ResultadoVentaBoleto> {
@@ -99,8 +109,63 @@ export class VenderBoleto {
       }
     }
 
+    const precios = await this.resolverPrecios.ejecutar(
+      input.pasajeros.map((pasajero) => pasajero.asientoId),
+    );
+
+    const pasajerosTarifados: PasajeroTarifado[] = input.pasajeros.map(
+      (pasajero) => {
+        const precioBase = precios.get(pasajero.asientoId);
+        if (precioBase === undefined) {
+          throw new DomainException(
+            `No se pudo resolver el precio del asiento ${pasajero.asientoId}.`,
+            'PRECIO_NO_DISPONIBLE',
+          );
+        }
+
+        const edad = calcularEdad(pasajero.fechaNacimiento);
+        if (edad < 0) {
+          throw new DomainException(
+            `La fecha de nacimiento del asiento ${pasajero.asientoId} no es válida.`,
+            'FECHA_NACIMIENTO_INVALIDA',
+          );
+        }
+
+        const descuento = this.calcularDescuentoUseCase.ejecutar({
+          numeroCedula: pasajero.cedula.trim(),
+          edad,
+          tieneDiscapacidad: !!pasajero.esDiscapacitado,
+          precioBase,
+        });
+
+        const esMenor = descuento.categoria === 'MENOR';
+        const esDiscapacitado = descuento.categoria === 'DISCAPACIDAD';
+        const esTerceraEdad = descuento.categoria === 'TERCERA_EDAD';
+
+        let tipoPasajero: TipoPasajero = TipoPasajero.GENERAL;
+        if (esDiscapacitado) {
+          tipoPasajero = TipoPasajero.DISCAPACITADO;
+        } else if (esTerceraEdad) {
+          tipoPasajero = TipoPasajero.TERCERA_EDAD;
+        } else if (esMenor) {
+          tipoPasajero = TipoPasajero.MENOR_EDAD;
+        }
+
+        return {
+          ...pasajero,
+          precioBase,
+          precioFinal: descuento.precioFinal,
+          descuentoAplicado: descuento.porcentajeDescuento,
+          esMenor,
+          esDiscapacitado,
+          esTerceraEdad,
+          tipoPasajero,
+        };
+      },
+    );
+
     const total = Number(
-      input.pasajeros
+      pasajerosTarifados
         .reduce((acc, pasajero) => acc + Number(pasajero.precioFinal || 0), 0)
         .toFixed(2),
     );
@@ -120,19 +185,10 @@ export class VenderBoleto {
 
     const ventaId = await this.ventaRepo.crearVenta(ventaPayload);
 
-    const boletosPayload: BoletoPayload[] = input.pasajeros.map((pasajero) => {
+    const boletosPayload: BoletoPayload[] = pasajerosTarifados.map((pasajero) => {
       const unique = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2);
       const codigoQr = `QR-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
       const codigoBarras = `BC-R${input.ruta.id}-V${ventaId}-A${pasajero.asientoId}-${unique}`;
-
-      let tipo = TipoPasajero.GENERAL;
-      if (pasajero.esDiscapacitado) {
-        tipo = TipoPasajero.DISCAPACITADO;
-      } else if (pasajero.esTerceraEdad) {
-        tipo = TipoPasajero.TERCERA_EDAD;
-      } else if (pasajero.esMenor) {
-        tipo = TipoPasajero.MENOR_EDAD;
-      }
 
       return {
         VentaId: ventaId,
@@ -145,7 +201,7 @@ export class VenderBoleto {
         EsMenor: pasajero.esMenor,
         EsDiscapacitado: pasajero.esDiscapacitado,
         EsTerceraEdad: pasajero.esTerceraEdad,
-        TipoPasajero: tipo,
+        TipoPasajero: pasajero.tipoPasajero,
         DescuentoAplicado: pasajero.descuentoAplicado,
         PrecioFinal: pasajero.precioFinal,
         CodigoQr: codigoQr,

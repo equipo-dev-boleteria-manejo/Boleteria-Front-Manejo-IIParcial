@@ -25,6 +25,13 @@
         :disabled="disabled"
         :required="required"
         :autocomplete="autocomplete"
+        :max="max"
+        :min="min"
+        :step="step"
+        :maxlength="maxlength"
+        :minlength="minlength"
+        :inputmode="inputmode"
+        :pattern="pattern"
         class="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
         :class="[
           error
@@ -69,6 +76,13 @@ interface Props {
   required?: boolean
   autocomplete?: string
   containerClass?: string
+  max?: string | number
+  min?: string | number
+  step?: string | number
+  maxlength?: string | number
+  minlength?: string | number
+  inputmode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search'
+  pattern?: string
 }
 
 withDefaults(defineProps<Props>(), {

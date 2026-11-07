@@ -26,6 +26,7 @@ interface VentaRow {
   Estado: string;
   MetodoPago: string;
   ComprobanteUrl: string | null;
+  StripePaymentIntentId: string | null;
   AprobadoPorId: string | null;
   FechaVenta: string | null;
 }
@@ -58,6 +59,9 @@ export class SupabaseVentasRepository implements IVentaRepository {
       ComprobanteUrl: esEntidad
         ? (venta.comprobanteUrl ?? null)
         : (venta.ComprobanteUrl ?? null),
+      StripePaymentIntentId: esEntidad
+        ? (venta.stripePaymentIntentId ?? null)
+        : (venta.StripePaymentIntentId ?? null),
       AprobadoPorId: esEntidad
         ? (venta.aprobadoPorId ?? null)
         : (venta.AprobadoPorId ?? null),
@@ -130,7 +134,10 @@ export class SupabaseVentasRepository implements IVentaRepository {
     return (data as VentaRow[]).map((row) => this.mapRowToEntity(row));
   }
 
-  async aprobarVenta(ventaId: number, aprobadoPorId: string): Promise<void> {
+  async aprobarVenta(
+    ventaId: number,
+    aprobadoPorId: string | null,
+  ): Promise<void> {
     const { error } = await supabase
       .from(this.TABLA_VENTAS)
       .update({
@@ -141,6 +148,27 @@ export class SupabaseVentasRepository implements IVentaRepository {
 
     if (error) {
       throw new VentaException(`Error al aprobar la venta ${ventaId}: ${error.message}`);
+    }
+  }
+
+  async confirmarVentaTarjeta(
+    ventaId: number,
+    stripePaymentIntentId: string,
+    aprobadoPorId?: string | null,
+  ): Promise<void> {
+    const { error } = await supabase
+      .from(this.TABLA_VENTAS)
+      .update({
+        Estado: EstadoVenta.APROBADA_PAGO,
+        StripePaymentIntentId: stripePaymentIntentId,
+        AprobadoPorId: aprobadoPorId ?? null,
+      })
+      .eq('Id', ventaId);
+
+    if (error) {
+      throw new VentaException(
+        `Error al confirmar el pago con tarjeta de la venta ${ventaId}: ${error.message}`,
+      );
     }
   }
 
@@ -177,8 +205,8 @@ export class SupabaseVentasRepository implements IVentaRepository {
 
   async uploadComprobante(
     path: string,
-    file: Blob | ArrayBuffer | any,
-    options?: any,
+    file: Blob | ArrayBuffer | Uint8Array,
+    options?: { contentType?: string; upsert?: boolean },
   ): Promise<{ publicUrl: string }> {
     const { error: uploadError } = await supabase.storage
       .from(this.BUCKET_COMPROBANTES)
@@ -207,6 +235,7 @@ export class SupabaseVentasRepository implements IVentaRepository {
     venta.id = row.Id;
     venta.usuarioVendedorId = row.UsuarioVendedorId;
     venta.comprobanteUrl = row.ComprobanteUrl;
+    venta.stripePaymentIntentId = row.StripePaymentIntentId;
     venta.aprobadoPorId = row.AprobadoPorId;
     if (row.FechaVenta) {
       venta.fechaVenta = new Date(row.FechaVenta);

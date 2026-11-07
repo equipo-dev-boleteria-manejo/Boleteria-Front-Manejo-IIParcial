@@ -12,6 +12,7 @@ export class Venta {
   public id?: number;
   public usuarioVendedorId?: string | null;
   public comprobanteUrl?: string | null;
+  public stripePaymentIntentId?: string | null;
   public aprobadoPorId?: string | null;
   public fechaVenta?: Date;
 
