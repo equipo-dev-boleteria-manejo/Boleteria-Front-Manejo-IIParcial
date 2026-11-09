@@ -92,4 +92,58 @@ describe('CrearUsuario UseCase', () => {
     await expect(useCase.execute(input)).rejects.toThrow(UsuarioException);
     expect(mockUsuarioRepo.guardar).not.toHaveBeenCalled();
   });
+
+  it('debe registrar credenciales en IAuthRepository cuando se provee contraseña y authRepo', async () => {
+    const mockAuthRepo = {
+      iniciarSesion: vi.fn(),
+      cerrarSesion: vi.fn(),
+      obtenerUsuarioActual: vi.fn(),
+      recuperarContrasenia: vi.fn(),
+      registrarse: vi.fn().mockResolvedValue(usuarioGuardado),
+    };
+
+    const useCaseConAuth = new CrearUsuario(mockUsuarioRepo, mockAuthRepo);
+
+    const input = {
+      email: 'chofer@boleteria.com',
+      cedula: '1710034065',
+      nombres: 'Luis',
+      apellidos: 'Morales',
+      rol: RolUsuario.CHOFER,
+      password: 'PasswordSeguro123',
+    };
+
+    const resultado = await useCaseConAuth.execute(input);
+
+    expect(resultado).toEqual(usuarioGuardado);
+    expect(mockAuthRepo.registrarse).toHaveBeenCalledWith(
+      expect.any(Usuario),
+      'PasswordSeguro123'
+    );
+    expect(mockUsuarioRepo.guardar).not.toHaveBeenCalled();
+  });
+
+  it('debe rechazar contraseña que no cumpla con las políticas de seguridad', async () => {
+    const mockAuthRepo = {
+      iniciarSesion: vi.fn(),
+      cerrarSesion: vi.fn(),
+      obtenerUsuarioActual: vi.fn(),
+      recuperarContrasenia: vi.fn(),
+      registrarse: vi.fn(),
+    };
+
+    const useCaseConAuth = new CrearUsuario(mockUsuarioRepo, mockAuthRepo);
+
+    const inputInseguro = {
+      email: 'chofer@boleteria.com',
+      cedula: '1710034065',
+      nombres: 'Luis',
+      apellidos: 'Morales',
+      rol: RolUsuario.CHOFER,
+      password: 'debil',
+    };
+
+    await expect(useCaseConAuth.execute(inputInseguro)).rejects.toThrow(DomainException);
+    expect(mockAuthRepo.registrarse).not.toHaveBeenCalled();
+  });
 });

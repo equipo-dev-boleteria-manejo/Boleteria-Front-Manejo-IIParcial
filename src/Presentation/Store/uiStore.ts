@@ -11,6 +11,13 @@ export interface ModalConfig {
   cancelText?: string;
 }
 
+export interface ToastNotification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  duration?: number;
+}
+
 export const useUiStore = defineStore('ui', () => {
   const isAlertOpen = ref(false);
   const isConfirmOpen = ref(false);
@@ -19,6 +26,24 @@ export const useUiStore = defineStore('ui', () => {
     message: '',
     type: 'info',
   });
+
+  // Notificaciones Toast emergentes (arriba a la derecha, 3s)
+  const toasts = ref<ToastNotification[]>([]);
+
+  function showToast(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'success', duration = 3000) {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    toasts.value.push({ id, message, type, duration });
+
+    if (duration > 0) {
+      setTimeout(() => {
+        removeToast(id);
+      }, duration);
+    }
+  }
+
+  function removeToast(id: string) {
+    toasts.value = toasts.value.filter((t) => t.id !== id);
+  }
 
   function showAlert(config: Omit<ModalConfig, 'onConfirm' | 'onCancel' | 'confirmText' | 'cancelText'>) {
     modalConfig.value = { ...config, confirmText: 'Aceptar' };
@@ -54,6 +79,9 @@ export const useUiStore = defineStore('ui', () => {
     isAlertOpen,
     isConfirmOpen,
     modalConfig,
+    toasts,
+    showToast,
+    removeToast,
     showAlert,
     showConfirm,
     closeAlert,

@@ -13,11 +13,13 @@
     "@stripe/stripe-js": "9.7.0",
     "@supabase/supabase-js": "2.105.1",
     "axios": "1.16.1",
+    "chart.js": "^4.6.1",
     "html5-qrcode": "2.3.8",
     "jsbarcode": "3.12.3",
     "pinia": "3.0.4",
     "qrcode": "1.5.4",
     "vue": "3.5.33",
+    "vue-chartjs": "^5.3.4",
     "vue-router": "5.0.6"
   },
   "devDependencies": {
