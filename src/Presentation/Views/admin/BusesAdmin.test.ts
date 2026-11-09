@@ -12,6 +12,7 @@ import { useReportarIncidente } from '../../Composables/useReportarIncidente'
 const uiMocks = vi.hoisted(() => ({
   showAlert: vi.fn(),
   showConfirm: vi.fn(),
+  showToast: vi.fn(),
 }))
 
 vi.mock('../../Store/uiStore', () => ({
@@ -295,6 +296,7 @@ function buscarBoton(wrapper: ReturnType<typeof montarVista>, texto: string) {
 beforeEach(() => {
   uiMocks.showAlert.mockReset()
   uiMocks.showConfirm.mockReset()
+  uiMocks.showToast.mockReset()
   uiMocks.showConfirm.mockResolvedValue(true)
 
   vi.mocked(useBuses).mockReset()
@@ -375,8 +377,10 @@ describe('BusesAdmin', () => {
       totalAsientos: 45,
       estructura: 'DosPisos',
     })
-    expect(uiMocks.showAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'success', title: 'Bus actualizado' }),
+    expect(uiMocks.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('actualizaron correctamente'),
+      'success',
+      3000,
     )
     expect(wrapper.findComponent({ name: 'EditarBusModal' }).props('modelValue')).toBe(false)
   })
@@ -434,11 +438,11 @@ describe('BusesAdmin', () => {
 
     expect(estado.cargarBuses).toHaveBeenCalled()
     expect(estado.cargarBusesActivos).toHaveBeenCalled()
-    expect(uiMocks.showAlert).toHaveBeenCalledWith({
-      type: 'success',
-      title: 'Incidente registrado',
-      message: 'Bus 25 marcado como En mantenimiento.',
-    })
+    expect(uiMocks.showToast).toHaveBeenCalledWith(
+      'Bus 25 marcado como En mantenimiento.',
+      'success',
+      3000,
+    )
     expect(wrapper.findComponent({ name: 'ReportarIncidenteModal' }).props('modelValue')).toBe(
       false,
     )
@@ -514,8 +518,10 @@ describe('BusesAdmin', () => {
       totalAsientos: 48,
       estructura: 'DosPisos',
     })
-    expect(uiMocks.showAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'success', title: 'Bus registrado' }),
+    expect(uiMocks.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('agregó correctamente al catálogo de flota'),
+      'success',
+      3000,
     )
   })
 

@@ -818,11 +818,11 @@ async function manejarRegistrarBusModal() {
 
   mostrarNuevoBusModal.value = false
   resetPlacaValidation()
-  uiStore.showAlert({
-    type: 'success',
-    title: 'Bus registrado',
-    message: `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
-  })
+  uiStore.showToast(
+    `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
+    'success',
+    3000,
+  )
 }
 
 function onEstructuraNueva(event: Event) {
@@ -848,11 +848,11 @@ async function manejarGuardarBus(payload: GuardarBusInput) {
 
   mostrarEdicion.value = false
   busEnEdicion.value = null
-  uiStore.showAlert({
-    type: 'success',
-    title: 'Bus actualizado',
-    message: `Los datos del bus ${payload.numero} se actualizaron correctamente.`,
-  })
+  uiStore.showToast(
+    `Los datos del bus ${payload.numero} se actualizaron correctamente.`,
+    'success',
+    3000,
+  )
 }
 
 function abrirReporte(bus: Bus) {
@@ -888,11 +888,7 @@ watch(reporteSuccess, async (exito) => {
   busConIncidente.value = null
 
   if (estabaAbierto) {
-    uiStore.showAlert({
-      type: 'success',
-      title: 'Incidente registrado',
-      message: mensaje,
-    })
+    uiStore.showToast(mensaje, 'success', 3000)
   }
 
   await cargarBuses()
