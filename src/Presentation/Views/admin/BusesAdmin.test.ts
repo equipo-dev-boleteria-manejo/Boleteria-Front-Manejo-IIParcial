@@ -352,6 +352,27 @@ describe('BusesAdmin', () => {
     expect(wrapper.text()).toContain('Activo')
   })
 
+  it('debe filtrar correctamente al buscar por número de bus o "Bus XX"', async () => {
+    estado.buses.value = [
+      crearBus('25', 'PBA-1234', 5),
+      crearBus('30', 'PBB-5678', 6),
+    ]
+    const wrapper = montarVista()
+
+    const searchInput = wrapper.find('#bus-search')
+    await searchInput.setValue('Bus 25')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Bus 25')
+    expect(wrapper.text()).not.toContain('Bus 30')
+
+    await searchInput.setValue('30')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Bus 30')
+    expect(wrapper.text()).not.toContain('Bus 25')
+  })
+
   it('debe abrir el modal de edición con el bus seleccionado', async () => {
     const bus = crearBus('25', 'PBA-1234', 5)
     estado.buses.value = [bus]

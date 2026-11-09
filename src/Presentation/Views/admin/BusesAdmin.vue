@@ -504,12 +504,26 @@ const filtroEstructura = ref<string>('Todas')
 
 const busesFiltrados = computed(() => {
   return buses.value.filter((bus) => {
-    // Filtro por término de búsqueda (número o placa)
+    // Filtro por término de búsqueda (número o placa con matching flexible)
     const termino = busqueda.value.toLowerCase().trim()
-    const coincideBusqueda =
-      !termino ||
-      (bus.numero && bus.numero.toLowerCase().includes(termino)) ||
-      (bus.placa && bus.placa.toLowerCase().includes(termino))
+    const numBus = String(bus.numero || '').toLowerCase()
+    const placaBus = String(bus.placa || '').toLowerCase()
+    const chasisBus = String(bus.marcaChasis || '').toLowerCase()
+    const soloDigitos = termino.replace(/[^0-9]/g, '')
+
+    const coincideNumero =
+      numBus.includes(termino) ||
+      `bus ${numBus}`.includes(termino) ||
+      `disco ${numBus}`.includes(termino) ||
+      (soloDigitos.length > 0 && numBus.includes(soloDigitos))
+
+    const coincidePlaca =
+      placaBus.includes(termino) ||
+      placaBus.replace(/-/g, '').includes(termino.replace(/-/g, ''))
+
+    const coincideChasis = chasisBus.includes(termino)
+
+    const coincideBusqueda = !termino || coincideNumero || coincidePlaca || coincideChasis
 
     // Filtro por estado operativo
     const coincideEstado =
