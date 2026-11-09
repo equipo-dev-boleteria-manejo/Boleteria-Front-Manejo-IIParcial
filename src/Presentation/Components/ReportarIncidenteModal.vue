@@ -11,7 +11,7 @@
       id="form-reportar-incidente"
       class="space-y-3.5"
       novalidate
-      @submit.prevent="emit('submit')"
+      @submit.prevent="onSubmit"
     >
       <div
         v-if="error"
@@ -54,10 +54,12 @@
           label="Fecha del incidente"
           type="date"
           required
+          :min="fechaMinima"
           :model-value="form.fechaIncidente"
           :disabled="loading"
-          helper-text="Fecha de ocurrencia del suceso."
-          @update:model-value="actualizar('fechaIncidente', $event)"
+          :error="errorFecha"
+          :helper-text="!errorFecha ? 'Solo fechas de hoy en adelante.' : ''"
+          @update:model-value="onFechaInput"
         />
 
         <div class="space-y-1.5">
@@ -96,9 +98,14 @@
 
       <!-- Motivo del incidente -->
       <fieldset class="space-y-1.5">
-        <legend class="block text-xs font-bold uppercase tracking-wider text-slate-700">
-          Motivo del incidente <span class="text-red-500" aria-hidden="true">*</span>
-        </legend>
+        <div class="flex items-center justify-between">
+          <legend class="block text-xs font-bold uppercase tracking-wider text-slate-700">
+            Motivo del incidente <span class="text-red-500" aria-hidden="true">*</span>
+          </legend>
+          <span v-if="errorMotivo" class="text-xs font-bold text-red-500">
+            ⚠️ {{ errorMotivo }}
+          </span>
+        </div>
 
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2" role="radiogroup" aria-required="true">
           <label
@@ -165,10 +172,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
 import ModalBase from './ModalBase.vue'
 import InputBase from './InputBase.vue'
 import ButtonBase from './ButtonBase.vue'
+import { useIncidenteValidation } from '../Composables/useIncidenteValidation'
 
 interface MotivoOpcion {
   value: string
@@ -219,6 +227,23 @@ const emit = defineEmits<{
   (e: 'submit'): void
 }>()
 
+const {
+  errorFecha,
+  errorMotivo,
+  fechaMinima,
+  validarFecha,
+  validarMotivo,
+  validarFormulario,
+  resetErrores,
+} = useIncidenteValidation()
+
+watch(
+  () => props.modelValue,
+  (abierto) => {
+    if (abierto) resetErrores()
+  },
+)
+
 const ESTADOS: Record<string, string> = {
   Activo: 'Activo',
   Inactivo: 'Inactivo',
@@ -237,9 +262,30 @@ function actualizar(campo: CampoFormulario, valor: string) {
   emit('update:form', { [campo]: valor } as Partial<FormularioIncidente>)
 }
 
+function onFechaInput(fecha: string) {
+  actualizar('fechaIncidente', fecha)
+  validarFecha(fecha)
+}
+
 function onMotivoChange(motivo: string) {
-  emit('update:form', { motivo })
+  actualizar('motivo', motivo)
+  validarMotivo(motivo)
   emit('select-motivo', motivo)
+}
+
+function onSubmit() {
+  if (props.loading) return
+
+  const valida = validarFormulario({
+    busNumero: props.form.busNumero,
+    motivo: props.form.motivo,
+    fechaIncidente: props.form.fechaIncidente,
+    descripcion: props.form.descripcion,
+  })
+
+  if (!valida) return
+
+  emit('submit')
 }
 
 function valorDeTexto(event: Event) {
@@ -251,6 +297,7 @@ function valorDeSelect(event: Event) {
 }
 
 function cerrarModal() {
+  resetErrores()
   emit('update:modelValue', false)
   emit('close')
 }

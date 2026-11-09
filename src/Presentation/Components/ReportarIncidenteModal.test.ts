@@ -2,12 +2,15 @@
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import ReportarIncidenteModal from './ReportarIncidenteModal.vue'
+import { obtenerFechaHoyLocal } from '../Composables/useIncidenteValidation'
+
+const hoy = obtenerFechaHoyLocal()
 
 const formularioBase = {
   busNumero: '25',
-  motivo: '',
+  motivo: 'AveriaMecanica',
   descripcion: '',
-  fechaIncidente: '2026-10-27',
+  fechaIncidente: hoy,
   replacementBusNumero: '',
   reportadoPor: 'admin@cooperativa.ec',
 }
@@ -52,16 +55,44 @@ describe('ReportarIncidenteModal', () => {
 
     expect(wrapper.text()).toContain('N.º 25 · PBA-1234')
     expect(wrapper.text()).toContain('Estado actual: Activo')
-    expect((wrapper.find('#incidente-fecha').element as HTMLInputElement).value).toBe(
-      '2026-10-27',
-    )
+    expect((wrapper.find('#incidente-fecha').element as HTMLInputElement).value).toBe(hoy)
     expect(wrapper.findAll('input[type="radio"]')).toHaveLength(4)
     expect(wrapper.text()).toContain('Avería Mecánica')
     expect(wrapper.text()).toContain('Reparación Programada')
   })
 
-  it('debe emitir el motivo seleccionado y solicitar el autocompletado de la descripción', async () => {
+  it('debe restringir la fecha mínima a la fecha actual', () => {
     const wrapper = montarModal()
+    const inputFecha = wrapper.find('#incidente-fecha')
+    expect(inputFecha.attributes('min')).toBe(hoy)
+  })
+
+  it('debe bloquear el envío si la fecha del incidente es anterior a hoy', async () => {
+    const wrapper = montarModal({
+      form: { ...formularioBase, fechaIncidente: '2020-01-01' },
+    })
+
+    await wrapper.find('#form-reportar-incidente').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.text()).toContain('La fecha del incidente no puede ser anterior a la fecha actual')
+  })
+
+  it('debe bloquear el envío si el motivo está vacío', async () => {
+    const wrapper = montarModal({
+      form: { ...formularioBase, motivo: '' },
+    })
+
+    await wrapper.find('#form-reportar-incidente').trigger('submit')
+
+    expect(wrapper.emitted('submit')).toBeUndefined()
+    expect(wrapper.text()).toContain('Debes seleccionar el motivo del incidente')
+  })
+
+  it('debe emitir el motivo seleccionado y solicitar el autocompletado de la descripción', async () => {
+    const wrapper = montarModal({
+      form: { ...formularioBase, motivo: '' },
+    })
 
     await wrapper.find('#incidente-motivo-AveriaMecanica').setValue(true)
 
@@ -72,12 +103,12 @@ describe('ReportarIncidenteModal', () => {
   it('debe emitir cambios de fecha, descripción y bus de reemplazo', async () => {
     const wrapper = montarModal()
 
-    await wrapper.find('#incidente-fecha').setValue('2026-10-28')
+    await wrapper.find('#incidente-fecha').setValue(hoy)
     await wrapper.find('#incidente-descripcion').setValue('Falla en el sistema de frenos.')
     await wrapper.find('#incidente-reemplazo').setValue('30')
 
     expect(wrapper.emitted('update:form')).toEqual([
-      [{ fechaIncidente: '2026-10-28' }],
+      [{ fechaIncidente: hoy }],
       [{ descripcion: 'Falla en el sistema de frenos.' }],
       [{ replacementBusNumero: '30' }],
     ])
