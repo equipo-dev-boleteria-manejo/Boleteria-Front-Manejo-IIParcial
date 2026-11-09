@@ -2,23 +2,28 @@
  * Login.ts - Caso de Uso Canónico de Autenticación (Golden Standard)
  *
  * Arquitectura:
- * - Inversión de Dependencias (DIP): Recibe IAuthRepository por constructor.
+ * - Inversión de Dependencias (DIP): Recibe IAuthRepository y IAuditRepository opcional.
  * - Cero acoplamiento a Vue, DOM o Supabase directo.
- * - Validación de entradas y manejo de excepciones canónicas de dominio.
+ * - Registro de Auditoría transparente (éxito y fallas de seguridad).
  */
 
 import type { IAuthRepository, SesionAuth } from '../../Domain/Repositories/IAuthRepository';
+import type { IAuditRepository } from '../../Domain/Repositories/IAuditRepository';
 import { Usuario } from '../../Domain/Entities/Usuario';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { SupabaseAuthRepository } from '../../Infrastructure/Repositories/SupabaseAuthRepository';
+import { SupabaseAuditRepository } from '../../Infrastructure/Repositories/SupabaseAuditRepository';
 import type { LoginDto } from '../Dtos/LoginDto';
 
 export class LoginUseCase {
-  constructor(private readonly authRepo: IAuthRepository) {}
+  constructor(
+    private readonly authRepo: IAuthRepository,
+    private readonly auditRepo?: IAuditRepository
+  ) {}
 
   /**
    * Ejecuta el inicio de sesión validando el formato de entrada
-   * y delegando la autenticación al repositorio.
+   * y delegando la autenticación al repositorio con registro de auditoría.
    */
   async execute(dto: LoginDto): Promise<SesionAuth> {
     const email = dto.email ? dto.email.trim().toLowerCase() : '';
@@ -33,7 +38,36 @@ export class LoginUseCase {
       throw new DomainException('El formato del correo electrónico no es válido');
     }
 
-    return await this.authRepo.iniciarSesion(email, password);
+    try {
+      const sesion = await this.authRepo.iniciarSesion(email, password);
+
+      // Auditoría de acceso exitoso
+      if (this.auditRepo) {
+        this.auditRepo.registrarEvento({
+          accion: 'INICIO_SESION',
+          usuarioId: sesion.usuario?.id || null,
+          entidadAfectada: 'Usuarios',
+          entidadId: sesion.usuario?.id,
+          detalle: `Inicio de sesión exitoso para ${email} (Rol: ${sesion.usuario?.rol})`,
+          resultado: 'Exito',
+        }).catch(() => {});
+      }
+
+      return sesion;
+    } catch (err: unknown) {
+      // Auditoría de intento de acceso fallido o bloqueado
+      if (this.auditRepo) {
+        const errorMsg = err instanceof Error ? err.message : 'Credenciales inválidas';
+        this.auditRepo.registrarEvento({
+          accion: 'INICIO_SESION_FALLIDO',
+          usuarioId: null,
+          entidadAfectada: 'Usuarios',
+          detalle: `Intento de acceso fallido para ${email}: ${errorMsg}`,
+          resultado: 'Fallo',
+        }).catch(() => {});
+      }
+      throw err;
+    }
   }
 
   /**
@@ -47,7 +81,21 @@ export class LoginUseCase {
    * Cierra la sesión activa del usuario.
    */
   async logout(): Promise<void> {
-    await this.authRepo.cerrarSesion();
+    try {
+      const usuario = await this.authRepo.obtenerUsuarioActual().catch(() => null);
+      if (this.auditRepo && usuario) {
+        this.auditRepo.registrarEvento({
+          accion: 'CIERRE_SESION',
+          usuarioId: usuario.id,
+          entidadAfectada: 'Usuarios',
+          entidadId: usuario.id,
+          detalle: `Cierre de sesión de ${usuario.email}`,
+          resultado: 'Exito',
+        }).catch(() => {});
+      }
+    } finally {
+      await this.authRepo.cerrarSesion();
+    }
   }
 
   async cerrarSesion(): Promise<void> {
@@ -67,4 +115,7 @@ export class LoginUseCase {
 }
 
 // Instancia por defecto lista para ser consumida en la capa de presentación
-export const loginUseCase = new LoginUseCase(new SupabaseAuthRepository());
+export const loginUseCase = new LoginUseCase(
+  new SupabaseAuthRepository(),
+  new SupabaseAuditRepository()
+);
