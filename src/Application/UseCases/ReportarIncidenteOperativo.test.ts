@@ -3,7 +3,11 @@ import { ReportarIncidenteOperativo } from './ReportarIncidenteOperativo';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
-import { BusNoEncontradoException, MotivoIncidenteInvalidoException } from '../../Domain/Exceptions/BusException';
+import {
+  BusNoEncontradoException,
+  BusYaEnMantenimientoException,
+  MotivoIncidenteInvalidoException,
+} from '../../Domain/Exceptions/BusException';
 import { BusReemplazoNoValidoException } from '../../Domain/Exceptions/BusFueraDeServicioException';
 
 describe('ReportarIncidenteOperativo', () => {
@@ -128,5 +132,15 @@ describe('ReportarIncidenteOperativo', () => {
     await useCase.ejecutar({ ...inputBase, busNumero: '  25  ' });
 
     expect(mockBusRepo.obtenerPorNumero).toHaveBeenCalledWith(1, '25');
+  });
+
+  it('debe lanzar BusYaEnMantenimientoException si el bus ya se encuentra en mantenimiento', async () => {
+    busActual.estado = EstadoBus.MANTENIMIENTO;
+
+    await expect(
+      useCase.ejecutar(inputBase)
+    ).rejects.toThrow(BusYaEnMantenimientoException);
+
+    expect(mockBusRepo.cambiarEstado).not.toHaveBeenCalled();
   });
 });

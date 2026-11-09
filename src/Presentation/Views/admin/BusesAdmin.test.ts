@@ -582,4 +582,41 @@ describe('BusesAdmin', () => {
     const inputPlaca = wrapper.find('#modal-nuevo-bus-placa').element as HTMLInputElement
     expect(inputPlaca.value).toBe('PBA-254')
   })
+
+  it('no debe mostrar el botón Incidente si el bus ya está en Mantenimiento', async () => {
+    const bus = crearBus('25', 'PBA-1234', 5, EstadoBus.MANTENIMIENTO)
+    estado.buses.value = [bus]
+    const wrapper = montarVista()
+
+    expect(buscarBoton(wrapper, 'Incidente')).toBeUndefined()
+    expect(buscarBoton(wrapper, 'Reactivar')).toBeDefined()
+  })
+
+  it('debe registrar contingencia y mostrar insignias para bus afectado y de reemplazo', async () => {
+    const busActivo = crearBus('25', 'PBA-1234', 5, EstadoBus.ACTIVO)
+    const busReemplazo = crearBus('30', 'PBB-5678', 6, EstadoBus.ACTIVO)
+    estado.buses.value = [busActivo, busReemplazo]
+    estado.busesDisponibles.value = [busReemplazo]
+
+    const wrapper = montarVista()
+
+    await buscarBoton(wrapper, 'Incidente')?.trigger('click')
+
+    estado.formIncidente.busNumero = '25'
+    estado.formIncidente.replacementBusNumero = '30'
+    busActivo.estado = EstadoBus.MANTENIMIENTO
+
+    estado.reporteSuccess.value = true
+    await nextTick()
+    await flushPromises()
+
+    expect(uiMocks.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('El Bus 30 ha sido asignado como reemplazo operativo'),
+      'success',
+      3000,
+    )
+
+    expect(wrapper.text()).toContain('🔄 Reemplazado por Bus 30')
+    expect(wrapper.text()).toContain('🛡️ Cubriendo contingencia de Bus 25')
+  })
 })

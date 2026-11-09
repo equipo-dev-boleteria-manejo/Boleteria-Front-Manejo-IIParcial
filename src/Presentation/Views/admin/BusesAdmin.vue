@@ -196,6 +196,21 @@
                     <p class="truncate text-[11px] text-slate-400">
                       {{ bus.marcaChasis || 'Marca no registrada' }}
                     </p>
+                    <!-- Insignias de contingencia / reemplazo operativo -->
+                    <div v-if="obtenerContingencia(bus)" class="mt-1">
+                      <span
+                        v-if="obtenerContingencia(bus)?.tipo === 'afectado'"
+                        class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 shadow-2xs"
+                      >
+                        🔄 Reemplazado por Bus {{ obtenerContingencia(bus)?.reemplazo }}
+                      </span>
+                      <span
+                        v-else-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
+                        class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 shadow-2xs"
+                      >
+                        🛡️ Cubriendo contingencia de Bus {{ obtenerContingencia(bus)?.afectado }}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </td>
@@ -232,6 +247,7 @@
                   />
 
                   <ActionButton
+                    v-if="puedeReportarIncidente(bus)"
                     action="warning"
                     label="Incidente"
                     :disabled="cargandoCatalogo"
@@ -680,6 +696,43 @@ function puedeReactivar(bus: Bus) {
   return bus.estado === EstadoBus.MANTENIMIENTO
 }
 
+function puedeReportarIncidente(bus: Bus) {
+  return bus.estado !== EstadoBus.MANTENIMIENTO && bus.estado !== EstadoBus.FUERA_DE_SERVICIO
+}
+
+interface ContingenciaOperativa {
+  busAfectadoNumero: string
+  busReemplazoNumero: string
+}
+
+const contingencias = ref<ContingenciaOperativa[]>([])
+
+function obtenerContingencia(bus: Bus) {
+  const num = String(bus.numero)
+  // Caso 1: Bus que fue enviado a mantenimiento y reemplazado
+  const comoAfectado = contingencias.value.find((c) => c.busAfectadoNumero === num)
+  if (comoAfectado && bus.estado === EstadoBus.MANTENIMIENTO) {
+    return {
+      tipo: 'afectado' as const,
+      reemplazo: comoAfectado.busReemplazoNumero,
+    }
+  }
+
+  // Caso 2: Bus activo que está cubriendo la contingencia
+  const comoReemplazo = contingencias.value.find((c) => c.busReemplazoNumero === num)
+  if (comoReemplazo) {
+    const afectado = buses.value.find((b) => String(b.numero) === comoReemplazo.busAfectadoNumero)
+    if (!afectado || afectado.estado === EstadoBus.MANTENIMIENTO) {
+      return {
+        tipo: 'reemplazo' as const,
+        afectado: comoReemplazo.busAfectadoNumero,
+      }
+    }
+  }
+
+  return null
+}
+
 const busesReemplazo = computed(() =>
   busesDisponibles.value.filter((bus) => bus.numero !== busConIncidente.value?.numero),
 )
@@ -809,9 +862,23 @@ function cerrarReporte() {
 watch(reporteSuccess, async (exito) => {
   if (!exito) return
 
-  const mensaje =
-    reporteResponse.value?.acciones.mensaje ||
-    'El incidente se registró correctamente y el bus fue actualizado.'
+  const busAfectado = formIncidente.busNumero
+  const busReemplazo = formIncidente.replacementBusNumero
+
+  if (busReemplazo) {
+    contingencias.value = contingencias.value.filter(
+      (c) => c.busAfectadoNumero !== busAfectado,
+    )
+    contingencias.value.push({
+      busAfectadoNumero: busAfectado,
+      busReemplazoNumero: busReemplazo,
+    })
+  }
+
+  const mensaje = busReemplazo
+    ? `Bus ${busAfectado} enviado a Mantenimiento. El Bus ${busReemplazo} ha sido asignado como reemplazo operativo para cubrir sus frecuencias.`
+    : (reporteResponse.value?.acciones.mensaje ||
+       'El incidente se registró correctamente y el bus fue actualizado.')
   const estabaAbierto = mostrarIncidente.value
 
   mostrarIncidente.value = false
@@ -889,6 +956,12 @@ async function confirmarCambioEstado(bus: Bus, accion: AccionEstado) {
       limpiarMensajesControl()
     }
     return
+  }
+
+  if (accion === 'reactivar') {
+    contingencias.value = contingencias.value.filter(
+      (c) => c.busAfectadoNumero !== String(bus.numero),
+    )
   }
 
   // Notificación de éxito consistente vía showSuccess (Toast 3s arriba a la derecha)
