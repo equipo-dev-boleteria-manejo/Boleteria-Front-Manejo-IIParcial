@@ -382,15 +382,27 @@
         </div>
 
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <!-- Información de la cooperativa vinculada -->
+          <div class="rounded-xl border border-blue-100 bg-blue-50/70 p-3 sm:col-span-2 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+            <div class="flex items-center gap-2 text-blue-900 font-semibold">
+              <span>🏢 Cooperativa asignada:</span>
+              <span class="font-bold text-blue-700">Cooperativa N.º {{ cooperativaId }}</span>
+            </div>
+            <span class="text-[10px] uppercase font-bold text-blue-600 bg-white px-2 py-0.5 rounded-md border border-blue-200 self-start sm:self-auto">
+              Vinculación automática por sesión
+            </span>
+          </div>
+
           <InputBase
             id="modal-nuevo-bus-numero"
-            label="Número de bus"
+            label="Número de bus (Disco)"
             placeholder="Ej. 25"
             required
             :model-value="nuevoBus.numero"
             :disabled="busesLoading"
-            helper-text="Identificador interno o número de disco."
-            @update:model-value="nuevoBus.numero = $event"
+            :error="errorNumeroBus"
+            helper-text="Identificador interno o número de disco asignado al bus."
+            @update:model-value="onNumeroNuevoInput"
           />
 
           <InputBase
@@ -398,20 +410,25 @@
             label="Placa vehicular"
             placeholder="Ej. PBA-1234"
             required
-            :model-value="nuevoBus.placa"
+            :model-value="placaModal"
             :disabled="busesLoading"
-            helper-text="Formato oficial ecuatoriano."
-            @update:model-value="nuevoBus.placa = $event"
+            :error="errorPlaca"
+            :helper-text="helperPlaca || 'Formato oficial ANT (ej. PBA-1234 o PBA-254).'"
+            @update:model-value="onPlacaNuevaInput"
           />
 
           <InputBase
             id="modal-nuevo-bus-asientos"
             label="Capacidad total de asientos"
             type="number"
+            min="1"
+            max="90"
+            step="1"
             required
             :model-value="nuevoBus.totalAsientos"
             :disabled="busesLoading"
-            helper-text="Total de asientos disponibles para pasaje."
+            :error="errorAsientos"
+            helper-text="Número entero mayor a 0 (ej. 40)."
             @update:model-value="onTotalAsientosNuevo"
           />
 
@@ -498,6 +515,7 @@ import InputBase from '../../Components/InputBase.vue'
 import ModalBase from '../../Components/ModalBase.vue'
 import EditarBusModal from '../../Components/EditarBusModal.vue'
 import ReportarIncidenteModal from '../../Components/ReportarIncidenteModal.vue'
+import { usePlacaValidation } from '../../Composables/usePlacaValidation'
 import { useBuses, type GuardarBusInput } from '../../Composables/useBuses'
 import { useControlBuses } from '../../Composables/useControlBuses'
 import {
@@ -716,31 +734,95 @@ function actualizarFormIncidente(patch: Partial<FormIncidente>) {
   Object.assign(formIncidente, patch)
 }
 
+// Validación independiente de placa ANT
+const {
+  placa: placaModal,
+  errorPlaca,
+  helperPlaca,
+  isPlacaValid,
+  formatPlacaOnInput,
+  resetPlacaValidation,
+} = usePlacaValidation()
+
+const errorNumeroBus = ref('')
+const errorAsientos = ref('')
+
+function onNumeroNuevoInput(val: string) {
+  // Limpiar caracteres no numéricos
+  const soloDigitos = (val || '').replace(/[^0-9]/g, '')
+  nuevoBus.value.numero = soloDigitos
+  if (!soloDigitos) {
+    errorNumeroBus.value = 'El número de disco es obligatorio'
+  } else if (parseInt(soloDigitos, 10) <= 0) {
+    errorNumeroBus.value = 'El número de disco debe ser mayor a 0'
+  } else {
+    errorNumeroBus.value = ''
+  }
+}
+
+function onPlacaNuevaInput(val: string) {
+  const formateada = formatPlacaOnInput(val)
+  nuevoBus.value.placa = formateada
+}
+
+function onTotalAsientosNuevo(value: string | number) {
+  const str = String(value ?? '').trim()
+  if (!str) {
+    nuevoBus.value.totalAsientos = 0
+    errorAsientos.value = 'La capacidad de asientos es obligatoria'
+    return
+  }
+  const num = Number(str)
+  if (isNaN(num) || !Number.isInteger(num) || num <= 0) {
+    errorAsientos.value = 'Debe ser un número entero mayor a 0'
+  } else if (num > 90) {
+    errorAsientos.value = 'La capacidad máxima permitida es de 90 asientos'
+  } else {
+    errorAsientos.value = ''
+  }
+  nuevoBus.value.totalAsientos = num
+}
+
 function abrirNuevoBus() {
+  resetPlacaValidation()
+  errorNumeroBus.value = ''
+  errorAsientos.value = ''
+  nuevoBus.value.numero = ''
+  nuevoBus.value.placa = ''
+  nuevoBus.value.totalAsientos = 40
+  nuevoBus.value.estructura = 'UnPiso'
+  nuevoBus.value.cooperativaId = cooperativaId
   mostrarNuevoBusModal.value = true
 }
 
 function cerrarNuevoBusModal() {
   mostrarNuevoBusModal.value = false
   limpiarErrorBuses()
+  resetPlacaValidation()
 }
 
 async function manejarRegistrarBusModal() {
+  // Disparar validaciones preventivas
+  onNumeroNuevoInput(nuevoBus.value.numero)
+  onPlacaNuevaInput(placaModal.value)
+  onTotalAsientosNuevo(nuevoBus.value.totalAsientos)
+
+  if (errorNumeroBus.value || errorPlaca.value || errorAsientos.value) {
+    return
+  }
+
   const numero = nuevoBus.value.numero
   const exito = await registrarBus()
 
   if (!exito) return
 
   mostrarNuevoBusModal.value = false
+  resetPlacaValidation()
   uiStore.showAlert({
     type: 'success',
     title: 'Bus registrado',
     message: `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
   })
-}
-
-function onTotalAsientosNuevo(value: string) {
-  nuevoBus.value.totalAsientos = value === '' ? 0 : Number(value)
 }
 
 function onEstructuraNueva(event: Event) {

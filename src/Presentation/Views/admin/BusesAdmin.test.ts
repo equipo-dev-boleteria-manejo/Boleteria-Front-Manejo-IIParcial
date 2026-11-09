@@ -518,4 +518,34 @@ describe('BusesAdmin', () => {
       expect.objectContaining({ type: 'success', title: 'Bus registrado' }),
     )
   })
+
+  it('debe bloquear el envío si la placa es inválida o la capacidad es negativa', async () => {
+    const wrapper = montarVista()
+
+    await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await flushPromises()
+
+    await wrapper.find('#modal-nuevo-bus-numero').setValue('15')
+    await wrapper.find('#modal-nuevo-bus-placa').setValue('DBA-1234') // D no es provincia ecuatoriana
+    await wrapper.find('#modal-nuevo-bus-asientos').setValue('-1')
+    await wrapper.find('#form-crear-bus-modal').trigger('submit')
+    await flushPromises()
+
+    expect(estado.registrarBus).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('no corresponde a una provincia')
+    expect(wrapper.text()).toContain('Debe ser un número entero mayor a 0')
+  })
+
+  it('debe sanitizar la placa automáticamente a mayúsculas y remover guiones al inicio', async () => {
+    const wrapper = montarVista()
+
+    await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await flushPromises()
+
+    await wrapper.find('#modal-nuevo-bus-placa').setValue('-pba254')
+    await flushPromises()
+
+    const inputPlaca = wrapper.find('#modal-nuevo-bus-placa').element as HTMLInputElement
+    expect(inputPlaca.value).toBe('PBA-254')
+  })
 })
