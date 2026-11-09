@@ -17,57 +17,34 @@
 
     <!-- Sección de KPIs: Métricas de Trazabilidad y Auditoría de Sistema -->
     <section class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-slate-500">
-          <span class="text-xs font-bold uppercase tracking-wide">Total Eventos</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
-            📋
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-slate-900 mt-3 tracking-tight">
-          {{ metricasAuditoria.total }}
-        </p>
-        <p class="text-[11px] text-slate-400 mt-1">Trazabilidad general del sistema</p>
-      </article>
-
-      <article class="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-emerald-800">
-          <span class="text-xs font-bold uppercase tracking-wide">Operaciones Exitosas</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800">
-            ✅
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-emerald-700 mt-3 tracking-tight">
-          {{ metricasAuditoria.exitos }}
-        </p>
-        <p class="text-[11px] text-emerald-700 mt-1">Transacciones ejecutadas correctamente</p>
-      </article>
-
-      <article class="rounded-2xl border border-rose-200 bg-rose-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-rose-800">
-          <span class="text-xs font-bold uppercase tracking-wide">Alertas y Fallos</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-100 text-rose-800">
-            🚨
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-rose-700 mt-3 tracking-tight">
-          {{ metricasAuditoria.fallos }}
-        </p>
-        <p class="text-[11px] text-rose-700 mt-1">Errores, bloqueos o rechazos</p>
-      </article>
-
-      <article class="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 shadow-xs hover:shadow-md transition-shadow">
-        <div class="flex items-center justify-between text-blue-800">
-          <span class="text-xs font-bold uppercase tracking-wide">Eventos de Seguridad</span>
-          <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-800">
-            🛡️
-          </div>
-        </div>
-        <p class="text-3xl font-extrabold text-blue-700 mt-3 tracking-tight">
-          {{ metricasAuditoria.seguridad }}
-        </p>
-        <p class="text-[11px] text-blue-700 mt-1">Logins, accesos y operaciones de cuenta</p>
-      </article>
+      <MetricCard
+        title="Total Eventos"
+        :value="metricasAuditoria.total"
+        icon="📋"
+        description="Trazabilidad general del sistema"
+        variant="default"
+      />
+      <MetricCard
+        title="Operaciones Exitosas"
+        :value="metricasAuditoria.exitos"
+        icon="✅"
+        description="Transacciones ejecutadas correctamente"
+        variant="success"
+      />
+      <MetricCard
+        title="Alertas y Fallos"
+        :value="metricasAuditoria.fallos"
+        icon="🚨"
+        description="Errores, bloqueos o rechazos"
+        variant="danger"
+      />
+      <MetricCard
+        title="Eventos de Seguridad"
+        :value="metricasAuditoria.seguridad"
+        icon="🛡️"
+        description="Logins, accesos y operaciones de cuenta"
+        variant="info"
+      />
     </section>
 
     <!-- Barra de Filtros y Búsqueda de Auditoría -->
@@ -231,6 +208,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useReportes } from '../../Composables/useReportes'
+import MetricCard from '../../Components/MetricCard.vue'
 import InputBase from '../../Components/InputBase.vue'
 import PaginationControls from '../../Components/PaginationControls.vue'
 

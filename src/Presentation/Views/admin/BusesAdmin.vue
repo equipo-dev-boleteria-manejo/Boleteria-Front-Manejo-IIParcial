@@ -25,86 +25,44 @@
 
     <!-- Resumen de la flota -->
     <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de la flota">
-      <div
+      <MetricCard
         v-for="tarjeta in tarjetasResumen"
         :key="tarjeta.etiqueta"
-        class="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
-      >
-        <div class="flex items-start justify-between gap-2">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-              {{ tarjeta.etiqueta }}
-            </p>
-            <p class="mt-1 text-2xl font-black text-slate-900">
-              {{ busesLoading && !buses.length ? '—' : tarjeta.valor }}
-            </p>
-          </div>
-          <span
-            class="flex h-9 w-9 items-center justify-center rounded-xl border text-base"
-            :class="tarjeta.tono"
-            aria-hidden="true"
-          >
-            {{ tarjeta.icono }}
-          </span>
-        </div>
-        <p class="mt-1 text-[11px] text-slate-500">{{ tarjeta.detalle }}</p>
-      </div>
+        :title="tarjeta.etiqueta"
+        :value="busesLoading && !buses.length ? '—' : tarjeta.valor"
+        :icon="tarjeta.icono"
+        :description="tarjeta.detalle"
+        :variant="tarjeta.variant"
+      />
     </section>
 
     <!-- Barra de Búsqueda y Filtros Unificada (Estilo Usuarios.vue) -->
     <div class="flex flex-col md:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
       <div class="w-full md:w-72">
-        <InputBase
+        <SearchInput
           id="bus-search"
           v-model="busqueda"
           placeholder="Buscar por número o placa..."
-          class="w-full"
-        >
-          <template #prefix>
-            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </template>
-        </InputBase>
+        />
       </div>
 
       <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Estado:</label>
-          <select
-            v-model="filtroEstado"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option value="Todos">Todos</option>
-            <option :value="EstadoBus.ACTIVO">Activo</option>
-            <option :value="EstadoBus.INACTIVO">Inactivo</option>
-            <option :value="EstadoBus.MANTENIMIENTO">Mantenimiento</option>
-            <option :value="EstadoBus.FUERA_DE_SERVICIO">Fuera de Servicio</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Estado:"
+          v-model="filtroEstado"
+          :options="opcionesEstado"
+        />
 
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Estructura:</label>
-          <select
-            v-model="filtroEstructura"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option value="Todas">Todas</option>
-            <option value="UnPiso">Un Piso</option>
-            <option value="DosPisos">Dos Pisos</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Estructura:"
+          v-model="filtroEstructura"
+          :options="opcionesEstructura"
+        />
 
-        <button
-          type="button"
+        <CreateButton
+          label="Registrar bus"
           @click="abrirNuevoBus"
-          class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer ml-1"
-        >
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Registrar bus</span>
-        </button>
+        />
       </div>
     </div>
 
@@ -129,14 +87,10 @@
               <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
               {{ resumenFlota.activos }} activos
             </span>
-            <ButtonBase
-              size="sm"
-              variant="outline"
+            <RefreshButton
               :loading="cargandoCatalogo"
               @click="recargarCatalogo"
-            >
-              Recargar
-            </ButtonBase>
+            />
           </div>
         </div>
       </template>
@@ -475,6 +429,11 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
 import ActionButton from '../../Components/ActionButton.vue'
+import MetricCard from '../../Components/MetricCard.vue'
+import SearchInput from '../../Components/SearchInput.vue'
+import SelectFilter from '../../Components/SelectFilter.vue'
+import CreateButton from '../../Components/CreateButton.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ModalBase from '../../Components/ModalBase.vue'
 import EditarBusModal from '../../Components/EditarBusModal.vue'
@@ -614,30 +573,44 @@ const tarjetasResumen = computed(() => [
     valor: resumenFlota.value.total,
     detalle: 'Unidades registradas',
     icono: '🚌',
-    tono: 'border-blue-100 bg-blue-50 text-blue-700',
+    variant: 'default' as const,
   },
   {
     etiqueta: 'Activos',
     valor: resumenFlota.value.activos,
     detalle: 'Disponibles para operar',
     icono: '✅',
-    tono: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+    variant: 'success' as const,
   },
   {
     etiqueta: 'Mantenimiento',
     valor: resumenFlota.value.mantenimiento,
     detalle: 'Fuera de operación temporal',
     icono: '🛠️',
-    tono: 'border-amber-100 bg-amber-50 text-amber-700',
+    variant: 'warning' as const,
   },
   {
     etiqueta: 'Fuera de servicio',
     valor: resumenFlota.value.fueraServicio,
     detalle: 'Requieren revisión técnica',
     icono: '⛔',
-    tono: 'border-red-100 bg-red-50 text-red-700',
+    variant: 'danger' as const,
   },
 ])
+
+const opcionesEstado = [
+  { value: 'Todos', label: 'Todos' },
+  { value: EstadoBus.ACTIVO, label: 'Activo' },
+  { value: EstadoBus.INACTIVO, label: 'Inactivo' },
+  { value: EstadoBus.MANTENIMIENTO, label: 'Mantenimiento' },
+  { value: EstadoBus.FUERA_DE_SERVICIO, label: 'Fuera de Servicio' },
+]
+
+const opcionesEstructura = [
+  { value: 'Todas', label: 'Todas' },
+  { value: 'UnPiso', label: 'Un Piso' },
+  { value: 'DosPisos', label: 'Dos Pisos' },
+]
 
 interface EstadoInfo {
   label: string

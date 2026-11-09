@@ -3,57 +3,33 @@
     <!-- Barra de Filtros, Búsqueda y Registro Rápido -->
     <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="w-full md:w-80">
-        <InputBase
+        <SearchInput
           v-model="busqueda"
           placeholder="Buscar por nombre, email o cédula..."
-          container-class="w-full"
-        >
-          <template #prefix>
-            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </template>
-        </InputBase>
+        />
       </div>
 
       <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Rol:</label>
-          <select
-            v-model="filtroRol"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option value="Todos">Todos los roles</option>
-            <option :value="RolUsuario.ADMIN">Administrador</option>
-            <option :value="RolUsuario.ENCARGADO">Encargado</option>
-            <option :value="RolUsuario.OFICINISTA">Oficinista</option>
-            <option :value="RolUsuario.CHOFER">Chofer</option>
-            <option :value="RolUsuario.CLIENTE">Usuario Final / Cliente</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Rol:"
+          v-model="filtroRol"
+          :options="opcionesRol"
+        />
 
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Mostrar:</label>
-          <select
-            v-model="registrosPorPagina"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option :value="5">5 filas</option>
-            <option :value="10">10 filas</option>
-            <option :value="20">20 filas</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Mostrar:"
+          v-model="registrosPorPagina"
+          :options="[
+            { value: 5, label: '5 filas' },
+            { value: 10, label: '10 filas' },
+            { value: 20, label: '20 filas' },
+          ]"
+        />
 
-        <button
-          type="button"
+        <CreateButton
+          label="Registrar Nuevo Usuario"
           @click="abrirModalCrear"
-          class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer ml-1"
-        >
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Registrar Nuevo Usuario</span>
-        </button>
+        />
       </div>
     </div>
 
@@ -427,9 +403,21 @@ import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
 import ButtonBase from '../Components/ButtonBase.vue'
 import ActionButton from '../Components/ActionButton.vue'
+import SearchInput from '../Components/SearchInput.vue'
+import SelectFilter from '../Components/SelectFilter.vue'
+import CreateButton from '../Components/CreateButton.vue'
 import InputBase from '../Components/InputBase.vue'
 import ModalBase from '../Components/ModalBase.vue'
 import PaginationControls from '../Components/PaginationControls.vue'
+
+const opcionesRol = [
+  { value: 'Todos', label: 'Todos los roles' },
+  { value: RolUsuario.ADMIN, label: 'Administrador' },
+  { value: RolUsuario.ENCARGADO, label: 'Encargado' },
+  { value: RolUsuario.OFICINISTA, label: 'Oficinista' },
+  { value: RolUsuario.CHOFER, label: 'Chofer' },
+  { value: RolUsuario.CLIENTE, label: 'Usuario Final / Cliente' },
+]
 
 const uiStore = useUiStore()
 
