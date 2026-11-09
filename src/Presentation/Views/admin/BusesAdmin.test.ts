@@ -290,7 +290,9 @@ function montarVista() {
 }
 
 function buscarBoton(wrapper: ReturnType<typeof montarVista>, texto: string) {
-  return wrapper.findAll('button').find((boton) => boton.text() === texto)
+  return wrapper
+    .findAll('button')
+    .find((boton) => boton.text().trim() === texto || boton.text().includes(texto))
 }
 
 beforeEach(() => {
@@ -461,6 +463,11 @@ describe('BusesAdmin', () => {
       expect.objectContaining({ title: 'Desactivar bus' }),
     )
     expect(estado.desactivarBus).toHaveBeenCalledWith(5)
+    expect(uiMocks.showToast).toHaveBeenCalledWith(
+      expect.stringContaining('desactivado correctamente'),
+      'success',
+      3000,
+    )
     expect(estado.cargarBuses).toHaveBeenCalledTimes(1)
   })
 
@@ -501,7 +508,7 @@ describe('BusesAdmin', () => {
   it('debe registrar un bus desde el formulario y notificar el éxito', async () => {
     const wrapper = montarVista()
 
-    await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await buscarBoton(wrapper, 'Registrar bus')?.trigger('click')
     await flushPromises()
 
     await wrapper.find('#modal-nuevo-bus-numero').setValue('40')
@@ -528,7 +535,7 @@ describe('BusesAdmin', () => {
   it('debe bloquear el envío si la placa es inválida o la capacidad es negativa', async () => {
     const wrapper = montarVista()
 
-    await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await buscarBoton(wrapper, 'Registrar bus')?.trigger('click')
     await flushPromises()
 
     await wrapper.find('#modal-nuevo-bus-numero').setValue('15')
@@ -545,7 +552,7 @@ describe('BusesAdmin', () => {
   it('debe sanitizar la placa automáticamente a mayúsculas y remover guiones al inicio', async () => {
     const wrapper = montarVista()
 
-    await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await buscarBoton(wrapper, 'Registrar bus')?.trigger('click')
     await flushPromises()
 
     await wrapper.find('#modal-nuevo-bus-placa').setValue('-pba254')

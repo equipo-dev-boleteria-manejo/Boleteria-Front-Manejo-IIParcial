@@ -23,30 +23,6 @@
       </button>
     </div>
 
-    <!-- Éxito de operaciones de control -->
-    <div
-      v-if="controlSuccess"
-      role="status"
-      aria-live="polite"
-      class="flex items-start justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 shadow-sm"
-    >
-      <div class="flex items-start gap-2.5">
-        <span class="text-base" aria-hidden="true">✅</span>
-        <div>
-          <p class="font-bold">Operación exitosa</p>
-          <p class="mt-0.5 text-xs leading-relaxed">{{ controlSuccess }}</p>
-        </div>
-      </div>
-      <button
-        type="button"
-        class="rounded-lg p-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
-        aria-label="Cerrar notificación de éxito"
-        @click="limpiarMensajesControl"
-      >
-        <span aria-hidden="true">✕</span>
-      </button>
-    </div>
-
     <!-- Resumen de la flota -->
     <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de la flota">
       <div
@@ -127,7 +103,7 @@
           <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          <span>+ Registrar bus</span>
+          <span>Registrar bus</span>
         </button>
       </div>
     </div>
@@ -516,6 +492,7 @@ import ModalBase from '../../Components/ModalBase.vue'
 import EditarBusModal from '../../Components/EditarBusModal.vue'
 import ReportarIncidenteModal from '../../Components/ReportarIncidenteModal.vue'
 import { usePlacaValidation } from '../../Composables/usePlacaValidation'
+import { useFeedback } from '../../Composables/useFeedback'
 import { useBuses, type GuardarBusInput } from '../../Composables/useBuses'
 import { useControlBuses } from '../../Composables/useControlBuses'
 import {
@@ -531,6 +508,7 @@ type EstructuraBus = 'UnPiso' | 'DosPisos'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
+const { showSuccess, showError, showWarning, confirm } = useFeedback()
 
 const cooperativaId = authStore.user?.cooperativaId ?? 1
 
@@ -818,11 +796,7 @@ async function manejarRegistrarBusModal() {
 
   mostrarNuevoBusModal.value = false
   resetPlacaValidation()
-  uiStore.showToast(
-    `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
-    'success',
-    3000,
-  )
+  showSuccess(`El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`)
 }
 
 function onEstructuraNueva(event: Event) {
@@ -848,11 +822,7 @@ async function manejarGuardarBus(payload: GuardarBusInput) {
 
   mostrarEdicion.value = false
   busEnEdicion.value = null
-  uiStore.showToast(
-    `Los datos del bus ${payload.numero} se actualizaron correctamente.`,
-    'success',
-    3000,
-  )
+  showSuccess(`Los datos del bus ${payload.numero} se actualizaron correctamente.`)
 }
 
 function abrirReporte(bus: Bus) {
@@ -888,7 +858,7 @@ watch(reporteSuccess, async (exito) => {
   busConIncidente.value = null
 
   if (estabaAbierto) {
-    uiStore.showToast(mensaje, 'success', 3000)
+    showSuccess(mensaje)
   }
 
   await cargarBuses()
@@ -931,10 +901,9 @@ async function confirmarCambioEstado(bus: Bus, accion: AccionEstado) {
     },
   }
 
-  const confirmado = await uiStore.showConfirm({
+  const confirmado = await confirm({
     ...configuracion[accion],
     type: accion === 'desactivar' ? 'warning' : 'info',
-    cancelText: 'Cancelar',
   })
 
   if (!confirmado) return
@@ -954,9 +923,26 @@ async function confirmarCambioEstado(bus: Bus, accion: AccionEstado) {
     actualizado = Boolean(respuesta)
   }
 
-  if (!actualizado) return
+  if (!actualizado) {
+    if (controlError.value) {
+      showError(controlError.value)
+      limpiarMensajesControl()
+    }
+    return
+  }
 
-  // Se recarga el catálogo completo; el mensaje de éxito proviene de useControlBuses.
+  // Notificación de éxito consistente vía showSuccess (Toast 3s arriba a la derecha)
+  const mensajeExito =
+    controlSuccess.value ||
+    (accion === 'desactivar'
+      ? `Bus ${bus.numero} desactivado correctamente.`
+      : accion === 'activar'
+        ? `Bus ${bus.numero} activado correctamente.`
+        : `Bus ${bus.numero} reactivado correctamente.`)
+  showSuccess(mensajeExito)
+  limpiarMensajesControl()
+
+  // Se recarga el catálogo completo
   await cargarBuses()
 }
 
