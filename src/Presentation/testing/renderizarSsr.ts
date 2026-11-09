@@ -34,3 +34,4 @@ export async function renderizar(
 
   return { html, cuerpo: contexto.teleports?.body ?? '' };
 }
+
