@@ -62,14 +62,6 @@
         </span>
       </div>
 
-      <p
-        class="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-relaxed text-slate-600"
-      >
-        <span aria-hidden="true">ℹ️</span>
-        Al reportar el incidente, el bus pasará a <strong>Mantenimiento</strong>. La reasignación de
-        rutas y pasajeros corresponde al módulo de Rutas y Ventas.
-      </p>
-
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <InputBase
           id="incidente-bus"

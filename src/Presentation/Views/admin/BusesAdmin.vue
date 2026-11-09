@@ -269,59 +269,48 @@
                 </span>
               </td>
               <td class="px-5 py-3.5 sm:px-6">
-                <div class="flex flex-wrap items-center justify-end gap-2">
-                  <ButtonBase
-                    size="sm"
-                    variant="outline"
+                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                  <ActionButton
+                    action="edit"
                     :disabled="cargandoCatalogo"
                     :aria-label="`Editar bus ${bus.numero}`"
                     @click="abrirEdicion(bus)"
-                  >
-                    Editar
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
-                    size="sm"
-                    variant="secondary"
+                  <ActionButton
+                    action="warning"
+                    label="Incidente"
                     :disabled="cargandoCatalogo"
                     :aria-label="`Reportar incidente del bus ${bus.numero}`"
                     @click="abrirReporte(bus)"
-                  >
-                    Incidente
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
+                  <ActionButton
                     v-if="puedeDesactivar(bus)"
-                    size="sm"
-                    variant="danger"
+                    action="danger"
+                    label="Desactivar"
                     :disabled="cargandoCatalogo"
                     :aria-label="`Desactivar bus ${bus.numero}`"
                     @click="confirmarCambioEstado(bus, 'desactivar')"
-                  >
-                    Desactivar
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
+                  <ActionButton
                     v-else-if="puedeActivar(bus)"
-                    size="sm"
-                    variant="success"
+                    action="success"
+                    label="Activar"
                     :disabled="cargandoCatalogo"
                     :aria-label="`Activar bus ${bus.numero}`"
                     @click="confirmarCambioEstado(bus, 'activar')"
-                  >
-                    Activar
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
+                  <ActionButton
                     v-else-if="puedeReactivar(bus)"
-                    size="sm"
-                    variant="primary"
+                    action="primary"
+                    label="Reactivar"
                     :disabled="cargandoCatalogo"
                     :aria-label="`Reactivar bus ${bus.numero}`"
                     @click="confirmarCambioEstado(bus, 'reactivar')"
-                  >
-                    Reactivar
-                  </ButtonBase>
+                  />
                 </div>
               </td>
             </tr>
@@ -374,7 +363,7 @@
             label="Número de bus (Disco)"
             placeholder="Ej. 25"
             required
-            :model-value="nuevoBus.numero"
+            :model-value="nuevoNumero"
             :disabled="busesLoading"
             :error="errorNumeroBus"
             helper-text="Identificador interno o número de disco asignado al bus."
@@ -386,7 +375,7 @@
             label="Placa vehicular"
             placeholder="Ej. PBA-1234"
             required
-            :model-value="placaModal"
+            :model-value="nuevaPlaca"
             :disabled="busesLoading"
             :error="errorPlaca"
             :helper-text="helperPlaca || 'Formato oficial ANT (ej. PBA-1234 o PBA-254).'"
@@ -401,7 +390,7 @@
             max="90"
             step="1"
             required
-            :model-value="nuevoBus.totalAsientos"
+            :model-value="nuevosAsientos"
             :disabled="busesLoading"
             :error="errorAsientos"
             helper-text="Número entero mayor a 0 (ej. 40)."
@@ -418,7 +407,7 @@
             <div class="relative">
               <select
                 id="modal-nuevo-bus-estructura"
-                :value="nuevoBus.estructura"
+                :value="nuevaEstructura"
                 :disabled="busesLoading"
                 required
                 class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed appearance-none pr-10"
@@ -436,26 +425,24 @@
             <p class="text-[11px] text-slate-400">Distribución física de la unidad.</p>
           </div>
         </div>
-
-        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
-          <button
-            type="button"
-            class="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
-            :disabled="busesLoading"
-            @click="cerrarNuevoBusModal"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            :disabled="busesLoading"
-            class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
-          >
-            <span v-if="busesLoading" class="animate-spin text-xs">⏳</span>
-            <span>Registrar Bus</span>
-          </button>
-        </div>
       </form>
+
+      <template #footer>
+        <ButtonBase
+          variant="secondary"
+          :disabled="busesLoading"
+          @click="cerrarNuevoBusModal"
+        >
+          Cancelar
+        </ButtonBase>
+        <ButtonBase
+          type="submit"
+          form="form-crear-bus-modal"
+          :loading="busesLoading"
+        >
+          Registrar Bus
+        </ButtonBase>
+      </template>
     </ModalBase>
 
     <EditarBusModal
@@ -487,11 +474,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import ActionButton from '../../Components/ActionButton.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ModalBase from '../../Components/ModalBase.vue'
 import EditarBusModal from '../../Components/EditarBusModal.vue'
 import ReportarIncidenteModal from '../../Components/ReportarIncidenteModal.vue'
 import { usePlacaValidation } from '../../Composables/usePlacaValidation'
+import { useBusFormValidation } from '../../Composables/useBusFormValidation'
 import { useFeedback } from '../../Composables/useFeedback'
 import { useBuses, type GuardarBusInput } from '../../Composables/useBuses'
 import { useControlBuses } from '../../Composables/useControlBuses'
@@ -712,59 +701,46 @@ function actualizarFormIncidente(patch: Partial<FormIncidente>) {
   Object.assign(formIncidente, patch)
 }
 
-// Validación independiente de placa ANT
+// Validación desacoplada del formulario de bus (Headless)
 const {
-  placa: placaModal,
+  numero: nuevoNumero,
+  placa: nuevaPlaca,
+  totalAsientos: nuevosAsientos,
+  estructura: nuevaEstructura,
+  errorNumero: errorNumeroBus,
   errorPlaca,
+  errorAsientos,
   helperPlaca,
-  isPlacaValid,
-  formatPlacaOnInput,
-  resetPlacaValidation,
-} = usePlacaValidation()
-
-const errorNumeroBus = ref('')
-const errorAsientos = ref('')
+  onNumeroInput,
+  onPlacaInput,
+  onTotalAsientosInput,
+  validateAll: validarNuevoBus,
+  resetForm: resetFormNuevoBus,
+} = useBusFormValidation({ totalAsientos: 40, estructura: 'UnPiso' })
 
 function onNumeroNuevoInput(val: string) {
-  // Limpiar caracteres no numéricos
-  const soloDigitos = (val || '').replace(/[^0-9]/g, '')
-  nuevoBus.value.numero = soloDigitos
-  if (!soloDigitos) {
-    errorNumeroBus.value = 'El número de disco es obligatorio'
-  } else if (parseInt(soloDigitos, 10) <= 0) {
-    errorNumeroBus.value = 'El número de disco debe ser mayor a 0'
-  } else {
-    errorNumeroBus.value = ''
-  }
+  onNumeroInput(val)
+  nuevoBus.value.numero = nuevoNumero.value
 }
 
 function onPlacaNuevaInput(val: string) {
-  const formateada = formatPlacaOnInput(val)
-  nuevoBus.value.placa = formateada
+  onPlacaInput(val)
+  nuevoBus.value.placa = nuevaPlaca.value
 }
 
-function onTotalAsientosNuevo(value: string | number) {
-  const str = String(value ?? '').trim()
-  if (!str) {
-    nuevoBus.value.totalAsientos = 0
-    errorAsientos.value = 'La capacidad de asientos es obligatoria'
-    return
-  }
-  const num = Number(str)
-  if (isNaN(num) || !Number.isInteger(num) || num <= 0) {
-    errorAsientos.value = 'Debe ser un número entero mayor a 0'
-  } else if (num > 90) {
-    errorAsientos.value = 'La capacidad máxima permitida es de 90 asientos'
-  } else {
-    errorAsientos.value = ''
-  }
-  nuevoBus.value.totalAsientos = num
+function onTotalAsientosNuevo(val: string | number) {
+  onTotalAsientosInput(val)
+  nuevoBus.value.totalAsientos = nuevosAsientos.value
+}
+
+function onEstructuraNueva(event: Event) {
+  const val = (event.target as HTMLSelectElement).value as EstructuraBus
+  nuevaEstructura.value = val
+  nuevoBus.value.estructura = val
 }
 
 function abrirNuevoBus() {
-  resetPlacaValidation()
-  errorNumeroBus.value = ''
-  errorAsientos.value = ''
+  resetFormNuevoBus()
   nuevoBus.value.numero = ''
   nuevoBus.value.placa = ''
   nuevoBus.value.totalAsientos = 40
@@ -776,31 +752,28 @@ function abrirNuevoBus() {
 function cerrarNuevoBusModal() {
   mostrarNuevoBusModal.value = false
   limpiarErrorBuses()
-  resetPlacaValidation()
+  resetFormNuevoBus()
 }
 
 async function manejarRegistrarBusModal() {
-  // Disparar validaciones preventivas
-  onNumeroNuevoInput(nuevoBus.value.numero)
-  onPlacaNuevaInput(placaModal.value)
-  onTotalAsientosNuevo(nuevoBus.value.totalAsientos)
-
-  if (errorNumeroBus.value || errorPlaca.value || errorAsientos.value) {
+  if (!validarNuevoBus()) {
     return
   }
 
-  const numero = nuevoBus.value.numero
+  nuevoBus.value.numero = nuevoNumero.value
+  nuevoBus.value.placa = nuevaPlaca.value
+  nuevoBus.value.totalAsientos = nuevosAsientos.value
+  nuevoBus.value.estructura = nuevaEstructura.value
+  nuevoBus.value.cooperativaId = cooperativaId
+
+  const numero = nuevoNumero.value
   const exito = await registrarBus()
 
   if (!exito) return
 
   mostrarNuevoBusModal.value = false
-  resetPlacaValidation()
+  resetFormNuevoBus()
   showSuccess(`El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`)
-}
-
-function onEstructuraNueva(event: Event) {
-  nuevoBus.value.estructura = (event.target as HTMLSelectElement).value as EstructuraBus
 }
 
 function abrirEdicion(bus: Bus) {

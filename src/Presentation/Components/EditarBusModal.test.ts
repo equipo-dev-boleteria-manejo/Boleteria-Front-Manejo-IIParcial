@@ -100,4 +100,16 @@ describe('EditarBusModal', () => {
     )
     expect((wrapper.find('#editar-bus-asientos').element as HTMLInputElement).value).toBe('52')
   })
+
+  it('no debe emitir save si los datos editados son inválidos (placa o asientos negativos)', async () => {
+    const wrapper = montarModal()
+
+    await wrapper.find('#editar-bus-placa').setValue('DBA-1234')
+    await wrapper.find('#editar-bus-asientos').setValue('-5')
+    await wrapper.find('#form-editar-bus').trigger('submit')
+
+    expect(wrapper.emitted('save')).toBeUndefined()
+    expect(wrapper.text()).toContain('no corresponde a una provincia válida')
+    expect(wrapper.text()).toContain('Debe ser un número entero mayor a 0')
+  })
 })

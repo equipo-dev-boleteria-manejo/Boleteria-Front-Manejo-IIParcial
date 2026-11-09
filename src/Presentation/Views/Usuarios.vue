@@ -156,16 +156,11 @@
               </td>
               <td class="px-6 py-3 text-right">
                 <div class="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
+                  <ActionButton
+                    action="edit"
+                    :aria-label="`Editar usuario ${u.nombres}`"
                     @click="abrirModalEditar(u)"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
-                  >
-                    <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    <span>Editar</span>
-                  </button>
+                  />
 
                   <!-- Super Admin base protegido: botón de baja bloqueado -->
                   <span
@@ -175,17 +170,13 @@
                   >
                     Protegido
                   </span>
-                  <button
+                  <ActionButton
                     v-else-if="u.activo"
-                    type="button"
+                    action="danger"
+                    label="Dar de Baja"
+                    :aria-label="`Dar de baja a ${u.nombres}`"
                     @click="confirmarBaja(u)"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <svg class="h-3.5 w-3.5 text-rose-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span>Dar de Baja</span>
-                  </button>
+                  />
                 </div>
               </td>
             </tr>
@@ -435,6 +426,7 @@ import { RolUsuario } from '../../Domain/Constants/EstadosSistema'
 import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
 import ButtonBase from '../Components/ButtonBase.vue'
+import ActionButton from '../Components/ActionButton.vue'
 import InputBase from '../Components/InputBase.vue'
 import ModalBase from '../Components/ModalBase.vue'
 import PaginationControls from '../Components/PaginationControls.vue'
