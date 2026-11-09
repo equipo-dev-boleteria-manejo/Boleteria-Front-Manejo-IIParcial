@@ -282,6 +282,7 @@ function montarVista() {
       stubs: {
         EditarBusModal: EditarBusModalStub,
         ReportarIncidenteModal: ReportarIncidenteModalStub,
+        teleport: true,
       },
     },
   })
@@ -497,12 +498,13 @@ describe('BusesAdmin', () => {
     const wrapper = montarVista()
 
     await buscarBoton(wrapper, '+ Registrar bus')?.trigger('click')
+    await flushPromises()
 
-    await wrapper.find('#nuevo-bus-numero').setValue('40')
-    await wrapper.find('#nuevo-bus-placa').setValue('PBD-3456')
-    await wrapper.find('#nuevo-bus-asientos').setValue('48')
-    await wrapper.find('#nuevo-bus-estructura').setValue('DosPisos')
-    await wrapper.find('#panel-registrar-bus form').trigger('submit')
+    await wrapper.find('#modal-nuevo-bus-numero').setValue('40')
+    await wrapper.find('#modal-nuevo-bus-placa').setValue('PBD-3456')
+    await wrapper.find('#modal-nuevo-bus-asientos').setValue('48')
+    await wrapper.find('#modal-nuevo-bus-estructura').setValue('DosPisos')
+    await wrapper.find('#form-crear-bus-modal').trigger('submit')
     await flushPromises()
 
     expect(estado.registrarBus).toHaveBeenCalledTimes(1)

@@ -1,64 +1,5 @@
 <template>
   <div class="space-y-6">
-    <!-- Encabezado de la vista -->
-    <section
-      class="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-blue-900 p-6 text-white shadow-lg sm:p-8"
-    >
-      <div
-        class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-blue-500/20 blur-3xl"
-        aria-hidden="true"
-      ></div>
-      <div
-        class="pointer-events-none absolute -bottom-20 left-1/3 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl"
-        aria-hidden="true"
-      ></div>
-
-      <div class="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div class="max-w-2xl">
-          <span
-            class="inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-blue-100"
-          >
-            Semana 3 · Capa de presentación
-          </span>
-          <h1 class="mt-3 text-2xl font-black tracking-tight sm:text-3xl">Flota y Buses</h1>
-          <p class="mt-2 text-sm leading-relaxed text-slate-300">
-            Catálogo y gestión operativa de la flota. Consulta disponibilidad, actualiza datos
-            técnicos y reporta incidentes desde un único panel.
-          </p>
-
-          <div class="mt-4 flex flex-wrap gap-2">
-            <span class="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-200">
-              Catálogo
-            </span>
-            <span class="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-200">
-              Estado operativo
-            </span>
-            <span class="rounded-full bg-white/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-200">
-              Incidentes
-            </span>
-          </div>
-        </div>
-
-        <div class="flex flex-col gap-2 sm:flex-row lg:flex-col xl:flex-row">
-          <ButtonBase
-            variant="secondary"
-            :loading="cargandoCatalogo"
-            @click="recargarCatalogo"
-          >
-            Actualizar catálogo
-          </ButtonBase>
-          <ButtonBase
-            variant="primary"
-            :aria-expanded="mostrarNuevoBus"
-            aria-controls="panel-registrar-bus"
-            @click="alternarNuevoBus"
-          >
-            {{ mostrarNuevoBus ? 'Ocultar formulario' : '+ Registrar bus' }}
-          </ButtonBase>
-        </div>
-      </div>
-    </section>
-
     <!-- Estado de error global -->
     <div
       v-if="errorGeneral"
@@ -134,6 +75,63 @@
       </div>
     </section>
 
+    <!-- Barra de Búsqueda y Filtros Unificada (Estilo Usuarios.vue) -->
+    <div class="flex flex-col md:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-xs">
+      <div class="w-full md:w-72">
+        <InputBase
+          id="bus-search"
+          v-model="busqueda"
+          placeholder="Buscar por número o placa..."
+          class="w-full"
+        >
+          <template #prefix>
+            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </template>
+        </InputBase>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Estado:</label>
+          <select
+            v-model="filtroEstado"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
+          >
+            <option value="Todos">Todos</option>
+            <option :value="EstadoBus.ACTIVO">Activo</option>
+            <option :value="EstadoBus.INACTIVO">Inactivo</option>
+            <option :value="EstadoBus.MANTENIMIENTO">Mantenimiento</option>
+            <option :value="EstadoBus.FUERA_DE_SERVICIO">Fuera de Servicio</option>
+          </select>
+        </div>
+
+        <div class="flex items-center gap-1.5">
+          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Estructura:</label>
+          <select
+            v-model="filtroEstructura"
+            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
+          >
+            <option value="Todas">Todas</option>
+            <option value="UnPiso">Un Piso</option>
+            <option value="DosPisos">Dos Pisos</option>
+          </select>
+        </div>
+
+        <button
+          type="button"
+          @click="abrirNuevoBus"
+          class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer ml-1"
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <span>+ Registrar bus</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Catálogo -->
     <CardBase padding="none">
       <template #header>
@@ -167,91 +165,6 @@
         </div>
       </template>
 
-      <!-- Formulario de registro -->
-      <div
-        v-if="mostrarNuevoBus"
-        id="panel-registrar-bus"
-        class="border-b border-slate-100 bg-slate-50/70 px-5 py-5 sm:px-6"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3 class="text-sm font-bold text-slate-900">Registrar nuevo bus</h3>
-            <p class="mt-0.5 text-xs text-slate-500">
-              Completa los datos básicos del vehículo. La validación se ejecuta en la capa de
-              aplicación.
-            </p>
-          </div>
-          <button
-            type="button"
-            class="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-200 hover:text-slate-700"
-            aria-label="Cerrar formulario de registro"
-            @click="cerrarNuevoBus"
-          >
-            <span aria-hidden="true">✕</span>
-          </button>
-        </div>
-
-        <form
-          class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4"
-          @submit.prevent="manejarRegistrarBus"
-        >
-          <InputBase
-            id="nuevo-bus-numero"
-            label="Número de bus"
-            placeholder="Ej. 25"
-            :model-value="nuevoBus.numero"
-            :disabled="busesLoading"
-            @update:model-value="nuevoBus.numero = $event"
-          />
-
-          <InputBase
-            id="nuevo-bus-placa"
-            label="Placa"
-            placeholder="Ej. PBA-1234"
-            :model-value="nuevoBus.placa"
-            :disabled="busesLoading"
-            @update:model-value="nuevoBus.placa = $event"
-          />
-
-          <InputBase
-            id="nuevo-bus-asientos"
-            label="Capacidad total"
-            type="number"
-            :model-value="nuevoBus.totalAsientos"
-            :disabled="busesLoading"
-            @update:model-value="onTotalAsientosNuevo"
-          />
-
-          <div class="space-y-1.5">
-            <label
-              for="nuevo-bus-estructura"
-              class="block text-xs font-bold uppercase tracking-wider text-slate-600"
-            >
-              Estructura
-            </label>
-            <select
-              id="nuevo-bus-estructura"
-              :value="nuevoBus.estructura"
-              :disabled="busesLoading"
-              class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
-              @change="onEstructuraNueva"
-            >
-              <option value="UnPiso">Un piso</option>
-              <option value="DosPisos">Dos pisos</option>
-            </select>
-          </div>
-
-          <div class="flex justify-end gap-2 sm:col-span-2 xl:col-span-4">
-            <ButtonBase variant="secondary" :disabled="busesLoading" @click="cerrarNuevoBus">
-              Cancelar
-            </ButtonBase>
-            <ButtonBase type="submit" :loading="busesLoading" :disabled="cargandoGeneral">
-              Registrar bus
-            </ButtonBase>
-          </div>
-        </form>
-      </div>
-
       <!-- Cargando -->
       <div
         v-if="cargandoCatalogo && !buses.length"
@@ -281,7 +194,7 @@
         </div>
       </div>
 
-      <!-- Estado vacío -->
+      <!-- Estado vacío cuando no hay buses en general -->
       <div v-else-if="!buses.length" class="px-5 py-12 text-center sm:px-6">
         <div
           class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-2xl"
@@ -296,6 +209,25 @@
         </p>
         <div class="mt-4 flex justify-center">
           <ButtonBase @click="abrirNuevoBus">Registrar primer bus</ButtonBase>
+        </div>
+      </div>
+
+      <!-- Estado vacío cuando los filtros no devuelven resultados -->
+      <div v-else-if="busesFiltrados.length === 0" class="px-5 py-12 text-center sm:px-6">
+        <div
+          class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-2xl"
+          aria-hidden="true"
+        >
+          🔍
+        </div>
+        <h3 class="mt-4 text-base font-bold text-slate-800">No se encontraron buses</h3>
+        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+          No existen unidades que coincidan con el término de búsqueda o los filtros seleccionados.
+        </p>
+        <div class="mt-4 flex justify-center">
+          <ButtonBase variant="outline" size="sm" @click="resetFiltros">
+            Restablecer Filtros
+          </ButtonBase>
         </div>
       </div>
 
@@ -317,7 +249,7 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr
-              v-for="bus in buses"
+              v-for="bus in busesFiltrados"
               :key="bus.id ?? bus.placa"
               class="transition-colors hover:bg-slate-50/80"
             >
@@ -432,6 +364,107 @@
     </CardBase>
 
     <!-- Modales desacoplados -->
+    <ModalBase
+      :model-value="mostrarNuevoBusModal"
+      title="Registrar Nuevo Bus"
+      max-width="2xl"
+      @update:model-value="mostrarNuevoBusModal = $event"
+      @close="cerrarNuevoBusModal"
+    >
+      <form id="form-crear-bus-modal" class="space-y-4" @submit.prevent="manejarRegistrarBusModal">
+        <div
+          v-if="busesError"
+          role="alert"
+          class="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700"
+        >
+          <span aria-hidden="true">⚠️</span>
+          <span>{{ busesError }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <InputBase
+            id="modal-nuevo-bus-numero"
+            label="Número de bus"
+            placeholder="Ej. 25"
+            required
+            :model-value="nuevoBus.numero"
+            :disabled="busesLoading"
+            helper-text="Identificador interno o número de disco."
+            @update:model-value="nuevoBus.numero = $event"
+          />
+
+          <InputBase
+            id="modal-nuevo-bus-placa"
+            label="Placa vehicular"
+            placeholder="Ej. PBA-1234"
+            required
+            :model-value="nuevoBus.placa"
+            :disabled="busesLoading"
+            helper-text="Formato oficial ecuatoriano."
+            @update:model-value="nuevoBus.placa = $event"
+          />
+
+          <InputBase
+            id="modal-nuevo-bus-asientos"
+            label="Capacidad total de asientos"
+            type="number"
+            required
+            :model-value="nuevoBus.totalAsientos"
+            :disabled="busesLoading"
+            helper-text="Total de asientos disponibles para pasaje."
+            @update:model-value="onTotalAsientosNuevo"
+          />
+
+          <div class="space-y-1.5">
+            <label
+              for="modal-nuevo-bus-estructura"
+              class="block text-xs font-bold uppercase tracking-wider text-slate-600"
+            >
+              Estructura del Bus <span class="text-red-500">*</span>
+            </label>
+            <div class="relative">
+              <select
+                id="modal-nuevo-bus-estructura"
+                :value="nuevoBus.estructura"
+                :disabled="busesLoading"
+                required
+                class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 outline-none transition-colors focus:border-blue-500 focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed appearance-none pr-10"
+                @change="onEstructuraNueva"
+              >
+                <option value="UnPiso">Un piso (Estándar)</option>
+                <option value="DosPisos">Dos pisos (Doble piso)</option>
+              </select>
+              <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3.5 text-slate-400">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-400">Distribución física de la unidad.</p>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          <button
+            type="button"
+            class="rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
+            :disabled="busesLoading"
+            @click="cerrarNuevoBusModal"
+          >
+            Cancelar
+          </button>
+          <button
+            type="submit"
+            :disabled="busesLoading"
+            class="rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 shadow-sm transition-all cursor-pointer inline-flex items-center gap-1.5"
+          >
+            <span v-if="busesLoading" class="animate-spin text-xs">⏳</span>
+            <span>Registrar Bus</span>
+          </button>
+        </div>
+      </form>
+    </ModalBase>
+
     <EditarBusModal
       v-model="mostrarEdicion"
       :bus="busEnEdicion"
@@ -462,6 +495,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
 import InputBase from '../../Components/InputBase.vue'
+import ModalBase from '../../Components/ModalBase.vue'
 import EditarBusModal from '../../Components/EditarBusModal.vue'
 import ReportarIncidenteModal from '../../Components/ReportarIncidenteModal.vue'
 import { useBuses, type GuardarBusInput } from '../../Composables/useBuses'
@@ -519,8 +553,40 @@ const {
 
 nuevoBus.value.cooperativaId = cooperativaId
 
+// Filtros y búsqueda reactiva
+const busqueda = ref('')
+const filtroEstado = ref<string>('Todos')
+const filtroEstructura = ref<string>('Todas')
+
+const busesFiltrados = computed(() => {
+  return buses.value.filter((bus) => {
+    // Filtro por término de búsqueda (número o placa)
+    const termino = busqueda.value.toLowerCase().trim()
+    const coincideBusqueda =
+      !termino ||
+      (bus.numero && bus.numero.toLowerCase().includes(termino)) ||
+      (bus.placa && bus.placa.toLowerCase().includes(termino))
+
+    // Filtro por estado operativo
+    const coincideEstado =
+      filtroEstado.value === 'Todos' || bus.estado === filtroEstado.value
+
+    // Filtro por estructura
+    const coincideEstructura =
+      filtroEstructura.value === 'Todas' || bus.estructura === filtroEstructura.value
+
+    return coincideBusqueda && coincideEstado && coincideEstructura
+  })
+})
+
+function resetFiltros() {
+  busqueda.value = ''
+  filtroEstado.value = 'Todos'
+  filtroEstructura.value = 'Todas'
+}
+
 // Estado exclusivamente de interfaz (apertura de paneles y selección de fila).
-const mostrarNuevoBus = ref(false)
+const mostrarNuevoBusModal = ref(false)
 const mostrarEdicion = ref(false)
 const mostrarIncidente = ref(false)
 const busEnEdicion = ref<Bus | null>(null)
@@ -650,16 +716,27 @@ function actualizarFormIncidente(patch: Partial<FormIncidente>) {
   Object.assign(formIncidente, patch)
 }
 
-function alternarNuevoBus() {
-  mostrarNuevoBus.value = !mostrarNuevoBus.value
-}
-
 function abrirNuevoBus() {
-  mostrarNuevoBus.value = true
+  mostrarNuevoBusModal.value = true
 }
 
-function cerrarNuevoBus() {
-  mostrarNuevoBus.value = false
+function cerrarNuevoBusModal() {
+  mostrarNuevoBusModal.value = false
+  limpiarErrorBuses()
+}
+
+async function manejarRegistrarBusModal() {
+  const numero = nuevoBus.value.numero
+  const exito = await registrarBus()
+
+  if (!exito) return
+
+  mostrarNuevoBusModal.value = false
+  uiStore.showAlert({
+    type: 'success',
+    title: 'Bus registrado',
+    message: `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
+  })
 }
 
 function onTotalAsientosNuevo(value: string) {
@@ -668,20 +745,6 @@ function onTotalAsientosNuevo(value: string) {
 
 function onEstructuraNueva(event: Event) {
   nuevoBus.value.estructura = (event.target as HTMLSelectElement).value as EstructuraBus
-}
-
-async function manejarRegistrarBus() {
-  const numero = nuevoBus.value.numero
-  const exito = await registrarBus()
-
-  if (!exito) return
-
-  mostrarNuevoBus.value = false
-  uiStore.showAlert({
-    type: 'success',
-    title: 'Bus registrado',
-    message: `El bus ${numero || 'nuevo'} se agregó correctamente al catálogo de flota.`,
-  })
 }
 
 function abrirEdicion(bus: Bus) {
