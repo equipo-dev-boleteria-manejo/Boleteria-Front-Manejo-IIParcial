@@ -1,6 +1,10 @@
 import { Bus } from '../../Domain/Entities/Bus';
 import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
-import { BusNoEncontradoException, MotivoIncidenteInvalidoException } from '../../Domain/Exceptions/BusException';
+import {
+  BusNoEncontradoException,
+  BusYaEnMantenimientoException,
+  MotivoIncidenteInvalidoException,
+} from '../../Domain/Exceptions/BusException';
 import { BusReemplazoNoValidoException } from '../../Domain/Exceptions/BusFueraDeServicioException';
 import { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import { ReportarIncidenteOperativoDto } from '../Dtos/ReportarIncidenteOperativoDto';
@@ -36,7 +40,12 @@ export class ReportarIncidenteOperativo {
       throw new BusNoEncontradoException(String(busNumero));
     }
 
-    // 2. Validar que el motivo sea válido
+    // 2. Validar que el bus no esté ya en mantenimiento
+    if (busActual.estado === EstadoBus.MANTENIMIENTO) {
+      throw new BusYaEnMantenimientoException(busActual.numero);
+    }
+
+    // 3. Validar que el motivo sea válido
     if (!MOTIVOS_VALIDOS.includes(motivo)) {
       throw new MotivoIncidenteInvalidoException(motivo, MOTIVOS_VALIDOS);
     }

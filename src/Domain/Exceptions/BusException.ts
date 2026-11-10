@@ -39,6 +39,12 @@ export class BusNoActivoException extends BusException {
   }
 }
 
+export class BusYaEnMantenimientoException extends BusException {
+  constructor(busId: number | string) {
+    super(`El bus ${busId} ya se encuentra en mantenimiento y no puede reportar otro incidente`, 'BUS_ALREADY_IN_MAINTENANCE');
+  }
+}
+
 export class MotivoIncidenteInvalidoException extends BusException {
   constructor(motivo: string, motivosValidos: readonly string[] = []) {
     const detalle = motivosValidos.length > 0

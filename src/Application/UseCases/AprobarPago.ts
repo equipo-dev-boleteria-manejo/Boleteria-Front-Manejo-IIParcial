@@ -1,14 +1,17 @@
 import type { IVentaRepository } from '../../Domain/Repositories/IVentaRepository';
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
+import type { IAuditRepository } from '../../Domain/Repositories/IAuditRepository';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { EstadoVenta, EstadoBoleto } from '../../Domain/Constants/EstadosSistema';
 import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
+import { SupabaseAuditRepository } from '../../Infrastructure/Repositories/SupabaseAuditRepository';
 
 export class AprobarPago {
   constructor(
     private ventaRepo: IVentaRepository = new SupabaseVentasRepository(),
     private boletosRepo: IBoletosRepository = new SupabaseBoletosRepository(),
+    private auditRepo?: IAuditRepository,
   ) {}
 
   async ejecutar(ventaId: number, aprobadoPorId: string): Promise<void> {
@@ -44,7 +47,22 @@ export class AprobarPago {
 
     await this.ventaRepo.aprobarVenta(ventaId, aprobadoPorId);
     await this.boletosRepo.actualizarEstadoPorVenta(ventaId, EstadoBoleto.EMITIDO);
+
+    if (this.auditRepo) {
+      this.auditRepo.registrarEvento({
+        accion: 'APROBAR_PAGO_TRANSFERENCIA',
+        usuarioId: aprobadoPorId,
+        entidadAfectada: 'Ventas',
+        entidadId: ventaId,
+        detalle: `Transferencia bancaria aprobada para la Venta #${ventaId}. ${boletos.length} boleto(s) emitidos.`,
+        resultado: 'Exito',
+      }).catch(() => {});
+    }
   }
 }
 
-export const aprobarPagoUseCase = new AprobarPago();
+export const aprobarPagoUseCase = new AprobarPago(
+  new SupabaseVentasRepository(),
+  new SupabaseBoletosRepository(),
+  new SupabaseAuditRepository()
+);

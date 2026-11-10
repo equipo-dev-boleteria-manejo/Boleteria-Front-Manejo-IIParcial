@@ -15,6 +15,8 @@ export interface UserProfile {
   cooperativaId?: number | null;
 }
 
+const STORAGE_KEY = 'boleteria_auth_user_profile';
+
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<UserProfile | null>(null);
   const loading = ref(false);
@@ -44,8 +46,8 @@ export const useAuthStore = defineStore('auth', () => {
       const sesion = await loginUseCase.execute({ email, password });
       user.value = mapUsuarioToProfile(sesion.usuario);
       return sesion;
-    } catch (err: any) {
-      error.value = err.message || 'Error al iniciar sesión';
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al iniciar sesión';
       throw err;
     } finally {
       loading.value = false;
@@ -58,24 +60,37 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       await loginUseCase.logout();
       user.value = null;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cerrar sesión';
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    } catch (err: unknown) {
+      error.value = err instanceof Error ? err.message : 'Error al cerrar sesión';
     } finally {
       loading.value = false;
     }
   };
 
   const initializeAuth = async () => {
+    loading.value = true;
     try {
       const currentUser = await loginUseCase.getCurrentUser();
       if (currentUser) {
         user.value = mapUsuarioToProfile(currentUser);
       } else {
+        // Principio Fail-Closed: Sin sesión legítima en Supabase Auth, corte inmediato.
+        // Se destruye cualquier perfil previo o servilleta en localStorage.
         user.value = null;
+        if (typeof window !== 'undefined' && window.localStorage) {
+          localStorage.removeItem(STORAGE_KEY);
+        }
       }
     } catch {
       user.value = null;
+      if (typeof window !== 'undefined' && window.localStorage) {
+        localStorage.removeItem(STORAGE_KEY);
+      }
     } finally {
+      loading.value = false;
       ready.value = true;
     }
   };
