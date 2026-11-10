@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "Si utilizas este software o deseas citar este repositorio en trabajos académicos, utiliza la siguiente referencia."
+authors:
+  - family-names: "Equipo de Desarrollo"
+    given-names: "Manejo y Configuración del Software"
+    affiliation: "Universidad Técnica de Ambato"
+title: "Boletería Front - Sistema de Gestión y Venta de Pasajes de Buses Interprovinciales"
+version: 0.1.0
+date-released: 2026-10-12
+url: "https://github.com/equipo-dev-boleteria-manejo/Boleteria-Front-Manejo-IIParcial"
+repository-code: "https://github.com/equipo-dev-boleteria-manejo/Boleteria-Front-Manejo-IIParcial"
+keywords:
+  - "vue3"
+  - "clean-architecture"
+  - "transporte"
+  - "ecuador"
+  - "boleteria"
+  - "gitflow"

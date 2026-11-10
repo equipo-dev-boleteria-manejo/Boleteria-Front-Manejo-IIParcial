@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@source "./Presentation/**/*.vue";
+@source "./Presentation/**/*.ts";
+
+/* Estilos globales personalizados nativos para evitar problemas de compilación */
+body { 
+  background-color: #f8fafc; 
+}
