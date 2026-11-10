@@ -59,6 +59,11 @@
           :options="opcionesEstructura"
         />
 
+        <RefreshButton
+          :loading="cargandoCatalogo"
+          @click="recargarCatalogo"
+        />
+
         <CreateButton
           label="Registrar bus"
           @click="abrirNuevoBus"
@@ -68,33 +73,6 @@
 
     <!-- Catálogo -->
     <CardBase padding="none">
-      <template #header>
-        <div
-          class="flex w-full flex-col gap-3 px-5 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"
-        >
-          <div>
-            <h2 class="text-base font-bold text-slate-900">Catálogo de flota</h2>
-            <p class="mt-0.5 text-xs text-slate-500">
-              {{ resumenFlota.total }} unidades registradas · datos actualizados desde la capa de
-              aplicación
-            </p>
-          </div>
-
-          <div class="flex flex-wrap items-center gap-2">
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700"
-            >
-              <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true"></span>
-              {{ resumenFlota.activos }} activos
-            </span>
-            <RefreshButton
-              :loading="cargandoCatalogo"
-              @click="recargarCatalogo"
-            />
-          </div>
-        </div>
-      </template>
-
       <!-- Cargando -->
       <div
         v-if="cargandoCatalogo && !buses.length"
@@ -163,37 +141,37 @@
 
       <!-- Éxito / datos -->
       <div v-else class="overflow-x-auto">
-        <table class="w-full min-w-[860px] border-collapse text-left">
+        <table class="w-full text-left text-sm border-collapse min-w-[860px]" aria-label="Catálogo de flota de buses">
           <caption class="sr-only">
             Catálogo de buses con número, placa, capacidad, estructura, estado y acciones
           </caption>
-          <thead>
-            <tr class="border-b border-slate-100 bg-slate-50/60 text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              <th scope="col" class="px-5 py-3 sm:px-6">Bus</th>
-              <th scope="col" class="px-4 py-3">Placa</th>
-              <th scope="col" class="px-4 py-3">Capacidad</th>
-              <th scope="col" class="px-4 py-3">Estructura</th>
-              <th scope="col" class="px-4 py-3">Estado</th>
-              <th scope="col" class="px-5 py-3 text-right sm:px-6">Acciones</th>
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-3.5">Bus</th>
+              <th scope="col" class="px-6 py-3.5">Placa</th>
+              <th scope="col" class="px-6 py-3.5">Capacidad</th>
+              <th scope="col" class="px-6 py-3.5">Estructura</th>
+              <th scope="col" class="px-6 py-3.5 text-center">Estado</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
             <tr
               v-for="bus in busesFiltrados"
               :key="bus.id ?? bus.placa"
-              class="transition-colors hover:bg-slate-50/80"
+              class="hover:bg-blue-50/50 transition-colors"
             >
-              <td class="px-5 py-3.5 sm:px-6">
+              <td class="px-6 py-3">
                 <div class="flex items-center gap-3">
                   <div
-                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-base"
+                    class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-base ring-1 ring-blue-100"
                     aria-hidden="true"
                   >
                     🚌
                   </div>
                   <div class="min-w-0">
-                    <p class="truncate text-sm font-bold text-slate-900">Bus {{ bus.numero }}</p>
-                    <p class="truncate text-[11px] text-slate-400">
+                    <p class="font-bold text-slate-900 text-sm leading-tight">Bus {{ bus.numero }}</p>
+                    <p class="text-slate-400 text-xs">
                       {{ bus.marcaChasis || 'Marca no registrada' }}
                     </p>
                     <!-- Insignias de contingencia / reemplazo operativo -->
@@ -202,7 +180,7 @@
                         v-if="obtenerContingencia(bus)?.tipo === 'afectado'"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-200 shadow-2xs"
                       >
-                        <span class="text-xs">🔄</span>
+                        <span class="text-xs" aria-hidden="true">🔄</span>
                         <span>Reemplazado por <strong>Bus {{ obtenerContingencia(bus)?.reemplazo }}</strong></span>
                       </span>
                       <span
@@ -216,7 +194,7 @@
                         v-else-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
                         class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-800 border border-blue-200 shadow-2xs"
                       >
-                        <span class="text-xs">🛡️</span>
+                        <span class="text-xs" aria-hidden="true">🛡️</span>
                         <span>Cubriendo contingencia de <strong>Bus {{ obtenerContingencia(bus)?.afectado }}</strong></span>
                       </span>
                       <span
@@ -229,19 +207,21 @@
                   </div>
                 </div>
               </td>
-              <td class="px-4 py-3.5">
-                <span class="font-mono text-xs font-semibold text-slate-700">{{ bus.placa }}</span>
+              <td class="px-6 py-3">
+                <span class="font-mono text-xs font-bold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-md border border-slate-200/80 inline-block">
+                  {{ bus.placa }}
+                </span>
               </td>
-              <td class="px-4 py-3.5">
-                <span class="text-sm font-semibold text-slate-700">{{ bus.totalAsientos }}</span>
-                <span class="text-[11px] text-slate-400"> asientos</span>
+              <td class="px-6 py-3">
+                <span class="text-sm font-bold text-slate-900">{{ bus.totalAsientos }}</span>
+                <span class="text-xs text-slate-400"> asientos</span>
               </td>
-              <td class="px-4 py-3.5">
-                <span class="text-xs text-slate-600">{{ estructuraLabel(bus.estructura) }}</span>
+              <td class="px-6 py-3">
+                <span class="text-xs text-slate-700 font-medium">{{ estructuraLabel(bus.estructura) }}</span>
               </td>
-              <td class="px-4 py-3.5">
+              <td class="px-6 py-3 text-center">
                 <span
-                  class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                  class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-wider shadow-2xs"
                   :class="estadoInfo(bus.estado).badge"
                 >
                   <span
@@ -264,8 +244,8 @@
                   Con reemplazo activo
                 </span>
               </td>
-              <td class="px-5 py-3.5 sm:px-6">
-                <div class="flex flex-wrap items-center justify-end gap-1.5">
+              <td class="px-6 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
                   <ActionButton
                     action="edit"
                     :disabled="cargandoCatalogo"

@@ -1,5 +1,18 @@
 <template>
-  <div class="space-y-3 max-w-7xl mx-auto font-sans">
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
+    <!-- Tarjetas de Métricas / KPIs (MetricCard.vue) -->
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de usuarios">
+      <MetricCard
+        v-for="tarjeta in tarjetasResumen"
+        :key="tarjeta.etiqueta"
+        :title="tarjeta.etiqueta"
+        :value="tarjeta.valor"
+        :icon="tarjeta.icono"
+        :description="tarjeta.detalle"
+        :variant="tarjeta.variant"
+      />
+    </section>
+
     <!-- Barra de Filtros, Búsqueda y Registro Rápido -->
     <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="w-full md:w-80">
@@ -392,7 +405,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUiStore } from '../Store/uiStore'
 import { useUsuarios } from '../Composables/useUsuarios'
 import { usePasswordValidation } from '../Composables/usePasswordValidation'
@@ -403,6 +416,7 @@ import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
 import ButtonBase from '../Components/ButtonBase.vue'
 import ActionButton from '../Components/ActionButton.vue'
+import MetricCard from '../Components/MetricCard.vue'
 import SearchInput from '../Components/SearchInput.vue'
 import SelectFilter from '../Components/SelectFilter.vue'
 import CreateButton from '../Components/CreateButton.vue'
@@ -443,6 +457,51 @@ const {
   existeCedula,
   existeEmail,
 } = useUsuarios()
+
+const resumenUsuarios = computed(() => {
+  const total = usuarios.value.length
+  const activos = usuarios.value.filter((u) => u.activo).length
+  const inactivos = usuarios.value.filter((u) => !u.activo).length
+  const personal = usuarios.value.filter(
+    (u) =>
+      u.rol === RolUsuario.ADMIN ||
+      u.rol === RolUsuario.ENCARGADO ||
+      u.rol === RolUsuario.OFICINISTA ||
+      u.rol === RolUsuario.CHOFER,
+  ).length
+  return { total, activos, inactivos, personal }
+})
+
+const tarjetasResumen = computed(() => [
+  {
+    etiqueta: 'Total Usuarios',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.total,
+    detalle: 'Usuarios registrados en plataforma',
+    icono: '👥',
+    variant: 'default' as const,
+  },
+  {
+    etiqueta: 'Usuarios Activos',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.activos,
+    detalle: 'Cuentas con acceso habilitado',
+    icono: '✅',
+    variant: 'success' as const,
+  },
+  {
+    etiqueta: 'Usuarios Inactivos',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.inactivos,
+    detalle: 'Cuentas dadas de baja o suspendidas',
+    icono: '⛔',
+    variant: 'danger' as const,
+  },
+  {
+    etiqueta: 'Personal Operativo',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.personal,
+    detalle: 'Admin, encargados, choferes y oficinistas',
+    icono: '🛡️',
+    variant: 'warning' as const,
+  },
+])
 
 const {
   password,
