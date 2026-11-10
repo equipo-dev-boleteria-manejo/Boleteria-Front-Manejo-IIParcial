@@ -102,6 +102,9 @@
     >
       <slot name="footer" />
     </div>
+
+    <!-- Paginación dedicada -->
+    <slot name="pagination" />
   </div>
 </template>
 

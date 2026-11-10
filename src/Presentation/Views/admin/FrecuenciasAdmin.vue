@@ -28,6 +28,8 @@
       <div class="flex w-full flex-wrap items-center justify-end gap-2.5 md:w-auto">
         <SelectFilter label="Estado:" v-model="filtroEstado" :options="OPCIONES_FILTRO_ESTADO" />
 
+        <PageSizeFilter v-model="pageSize" />
+
         <RefreshButton :loading="loading" @click="recargar" />
 
         <CreateButton label="Registrar frecuencia" @click="abrirModal" />
@@ -74,7 +76,7 @@
       </template>
 
       <tr
-        v-for="fila in filasFiltradas"
+        v-for="fila in frecuenciasPaginadas"
         :key="fila.id"
         class="transition-colors hover:bg-blue-50/50"
       >
@@ -197,6 +199,20 @@
           {{ filasFiltradas.length }} de {{ resumen.total }} frecuencias listadas
         </p>
       </template>
+
+      <template v-if="totalPages > 1" #pagination>
+        <PaginationControls
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total-items="totalItems"
+          :items-per-page="pageSize"
+          :has-prev-page="hasPrevPage"
+          :has-next-page="hasNextPage"
+          @prev="prevPage"
+          @next="nextPage"
+          @set-page="setPage"
+        />
+      </template>
     </TableBase>
 
     <!-- Modales desacoplados -->
@@ -273,8 +289,11 @@ import ModalCrearFrecuencia from '../../Components/ModalCrearFrecuencia.vue'
 import RefreshButton from '../../Components/RefreshButton.vue'
 import SearchInput from '../../Components/SearchInput.vue'
 import SelectFilter from '../../Components/SelectFilter.vue'
+import PageSizeFilter from '../../Components/PageSizeFilter.vue'
+import PaginationControls from '../../Components/PaginationControls.vue'
 import TableBase from '../../Components/TableBase.vue'
 import { useFeedback } from '../../Composables/useFeedback'
+import { usePagination } from '../../Composables/usePagination'
 import { useFrecuencias, type FilaFrecuencia } from '../../Composables/useFrecuencias'
 import {
   OPCIONES_FILTRO_ESTADO,
@@ -313,6 +332,21 @@ const {
   eliminarParada: eliminarParadaDeFrecuencia,
   limpiarError,
 } = useFrecuencias()
+
+const {
+  currentPage,
+  pageSize,
+  totalItems,
+  totalPages,
+  paginatedItems: frecuenciasPaginadas,
+  hasPrevPage,
+  hasNextPage,
+  startIndex,
+  endIndex,
+  prevPage,
+  nextPage,
+  setPage,
+} = usePagination(filasFiltradas, { initialPageSize: 10 })
 
 const authStore = useAuthStore()
 const { showSuccess, showError, showInfo, showWarning, confirm } = useFeedback()

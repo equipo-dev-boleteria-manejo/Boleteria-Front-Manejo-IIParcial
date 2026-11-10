@@ -29,14 +29,9 @@
           :options="opcionesRol"
         />
 
-        <SelectFilter
-          label="Mostrar:"
+        <PageSizeFilter
           v-model="registrosPorPagina"
-          :options="[
-            { value: 5, label: '5 filas' },
-            { value: 10, label: '10 filas' },
-            { value: 20, label: '20 filas' },
-          ]"
+          :options="[5, 10, 20, 50]"
         />
 
         <CreateButton
@@ -419,6 +414,7 @@ import ActionButton from '../Components/ActionButton.vue'
 import MetricCard from '../Components/MetricCard.vue'
 import SearchInput from '../Components/SearchInput.vue'
 import SelectFilter from '../Components/SelectFilter.vue'
+import PageSizeFilter from '../Components/PageSizeFilter.vue'
 import CreateButton from '../Components/CreateButton.vue'
 import InputBase from '../Components/InputBase.vue'
 import ModalBase from '../Components/ModalBase.vue'
