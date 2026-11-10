@@ -6,8 +6,12 @@ import AsientosTarifasView from './AsientosTarifasView.vue';
 import * as useSeatTypesModule from '../Composables/useSeatTypes';
 import { ref } from 'vue';
 
+vi.mock('@stripe/stripe-js', () => ({
+  loadStripe: vi.fn().mockResolvedValue(null),
+}));
+
 describe('AsientosTarifasView.vue', () => {
-  it('renderiza las tarjetas métricas y el card base con el selector', () => {
+  it('renderiza las métricas y el selector interactivo de asientos', () => {
     setActivePinia(createPinia());
 
     vi.spyOn(useSeatTypesModule, 'useSeatTypes').mockReturnValue({
@@ -31,8 +35,8 @@ describe('AsientosTarifasView.vue', () => {
     expect(wrapper.text()).toContain('Ocupados');
     expect(wrapper.text()).toContain('Tarifas Activas');
 
-    // CardBase title & subtitle
-    expect(wrapper.text()).toContain('Gestión de Asientos y Tarifas');
-    expect(wrapper.text()).toContain('Consulta las tarifas y selecciona un asiento disponible');
+    // SelectorAsientosBus
+    expect(wrapper.text()).toContain('Selección de Asiento');
+    expect(wrapper.text()).toContain('Elija la ubicación dentro del mapa interactivo del bus');
   });
 });
