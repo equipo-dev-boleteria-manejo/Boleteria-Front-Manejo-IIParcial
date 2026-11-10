@@ -41,6 +41,7 @@
           $slots.suffix ? 'pr-10' : ''
         ]"
         @input="onInput"
+        @change="onInput"
         @blur="$emit('blur', $event)"
         @focus="$emit('focus', $event)"
       />
@@ -101,6 +102,7 @@ withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
+  (e: 'change', event: Event): void
   (e: 'blur', event: FocusEvent): void
   (e: 'focus', event: FocusEvent): void
 }>()
@@ -108,5 +110,6 @@ const emit = defineEmits<{
 function onInput(event: Event) {
   const target = event.target as HTMLInputElement
   emit('update:modelValue', target.value)
+  emit('change', event)
 }
 </script>
