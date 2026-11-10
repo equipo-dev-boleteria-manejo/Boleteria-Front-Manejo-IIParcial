@@ -72,6 +72,7 @@ onMounted(async () => {
     });
 
     if (cardElementRef.value) {
+      cardElementRef.value.innerHTML = '';
       cardElement.mount(cardElementRef.value);
       isStripeLoaded.value = true;
     }
@@ -156,7 +157,7 @@ async function pagar(monto?: number): Promise<string> {
 
   // Simulación fallback
   isProcessing.value = false;
-  return `pi_sim_${Date.now()}`;
+  return `pi_sim_${Math.round(total * 100)}_${Date.now()}`;
 }
 
 function reiniciar(): void {
@@ -193,11 +194,10 @@ defineExpose({
         <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
           Datos de la Tarjeta
         </label>
-        <div ref="cardElementRef" class="min-h-[28px] text-sm text-slate-700">
-          <p v-if="!isStripeLoaded" class="text-xs text-slate-500 italic py-1">
-            💳 Ingreso seguro de tarjeta habilitado (Stripe Gateway)
-          </p>
-        </div>
+        <div ref="cardElementRef" class="min-h-[28px] text-sm text-slate-700"></div>
+        <p v-show="!isStripeLoaded" class="text-xs text-slate-500 italic py-1">
+          💳 Ingreso seguro de tarjeta habilitado (Stripe Gateway)
+        </p>
       </div>
 
       <div
