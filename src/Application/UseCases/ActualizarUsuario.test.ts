@@ -66,4 +66,25 @@ describe('ActualizarUsuario UseCase', () => {
       useCase.execute({ id: 'no-existe', nombres: 'A', apellidos: 'B', rol: RolUsuario.CLIENTE })
     ).rejects.toThrow(UsuarioNoEncontradoException);
   });
+
+  it('debe impedir revocar el rol de Administrador al Super Administrador', async () => {
+    const superAdmin = new Usuario(
+      'admin@transporte.ec',
+      new Cedula('1710034065'),
+      'Super',
+      'Admin',
+      RolUsuario.ADMIN
+    );
+    superAdmin.id = 'super-admin-id';
+    mockUsuarioRepo.obtenerPorId = vi.fn().mockResolvedValue(superAdmin);
+
+    await expect(
+      useCase.execute({
+        id: 'super-admin-id',
+        nombres: 'Super',
+        apellidos: 'Admin',
+        rol: RolUsuario.OFICINISTA,
+      })
+    ).rejects.toThrow(DomainException);
+  });
 });

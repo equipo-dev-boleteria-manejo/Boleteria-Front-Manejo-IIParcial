@@ -87,4 +87,20 @@ describe("cubreTramo", () => {
     expect(frecuencia.cubreTramo("Quito", "Guayaquil")).toBe(false);
     expect(frecuencia.cubreTramo("Quito", "Quito")).toBe(false);
   });
+
+  describe("estaIncompleta", () => {
+    it("una frecuencia con paradas (no directa) sin ninguna parada está incompleta", () => {
+      const frecuencia = new Frecuencia(1, "Quito", "Cuenca", "08:30", "FR-001", false);
+      expect(frecuencia.estaIncompleta()).toBe(true);
+
+      frecuencia.establecerParadas([new ParadaIntermedia("Latacunga", 1, 120)]);
+      expect(frecuencia.estaIncompleta()).toBe(false);
+    });
+
+    it("una frecuencia directa nunca está incompleta, aunque no tenga paradas", () => {
+      const frecuencia = new Frecuencia(1, "Quito", "Cuenca", "08:30", "FR-002", true);
+
+      expect(frecuencia.estaIncompleta()).toBe(false);
+    });
+  });
 });
