@@ -169,19 +169,68 @@ export class SupabaseBoletosRepository
   }
 
   async obtenerBoletosPorUsuario(cedula: string): Promise<Boleto[]> {
-    const { data, error } = await supabase
+    const valor = cedula.trim();
+
+    // 1. Boletos donde la persona figura directamente como pasajero
+    const { data: boletosPorPasajero, error: errorPasajero } = await supabase
       .from(this.TABLA_BOLETOS)
       .select('*')
-      .eq('CedulaPasajero', cedula.trim())
+      .eq('CedulaPasajero', valor)
       .order('CreatedAt', { ascending: false });
 
-    if (error) {
+    if (errorPasajero) {
       throw new BoletoException(
-        `Error al obtener boletos para la cédula ${cedula}: ${error.message}`,
+        `Error al obtener boletos para la cédula ${cedula}: ${errorPasajero.message}`,
       );
     }
 
-    return (data as BoletoRow[]).map((row) => this.mapRowToEntity(row));
+    const mapa = new Map<number, BoletoRow>();
+    ((boletosPorPasajero ?? []) as BoletoRow[]).forEach((row) => {
+      mapa.set(row.Id, row);
+    });
+
+    // 2. Boletos comprados por el usuario como titular (Ventas.UsuarioVendedorId)
+    let usuarioId: string | null = null;
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(valor)) {
+      usuarioId = valor;
+    } else {
+      const { data: usuario } = await supabase
+        .from('Usuarios')
+        .select('Id')
+        .eq('Cedula', valor)
+        .maybeSingle();
+      if (usuario?.Id) {
+        usuarioId = String(usuario.Id);
+      }
+    }
+
+    if (usuarioId) {
+      const { data: ventas } = await supabase
+        .from('Ventas')
+        .select('Id')
+        .eq('UsuarioVendedorId', usuarioId);
+
+      const ventaIds = (ventas ?? []).map((v) => v.Id).filter(Boolean);
+      if (ventaIds.length > 0) {
+        const { data: boletosPorVenta } = await supabase
+          .from(this.TABLA_BOLETOS)
+          .select('*')
+          .in('VentaId', ventaIds)
+          .order('CreatedAt', { ascending: false });
+
+        ((boletosPorVenta ?? []) as BoletoRow[]).forEach((row) => {
+          mapa.set(row.Id, row);
+        });
+      }
+    }
+
+    const lista = Array.from(mapa.values()).sort((a, b) => {
+      const fechaA = a.CreatedAt ? new Date(a.CreatedAt).getTime() : 0;
+      const fechaB = b.CreatedAt ? new Date(b.CreatedAt).getTime() : 0;
+      return fechaB - fechaA;
+    });
+
+    return lista.map((row) => this.mapRowToEntity(row));
   }
 
   async verificarAsientoDisponible(

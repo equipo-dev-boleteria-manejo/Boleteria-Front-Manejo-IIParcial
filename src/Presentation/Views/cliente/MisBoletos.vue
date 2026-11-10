@@ -392,6 +392,17 @@ function abrirComprobante(grupo: GrupoBoletos): void {
   mostrarComprobante.value = true
 }
 
+watch(
+  () => authStore.user,
+  (usuarioActual) => {
+    if (usuarioActual?.cedula && !cedula.value) {
+      cedula.value = usuarioActual.cedula
+      void cargarHistorialActual()
+    }
+  },
+  { immediate: true },
+)
+
 onMounted(() => {
   if (!supabaseConfigurado) {
     showError(MENSAJE_SUPABASE_NO_CONFIGURADO)
