@@ -140,7 +140,7 @@ describe('useRutas Composable', () => {
       composable.cargarFrecuencias(),
     ]);
 
-    expect(composable.rutasPaginadas.value[0]).toMatchObject({
+    expect(composable.filasFiltradas.value[0]).toMatchObject({
       ruta,
       trayectoEtiqueta: 'Quito → Guayaquil',
       busEtiqueta: 'Bus #25 (PBA-1234)',
@@ -149,11 +149,11 @@ describe('useRutas Composable', () => {
     composable.filtroTexto.value = 'guayaquil';
     expect(composable.rutasFiltradas.value).toHaveLength(1);
     composable.filtroTexto.value = 'placa-no-existe';
-    expect(composable.rutasPaginadas.value).toHaveLength(0);
+    expect(composable.filasFiltradas.value).toHaveLength(0);
   });
 
-  it('pagina los resultados y reinicia la página cuando cambian los filtros', async () => {
-    const rutas = Array.from({ length: 9 }, (_, index) => {
+  it('expone todas las filas filtradas sin paginar (la paginación la aplica la vista)', async () => {
+    const rutas = Array.from({ length: 25 }, (_, index) => {
       const ruta = new Ruta(1, index + 1, '2026-06-01', EstadoRuta.PROGRAMADA);
       ruta.id = index + 1;
       return ruta;
@@ -163,15 +163,12 @@ describe('useRutas Composable', () => {
     const composable = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
     await composable.cargarRutas();
 
-    expect(composable.totalPaginas.value).toBe(2);
-    composable.paginaActual.value = 2;
-    expect(composable.rutasPaginadas.value).toHaveLength(1);
+    expect(composable.filasFiltradas.value).toHaveLength(25);
 
     composable.filtroTexto.value = 'no existe';
     await nextTick();
 
-    expect(composable.paginaActual.value).toBe(1);
-    expect(composable.rutasPaginadas.value).toHaveLength(0);
+    expect(composable.filasFiltradas.value).toHaveLength(0);
   });
 
   it('debe cambiar estado de una ruta e iniciar viaje', async () => {
@@ -268,5 +265,80 @@ describe('useRutas Composable', () => {
 
     expect(mockRutaRepo.eliminar).toHaveBeenCalledWith(1);
     expect(composable.rutas.value).toHaveLength(0);
+  });
+
+  describe('listas operativas, resumen y filtros', () => {
+    const crearBus = (id: number, estado: EstadoBus): Bus => {
+      const bus = new Bus(1, String(id), `PBA-100${id}`, 40, estado);
+      bus.id = id;
+      return bus;
+    };
+
+    it('solo ofrece frecuencias activas y buses en estado Activo para programar rutas', async () => {
+      const activa = new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FR-1');
+      activa.id = 1;
+      const inactiva = new Frecuencia(1, 'Quito', 'Loja', '09:00', 'FR-2');
+      inactiva.id = 2;
+      inactiva.desactivar();
+      vi.mocked(mockFrecuenciaRepo.obtenerTodas).mockResolvedValue([activa, inactiva]);
+      vi.mocked(mockBusRepo.obtenerTodos).mockResolvedValue([
+        crearBus(1, EstadoBus.ACTIVO),
+        crearBus(2, EstadoBus.MANTENIMIENTO),
+        crearBus(3, EstadoBus.INACTIVO),
+      ]);
+      const { frecuencias, buses, frecuenciasActivas, busesActivos, cargarFrecuencias, cargarBuses } = useRutas(
+        mockRutaRepo,
+        mockBusRepo,
+        mockFrecuenciaRepo,
+      );
+
+      await cargarFrecuencias();
+      await cargarBuses();
+
+      expect(frecuenciasActivas.value.map((f) => f.id)).toEqual([1]);
+      expect(busesActivos.value.map((b) => b.id)).toEqual([1]);
+      // Las listas completas se conservan para nombrar rutas ya existentes.
+      expect(frecuencias.value).toHaveLength(2);
+      expect(buses.value).toHaveLength(3);
+    });
+
+    it('resume las rutas por estado para las tarjetas de métricas', async () => {
+      const rutas = [
+        new Ruta(1, 1, '2026-06-01', EstadoRuta.PROGRAMADA),
+        new Ruta(1, 2, '2026-06-01', EstadoRuta.PROGRAMADA),
+        new Ruta(1, 3, '2026-06-01', EstadoRuta.EN_CURSO),
+        new Ruta(1, 4, '2026-06-01', EstadoRuta.FINALIZADA),
+        new Ruta(1, 5, '2026-06-01', EstadoRuta.CANCELADA),
+      ];
+      vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue(rutas);
+      const { resumen, cargarRutas } = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+      expect(resumen.value).toEqual({ total: 0, programadas: 0, enCurso: 0, finalizadas: 0 });
+
+      await cargarRutas();
+
+      expect(resumen.value).toEqual({ total: 5, programadas: 2, enCurso: 1, finalizadas: 1 });
+    });
+
+    it('detecta si hay filtros activos y permite reiniciarlos', () => {
+      const { hayFiltros, filtroTexto, filtroFecha, filtroEstado, reiniciarFiltros } = useRutas(
+        mockRutaRepo,
+        mockBusRepo,
+        mockFrecuenciaRepo,
+      );
+      expect(hayFiltros.value).toBe(false);
+
+      filtroTexto.value = '  ';
+      expect(hayFiltros.value).toBe(false);
+
+      filtroTexto.value = 'quito';
+      filtroFecha.value = '2026-06-01';
+      filtroEstado.value = EstadoRuta.EN_CURSO;
+      expect(hayFiltros.value).toBe(true);
+
+      reiniciarFiltros();
+
+      expect(hayFiltros.value).toBe(false);
+      expect([filtroTexto.value, filtroFecha.value, filtroEstado.value]).toEqual(['', '', 'Todas']);
+    });
   });
 });

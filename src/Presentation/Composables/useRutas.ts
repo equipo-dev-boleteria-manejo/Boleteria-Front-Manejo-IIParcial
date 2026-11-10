@@ -8,11 +8,11 @@
  * - Soporta inyección de dependencias (DIP).
  */
 
-import { ref, computed, watch } from 'vue';
+import { ref, shallowRef, computed } from 'vue';
 import type { Ruta } from '../../Domain/Entities/Ruta';
 import type { Bus } from '../../Domain/Entities/Bus';
 import type { Frecuencia } from '../../Domain/Entities/Frecuencia';
-import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
+import { EstadoBus, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import type { IRutaRepository, RutaFiltros } from '../../Domain/Repositories/IRutaRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import type { IFrecuenciaRepository } from '../../Domain/Repositories/IFrecuenciaRepository';
@@ -40,8 +40,9 @@ export function useRutas(
   const viajeUseCase = gestionarViajeUseCase || new GestionarViajeRuta(rutaRepo);
 
   const rutas = ref<Ruta[]>([]);
-  const buses = ref<Bus[]>([]);
-  const frecuencias = ref<Frecuencia[]>([]);
+  // Entidades con campos privados: se guardan en shallowRef y la lista se reemplaza completa.
+  const buses = shallowRef<Bus[]>([]);
+  const frecuencias = shallowRef<Frecuencia[]>([]);
   const loading = ref(false);
   const error = ref<string | null>(null);
   const success = ref<string | null>(null);
@@ -49,8 +50,6 @@ export function useRutas(
   const filtroEstado = ref<string>('Todas');
   const filtroFecha = ref<string>('');
   const filtroTexto = ref('');
-  const paginaActual = ref(1);
-  const itemsPorPagina = 8;
 
   const rutasFiltradas = computed(() => {
     const consulta = filtroTexto.value.trim().toLocaleLowerCase();
@@ -69,24 +68,29 @@ export function useRutas(
     });
   });
 
-  const totalFiltradas = computed(() => rutasFiltradas.value.length);
-  const totalPaginas = computed(() =>
-    Math.max(1, Math.ceil(totalFiltradas.value / itemsPorPagina))
+  /** Filas ya formateadas para la tabla; la paginación la aplica la vista con usePagination. */
+  const filasFiltradas = computed<RutaFilaPresentacion[]>(() =>
+    rutasFiltradas.value.map((ruta) => ({
+      ruta,
+      trayectoEtiqueta: obtenerRutaTrayecto(ruta),
+      busEtiqueta: obtenerBusEtiqueta(ruta.busId),
+    })),
   );
-  const rutasPaginadas = computed<RutaFilaPresentacion[]>(() => {
-    const inicio = (paginaActual.value - 1) * itemsPorPagina;
-    return rutasFiltradas.value
-      .slice(inicio, inicio + itemsPorPagina)
-      .map((ruta) => ({
-        ruta,
-        trayectoEtiqueta: obtenerRutaTrayecto(ruta),
-        busEtiqueta: obtenerBusEtiqueta(ruta.busId),
-      }));
-  });
 
-  watch([filtroEstado, filtroFecha, filtroTexto], () => {
-    paginaActual.value = 1;
-  });
+  const hayFiltros = computed(
+    () => Boolean(filtroTexto.value.trim()) || Boolean(filtroFecha.value) || filtroEstado.value !== 'Todas',
+  );
+
+  function reiniciarFiltros(): void {
+    filtroEstado.value = 'Todas';
+    filtroFecha.value = '';
+    filtroTexto.value = '';
+  }
+
+  // Para programar rutas solo se ofrecen frecuencias y buses operativos; las listas completas se conservan
+  // para poder nombrar rutas ya existentes cuya frecuencia o bus dejó de estar activo.
+  const frecuenciasActivas = computed(() => frecuencias.value.filter((frecuencia) => frecuencia.activa));
+  const busesActivos = computed(() => buses.value.filter((bus) => bus.estado === EstadoBus.ACTIVO));
 
   const rutasProgramadas = computed(() =>
     rutas.value.filter((r) => r.estado === EstadoRuta.PROGRAMADA)
@@ -99,6 +103,13 @@ export function useRutas(
   const rutasFinalizadas = computed(() =>
     rutas.value.filter((r) => r.estado === EstadoRuta.FINALIZADA)
   );
+
+  const resumen = computed(() => ({
+    total: rutas.value.length,
+    programadas: rutasProgramadas.value.length,
+    enCurso: rutasEnCurso.value.length,
+    finalizadas: rutasFinalizadas.value.length,
+  }));
 
   async function cargarRutas(filtros?: RutaFiltros): Promise<Ruta[]> {
     loading.value = true;
@@ -283,7 +294,6 @@ export function useRutas(
     filtroEstado.value = 'Todas';
     filtroFecha.value = '';
     filtroTexto.value = '';
-    paginaActual.value = 1;
   }
 
   function obtenerRutaTrayecto(ruta: Ruta): string {
@@ -308,15 +318,16 @@ export function useRutas(
     filtroEstado,
     filtroFecha,
     filtroTexto,
-    paginaActual,
-    itemsPorPagina,
-    totalFiltradas,
-    totalPaginas,
     rutasFiltradas,
-    rutasPaginadas,
+    filasFiltradas,
     rutasProgramadas,
     rutasEnCurso,
     rutasFinalizadas,
+    resumen,
+    hayFiltros,
+    frecuenciasActivas,
+    busesActivos,
+    reiniciarFiltros,
     cargarRutas,
     cargarBuses,
     cargarFrecuencias,
