@@ -392,6 +392,13 @@ const navItems: NavItem[] = [
     roles: ADMIN,
   },
   {
+    to: '/asientos-tarifas',
+    label: 'Asientos y Tarifas',
+    desc: 'Esquema interactivo de unidades y tarifas por piso.',
+    iconComponent: IconTickets,
+    roles: [...ADMIN, ...OFICINISTA, ...CLIENTE],
+  },
+  {
     to: '/admin/usuarios',
     label: 'Gestión de Usuarios',
     desc: 'Administración de personal, choferes y clientes.',

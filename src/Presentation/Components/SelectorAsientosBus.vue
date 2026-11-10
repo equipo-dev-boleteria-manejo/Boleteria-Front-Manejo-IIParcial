@@ -43,15 +43,10 @@ const { seatTypes, loading, error, cargarTiposAsiento, tieneTiposAsiento } = use
 const pisoSeleccionado = ref<1 | 2>(props.pisoActivoInicial);
 const asientoSeleccionado = ref<AsientoVisual | null>(props.modelValue);
 
-const asientosMatrizPiso1 = ref<AsientoVisual[]>([]);
-const asientosMatrizPiso2 = ref<AsientoVisual[]>([]);
-
-const inicializarGrillaBus = () => {
+// Reactividad completa de matrices de asientos basadas en seatTypes y props.asientosOcupadosIds
+const asientosMatrizPiso1 = computed<AsientoVisual[]>(() => {
   const vipType = seatTypes.value.find((t) => t.nombre.toLowerCase().includes('vip')) || seatTypes.value[0];
-  const normalType = seatTypes.value.find((t) => !t.nombre.toLowerCase().includes('vip')) || seatTypes.value[0];
-
-  // Piso 1: 12 Asientos VIP
-  asientosMatrizPiso1.value = Array.from({ length: 12 }, (_, i) => {
+  return Array.from({ length: 12 }, (_, i) => {
     const num = i + 1;
     const id = `P1-${num}`;
     return {
@@ -65,9 +60,11 @@ const inicializarGrillaBus = () => {
       esVip: true,
     };
   });
+});
 
-  // Piso 2: 24 Asientos Standard
-  asientosMatrizPiso2.value = Array.from({ length: 24 }, (_, i) => {
+const asientosMatrizPiso2 = computed<AsientoVisual[]>(() => {
+  const normalType = seatTypes.value.find((t) => !t.nombre.toLowerCase().includes('vip')) || seatTypes.value[0];
+  return Array.from({ length: 24 }, (_, i) => {
     const num = i + 13;
     const id = `P2-${num}`;
     return {
@@ -81,11 +78,10 @@ const inicializarGrillaBus = () => {
       esVip: false,
     };
   });
-};
+});
 
 onMounted(async () => {
   await cargarTiposAsiento();
-  inicializarGrillaBus();
 });
 
 const asientosFiltradosPorPiso = computed(() => {
@@ -147,11 +143,14 @@ const seleccionarAsiento = (asiento: AsientoVisual) => {
     </div>
 
     <!-- ESTADO 2: ERROR -->
-    <div v-else-if="error" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800" role="alert">
+    <div v-else-if="error" class="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm text-red-800 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3" role="alert">
       <div class="flex items-start gap-2.5">
         <span aria-hidden="true">⚠️</span>
         <p class="font-semibold">Error al cargar tipos de asiento: {{ error }}</p>
       </div>
+      <ButtonBase size="sm" variant="outline" @click="cargarTiposAsiento">
+        Reintentar
+      </ButtonBase>
     </div>
 
     <!-- ESTADO 3: VACÍO (EMPTY STATE) -->
@@ -191,15 +190,9 @@ const seleccionarAsiento = (asiento: AsientoVisual) => {
           </span>
         </div>
 
-        <!-- Matriz de Asientos -->
-        <div class="grid grid-cols-4 gap-3">
+        <!-- Matriz de Asientos con pasillo central (columna 3 de 5) -->
+        <div class="grid grid-cols-5 gap-2 sm:gap-3 items-center">
           <template v-for="(asiento, index) in asientosFiltradosPorPiso" :key="asiento.id">
-            <div
-              v-if="index > 0 && index % 2 === 0 && index % 4 !== 0"
-              class="col-span-4 h-0"
-              aria-hidden="true"
-            ></div>
-
             <button
               type="button"
               :disabled="asiento.estaOcupado || deshabilitado"
@@ -220,6 +213,15 @@ const seleccionarAsiento = (asiento: AsientoVisual) => {
               <span>Nº {{ asiento.numero }}</span>
               <span class="text-[10px] font-normal opacity-80">${{ asiento.precioBase.toFixed(2) }}</span>
             </button>
+
+            <!-- Pasillo central entre asientos 2 y 3 de cada fila (cada 4 asientos) -->
+            <div
+              v-if="index % 4 === 1"
+              class="flex h-14 items-center justify-center text-[10px] font-semibold text-slate-400"
+              aria-hidden="true"
+            >
+              🚶
+            </div>
           </template>
         </div>
       </div>
