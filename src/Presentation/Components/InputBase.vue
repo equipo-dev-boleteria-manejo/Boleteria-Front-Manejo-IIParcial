@@ -86,7 +86,7 @@ interface Props {
   pattern?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   label: '',
   id: () => `input-${Math.random().toString(36).slice(2, 9)}`,
@@ -109,6 +109,9 @@ const emit = defineEmits<{
 
 function onInput(event: Event) {
   const target = event.target as HTMLInputElement
+  if (event.type === 'change' && target.value === String(props.modelValue ?? '')) {
+    return
+  }
   emit('update:modelValue', target.value)
   emit('change', event)
 }
