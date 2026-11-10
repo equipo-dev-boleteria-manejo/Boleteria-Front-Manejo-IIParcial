@@ -56,6 +56,11 @@ export class CrearFrecuenciaUseCase {
       throw new ParadaInvalidaException();
     }
 
+    // Una frecuencia con paradas nace inactiva hasta que tenga al menos una.
+    if (frecuencia.estaIncompleta()) {
+      frecuencia.activa = false;
+    }
+
     return await this.frecuenciaRepo.crear(frecuencia);
   }
 

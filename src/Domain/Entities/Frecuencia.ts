@@ -92,6 +92,14 @@ export class Frecuencia {
   }
 
   /**
+   * Una frecuencia con paradas (no directa) que no tiene ninguna está incompleta:
+   * no debe operar hasta que se le agregue al menos una.
+   */
+  estaIncompleta(): boolean {
+    return !this.esDirecto && this._paradas.length === 0;
+  }
+
+  /**
    * Las paradas deben ser válidas, con orden único y con tiempos que no
    * retrocedan a medida que avanza el orden. Ninguna puede ser el origen
    * ni el destino de la frecuencia.

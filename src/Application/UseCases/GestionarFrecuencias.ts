@@ -54,6 +54,12 @@ export class GestionarFrecuenciasUseCase {
 
   async activar(id: number): Promise<Frecuencia> {
     this.validarId(id, 'frecuencia');
+    const frecuencia = await this.obtenerPorId(id);
+    if (frecuencia.estaIncompleta()) {
+      throw new FrecuenciaInvalidaException(
+        'La frecuencia no tiene paradas: agrega al menos una antes de activarla',
+      );
+    }
     return await this.frecuenciaRepo.actualizar(id, { activa: true });
   }
 

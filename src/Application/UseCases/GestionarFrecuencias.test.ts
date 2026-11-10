@@ -91,11 +91,23 @@ describe('GestionarFrecuenciasUseCase', () => {
     });
 
     it('debe activar marcando la frecuencia como activa', async () => {
+      vi.mocked(repo.obtenerPorId).mockResolvedValue(frecuenciaDePrueba(1));
       vi.mocked(repo.actualizar).mockResolvedValue(frecuenciaDePrueba(1));
 
       await useCase.activar(1);
 
       expect(repo.actualizar).toHaveBeenCalledWith(1, { activa: true });
+    });
+
+    it('no debe activar una frecuencia incompleta (con paradas pero sin ninguna)', async () => {
+      const incompleta = frecuenciaDePrueba(1);
+      incompleta.esDirecto = false;
+      incompleta.establecerParadas([]);
+      vi.mocked(repo.obtenerPorId).mockResolvedValue(incompleta);
+
+      await expect(useCase.activar(1)).rejects.toThrow(FrecuenciaInvalidaException);
+
+      expect(repo.actualizar).not.toHaveBeenCalled();
     });
 
     it('debe desactivar solo si la frecuencia existe', async () => {
