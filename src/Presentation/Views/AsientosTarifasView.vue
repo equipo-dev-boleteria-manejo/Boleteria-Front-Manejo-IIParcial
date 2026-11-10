@@ -1,34 +1,22 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import CardBase from '../Components/CardBase.vue';
 import MetricCard from '../Components/MetricCard.vue';
 import ButtonBase from '../Components/ButtonBase.vue';
 import SelectorAsientosBus, {
   type AsientoVisual,
 } from '../Components/SelectorAsientosBus.vue';
-import SelectorDescuentoPasajero, {
-  type PasajeroData,
-} from '../Components/SelectorDescuentoPasajero.vue';
 import ModalPagoBoleto from '../Components/ModalPagoBoleto.vue';
 import { useFeedback } from '../Composables/useFeedback';
 
 const { showSuccess, showInfo } = useFeedback();
 
 const asientoSeleccionado = ref<AsientoVisual | null>(null);
-const ocupadosSimulados = ref<(number | string)>([
+const ocupadosSimulados = ref<(number | string)[]>([
   'P1-2',
   'P1-5',
   'P2-14',
   'P2-18',
 ]);
-
-const pasajero = ref<PasajeroData>({
-  cedula: '',
-  nombres: '',
-  categoria: 'GENERAL',
-  tieneDiscapacidad: false,
-  edad: 30,
-});
 
 const mostrarModalPago = ref(false);
 const ultimaReserva = ref<{
@@ -45,32 +33,18 @@ const totalAsientos = 36;
 const totalOcupados = computed(() => ocupadosSimulados.value.length);
 const totalLibres = computed(() => totalAsientos - totalOcupados.value);
 
-const precioBaseSeleccionado = computed(() => {
-  return asientoSeleccionado.value ? asientoSeleccionado.value.precioBase : 0;
-});
-
-const porcentajeDescuento = computed(() => {
-  if (pasajero.value.categoria === 'TERCERA_EDAD' || pasajero.value.categoria === 'DISCAPACIDAD' || pasajero.value.categoria === 'MENOR') {
-    return 0.5;
-  }
-  return 0;
-});
-
-const montoTotal = computed(() => {
-  const base = precioBaseSeleccionado.value;
-  const descuento = base * porcentajeDescuento.value;
-  return Math.max(base - descuento, 0);
-});
-
 const handleSeleccionarAsiento = (asiento: AsientoVisual) => {
+  asientoSeleccionado.value = asiento;
   showInfo(
-    `Asiento Nº ${asiento.numero} (${asiento.tipoNombre}) seleccionado por $${asiento.precioBase.toFixed(2)}`,
+    `Asiento Seleccionado: Nº ${asiento.numero} - Piso ${asiento.piso} (${asiento.tipoNombre}) · $${asiento.precioBase.toFixed(2)}`,
+    3000
   );
+  mostrarModalPago.value = true;
 };
 
-const handleAbrirPago = () => {
-  if (!asientoSeleccionado.value) return;
-  mostrarModalPago.value = true;
+const handleCerrarModal = () => {
+  mostrarModalPago.value = false;
+  asientoSeleccionado.value = null;
 };
 
 const handlePagoConfirmado = (data: {
@@ -78,6 +52,8 @@ const handlePagoConfirmado = (data: {
   referencia: string;
   comprobanteNombre?: string;
   estado: 'PAGADO' | 'EN_VALIDACION';
+  pasajero: any;
+  total: number;
 }) => {
   if (!asientoSeleccionado.value) return;
 
@@ -89,9 +65,9 @@ const handlePagoConfirmado = (data: {
   ultimaReserva.value = {
     asientoNumero: asientoSeleccionado.value.numero,
     asientoTipo: asientoSeleccionado.value.tipoNombre,
-    pasajeroNombres: pasajero.value.nombres || 'Pasajero General',
+    pasajeroNombres: data.pasajero.nombres || 'Pasajero General',
     metodoPago: data.metodoPago,
-    total: montoTotal.value,
+    total: data.total,
     referencia: data.referencia,
     estado: data.estado,
   };
@@ -102,7 +78,8 @@ const handlePagoConfirmado = (data: {
   showSuccess(
     data.estado === 'PAGADO'
       ? `¡Pago exitoso vía Tarjeta (Stripe)! Boleto emitido.`
-      : `Comprobante registrado. Boleto en estado EN VALIDACIÓN para aprobación.`
+      : `Comprobante registrado. Boleto en estado EN VALIDACIÓN para aprobación.`,
+    3000
   );
 };
 </script>
@@ -174,43 +151,16 @@ const handlePagoConfirmado = (data: {
       @seleccionar-asiento="handleSeleccionarAsiento"
     />
 
-    <!-- Panel de Acción: Descuentos y Pago del Asiento Seleccionado -->
-    <div v-if="asientoSeleccionado" class="space-y-4">
-      <SelectorDescuentoPasajero
-        v-model="pasajero"
-        :precio-base="asientoSeleccionado.precioBase"
-      />
-
-      <div class="flex flex-col sm:flex-row items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-blue-50/50 p-4 shadow-sm">
-        <div class="text-xs text-slate-600">
-          <p>
-            Asiento Nº <strong>{{ asientoSeleccionado.numero }}</strong> ({{ asientoSeleccionado.tipoNombre }}) listo para emisión.
-          </p>
-          <p class="text-slate-500">
-            Haga clic en continuar para seleccionar pago con Tarjeta (Stripe) o Transferencia Bancaria.
-          </p>
-        </div>
-        <ButtonBase
-          variant="primary"
-          class="w-full sm:w-auto font-bold px-6 py-2.5 shadow-md shadow-blue-500/20"
-          @click="handleAbrirPago"
-        >
-          Proceder al Pago (${{ montoTotal.toFixed(2) }}) →
-        </ButtonBase>
-      </div>
-    </div>
-
-    <!-- Modal de Pago y Confirmación -->
+    <!-- Modal de Registro de Pasajero, Descuento y Pago -->
     <ModalPagoBoleto
       v-if="asientoSeleccionado"
       :model-value="mostrarModalPago"
       :asiento-numero="asientoSeleccionado.numero"
       :asiento-tipo="asientoSeleccionado.tipoNombre"
       :piso="asientoSeleccionado.piso"
-      :pasajero="pasajero"
-      :monto-total="montoTotal"
+      :precio-base="asientoSeleccionado.precioBase"
       @update:model-value="mostrarModalPago = $event"
-      @close="mostrarModalPago = false"
+      @close="handleCerrarModal"
       @confirmado="handlePagoConfirmado"
     />
 

@@ -18,17 +18,17 @@
       aria-label="Navegación principal del sistema"
     >
       <!-- Cabecera de la Barra Lateral -->
-      <div class="border-b border-slate-800 p-3" :class="!expanded ? 'px-2 text-center' : ''">
-        <div class="flex items-center gap-2.5" :class="!expanded ? 'justify-center' : 'justify-between'">
-          <div class="flex items-center gap-2.5 overflow-hidden">
-            <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 font-black text-white text-base shadow-md shadow-blue-500/30">
+      <div class="border-b border-slate-800 p-4" :class="!expanded ? 'px-3 text-center' : ''">
+        <div class="flex items-center gap-3" :class="!expanded ? 'justify-center' : 'justify-between'">
+          <div class="flex items-center gap-3 overflow-hidden">
+            <div class="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-blue-600 font-black text-white text-lg shadow-md shadow-blue-500/30">
               B
             </div>
             <div v-if="expanded" class="min-w-0 transition-opacity duration-200">
-              <h1 class="truncate text-sm font-black tracking-tight text-white leading-tight">
+              <h1 class="truncate text-base font-black tracking-tight text-white leading-tight">
                 Boletería Front
               </h1>
-              <p class="truncate text-[10px] font-semibold text-blue-400">
+              <p class="truncate text-[11px] font-semibold text-blue-400">
                 Cooperativas Ecuador
               </p>
             </div>
@@ -39,10 +39,10 @@
             v-if="expanded"
             type="button"
             @click="expanded = !expanded"
-            class="hidden rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors md:flex items-center justify-center"
+            class="hidden rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors md:flex items-center justify-center"
             title="Colapsar menú"
           >
-            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
             </svg>
           </button>
@@ -53,10 +53,10 @@
           v-if="!expanded"
           type="button"
           @click="expanded = true"
-          class="hidden mt-2 mx-auto rounded-lg border border-slate-700 bg-slate-800 p-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors md:flex items-center justify-center"
+          class="hidden mt-3 mx-auto rounded-xl border border-slate-700 bg-slate-800 p-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors md:flex items-center justify-center"
           title="Expandir menú"
         >
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
           </svg>
         </button>
@@ -64,9 +64,9 @@
         <!-- Tarjeta de Usuario Activo en Sidebar -->
         <div
           v-if="expanded"
-          class="mt-2.5 flex items-center gap-2.5 rounded-xl border border-slate-800 bg-slate-950/50 p-2"
+          class="mt-4 flex items-center gap-3 rounded-2xl border border-slate-800 bg-slate-950/50 p-3"
         >
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600/20 text-blue-300 font-bold text-xs ring-1 ring-blue-500/30">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-600/20 text-blue-300 font-bold text-sm ring-1 ring-blue-500/30">
             {{ userInitial }}
           </div>
           <div class="min-w-0 flex-1">
@@ -74,7 +74,7 @@
               {{ displayName }}
             </p>
             <span
-              class="inline-block mt-0.5 text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-full"
+              class="inline-block mt-0.5 text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full"
               :class="roleBadgeColor"
             >
               {{ currentRoleName }}
@@ -84,7 +84,7 @@
       </div>
 
       <!-- Menú de Navegación -->
-      <nav class="flex-1 space-y-1 overflow-y-auto px-2.5 py-2.5 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+      <nav class="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <router-link
           v-for="item in visibleItems"
           :key="item.to"
@@ -96,17 +96,17 @@
             <a
               :href="href"
               @click="navigate"
-              class="flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 cursor-pointer"
+              class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-semibold transition-all duration-150 cursor-pointer"
               :class="[
                 isActive
-                  ? 'bg-blue-600 text-white font-bold shadow-sm shadow-blue-600/30'
+                  ? 'bg-blue-600 text-white font-bold shadow-md shadow-blue-600/30'
                   : 'text-slate-300 hover:text-white hover:bg-slate-800/80',
                 !expanded ? 'justify-center px-0' : ''
               ]"
             >
               <!-- Icono SVG -->
               <span class="shrink-0 text-slate-300 group-hover:text-white" :class="isActive ? 'text-white' : ''">
-                <component :is="item.iconComponent" class="h-4 w-4" />
+                <component :is="item.iconComponent" class="h-5 w-5" />
               </span>
 
               <span v-if="expanded" class="truncate">
@@ -128,16 +128,16 @@
       </nav>
 
       <!-- Pie de Sesión -->
-      <div class="border-t border-slate-800 p-2">
+      <div class="border-t border-slate-800 p-3">
         <button
           v-if="authStore.isAuthenticated"
           type="button"
           @click="logout"
-          class="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all cursor-pointer"
           :class="!expanded ? 'justify-center px-0' : ''"
           :title="!expanded ? 'Cerrar Sesión' : ''"
         >
-          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
           </svg>
           <span v-if="expanded">Cerrar Sesión</span>
@@ -145,10 +145,10 @@
         <router-link
           v-else
           to="/login"
-          class="w-full flex items-center gap-2.5 px-3 py-1.5 rounded-lg text-xs font-bold text-blue-400 hover:text-white hover:bg-blue-600 transition-all"
+          class="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-bold text-blue-400 hover:text-white hover:bg-blue-600 transition-all"
           :class="!expanded ? 'justify-center px-0' : ''"
         >
-          <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1" />
           </svg>
           <span v-if="expanded">Iniciar Sesión</span>

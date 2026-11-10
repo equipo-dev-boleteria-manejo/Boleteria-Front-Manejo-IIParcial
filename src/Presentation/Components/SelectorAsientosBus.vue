@@ -225,17 +225,6 @@ const seleccionarAsiento = (asiento: AsientoVisual) => {
           </template>
         </div>
       </div>
-
-      <!-- Resumen del Asiento Seleccionado -->
-      <div v-if="asientoSeleccionado" class="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p class="text-xs text-emerald-700 font-semibold uppercase tracking-wider">Asiento Seleccionado</p>
-          <p class="text-sm font-bold text-emerald-900">
-            Nº {{ asientoSeleccionado.numero }} - Piso {{ asientoSeleccionado.piso }} ({{ asientoSeleccionado.tipoNombre }})
-          </p>
-        </div>
-        <p class="text-lg font-extrabold text-emerald-800">${{ asientoSeleccionado.precioBase.toFixed(2) }}</p>
-      </div>
     </div>
   </div>
 </template>

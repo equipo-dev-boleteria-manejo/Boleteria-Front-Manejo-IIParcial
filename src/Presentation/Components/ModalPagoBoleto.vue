@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, computed, watch } from 'vue';
 import ModalBase from './ModalBase.vue';
 import ButtonBase from './ButtonBase.vue';
 import InputBase from './InputBase.vue';
 import StripePaymentForm from './StripePaymentForm.vue';
-import type { PasajeroData } from './SelectorDescuentoPasajero.vue';
+import SelectorDescuentoPasajero, {
+  type PasajeroData,
+} from './SelectorDescuentoPasajero.vue';
 
 const props = defineProps<{
   modelValue: boolean;
   asientoNumero: number | string;
   asientoTipo: string;
   piso: number;
-  pasajero: PasajeroData;
-  montoTotal: number;
+  precioBase: number;
 }>();
 
 const emit = defineEmits<{
@@ -25,15 +26,54 @@ const emit = defineEmits<{
       referencia: string;
       comprobanteNombre?: string;
       estado: 'PAGADO' | 'EN_VALIDACION';
+      pasajero: PasajeroData;
+      total: number;
     }
   ): void;
 }>();
+
+const pasajero = ref<PasajeroData>({
+  cedula: '',
+  nombres: '',
+  categoria: 'GENERAL',
+  tieneDiscapacidad: false,
+  edad: 30,
+});
+
+watch(
+  () => props.modelValue,
+  (abierto) => {
+    if (abierto) {
+      metodoSeleccionado.value = 'Tarjeta';
+      numeroComprobante.value = '';
+      nombreArchivo.value = '';
+      errorTransferencia.value = '';
+    }
+  }
+);
 
 const metodoSeleccionado = ref<'Tarjeta' | 'Transferencia'>('Tarjeta');
 const numeroComprobante = ref('');
 const nombreArchivo = ref('');
 const procesandoTransferencia = ref(false);
 const errorTransferencia = ref('');
+
+const porcentajeDescuento = computed(() => {
+  if (
+    pasajero.value.categoria === 'TERCERA_EDAD' ||
+    pasajero.value.categoria === 'DISCAPACIDAD' ||
+    pasajero.value.categoria === 'MENOR'
+  ) {
+    return 0.5;
+  }
+  return 0;
+});
+
+const totalFinal = computed(() => {
+  const base = props.precioBase;
+  const descuento = base * porcentajeDescuento.value;
+  return Math.max(base - descuento, 0);
+});
 
 const handleArchivoChange = (event: Event) => {
   const target = event.target as HTMLInputElement;
@@ -48,6 +88,8 @@ const handlePagoTarjetaExitoso = (paymentIntent: any) => {
     metodoPago: 'Tarjeta',
     referencia: paymentIntent?.id || `STRIPE_${Date.now()}`,
     estado: 'PAGADO',
+    pasajero: { ...pasajero.value },
+    total: totalFinal.value,
   });
 };
 
@@ -67,78 +109,82 @@ const handleConfirmarTransferencia = () => {
       referencia: numeroComprobante.value.trim(),
       comprobanteNombre: nombreArchivo.value || 'comprobante_bancario.jpg',
       estado: 'EN_VALIDACION',
+      pasajero: { ...pasajero.value },
+      total: totalFinal.value,
     });
-  }, 600);
+  }, 500);
 };
 </script>
 
 <template>
   <ModalBase
     :model-value="modelValue"
-    title="Confirmar Pago y Reserva"
+    title="Reserva y Pago de Asiento"
     maxWidth="2xl"
     @close="emit('close')"
   >
     <div class="space-y-5">
-      <!-- Resumen de Compra -->
-      <div class="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+      <!-- Resumen del Asiento Seleccionado -->
+      <div class="rounded-2xl border border-blue-100 bg-blue-50/70 p-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div>
-            <span class="text-slate-500 block">Asiento</span>
-            <span class="font-bold text-slate-800 text-sm">Nº {{ asientoNumero }} (Piso {{ piso }})</span>
+            <span class="text-blue-700 font-bold block uppercase tracking-wider text-[11px]">Asiento Seleccionado</span>
+            <p class="font-extrabold text-slate-800 text-base">
+              Nº {{ asientoNumero }} · Piso {{ piso }} ({{ asientoTipo }})
+            </p>
           </div>
-          <div>
-            <span class="text-slate-500 block">Servicio</span>
-            <span class="font-bold text-blue-700 text-sm">{{ asientoTipo }}</span>
-          </div>
-          <div>
-            <span class="text-slate-500 block">Pasajero</span>
-            <span class="font-bold text-slate-800 truncate block">
-              {{ pasajero.nombres || 'Pasajero General' }}
-            </span>
-          </div>
-          <div>
-            <span class="text-slate-500 block">Total a Pagar</span>
-            <span class="font-black text-emerald-700 text-base">
-              ${{ montoTotal.toFixed(2) }}
-            </span>
+          <div class="sm:text-right">
+            <span class="text-slate-500 block">Tarifa Base</span>
+            <span class="text-base font-black text-blue-800">${{ precioBase.toFixed(2) }}</span>
           </div>
         </div>
       </div>
 
-      <!-- Selector de Método de Pago -->
-      <div class="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          @click="metodoSeleccionado = 'Tarjeta'"
-          class="flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all"
-          :class="[
-            metodoSeleccionado === 'Tarjeta'
-              ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20'
-              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-          ]"
-        >
-          <span>💳 Tarjeta (Stripe)</span>
-        </button>
+      <!-- Paso 1: Datos del Pasajero y Descuento por Ley -->
+      <SelectorDescuentoPasajero
+        v-model="pasajero"
+        :precio-base="precioBase"
+      />
 
-        <button
-          type="button"
-          @click="metodoSeleccionado = 'Transferencia'"
-          class="flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all"
-          :class="[
-            metodoSeleccionado === 'Transferencia'
-              ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20'
-              : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-          ]"
-        >
-          <span>🏦 Transferencia Bancaria</span>
-        </button>
+      <!-- Paso 2: Selección de Método de Pago -->
+      <div class="space-y-3 pt-2">
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-600">
+          Seleccione Método de Pago
+        </h4>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            @click="metodoSeleccionado = 'Tarjeta'"
+            class="flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all"
+            :class="[
+              metodoSeleccionado === 'Tarjeta'
+                ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            ]"
+          >
+            <span>💳 Tarjeta (Stripe)</span>
+          </button>
+
+          <button
+            type="button"
+            @click="metodoSeleccionado = 'Transferencia'"
+            class="flex items-center justify-center gap-2 rounded-xl border p-3 text-xs font-bold transition-all"
+            :class="[
+              metodoSeleccionado === 'Transferencia'
+                ? 'border-blue-600 bg-blue-50 text-blue-800 ring-2 ring-blue-500/20'
+                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+            ]"
+          >
+            <span>🏦 Transferencia Bancaria</span>
+          </button>
+        </div>
       </div>
 
       <!-- Pestaña 1: Tarjeta con Stripe -->
       <div v-if="metodoSeleccionado === 'Tarjeta'">
         <StripePaymentForm
-          :amount="montoTotal"
+          :amount="totalFinal"
           @success="handlePagoTarjetaExitoso"
         />
       </div>
@@ -190,7 +236,7 @@ const handleConfirmarTransferencia = () => {
             :loading="procesandoTransferencia"
             @click="handleConfirmarTransferencia"
           >
-            Registrar Transferencia (${{ montoTotal.toFixed(2) }})
+            Registrar Transferencia (${{ totalFinal.toFixed(2) }})
           </ButtonBase>
         </div>
       </div>

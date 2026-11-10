@@ -8,14 +8,6 @@ vi.mock('@stripe/stripe-js', () => ({
 }));
 
 describe('ModalPagoBoleto.vue', () => {
-  const defaultPasajero = {
-    cedula: '1801234567',
-    nombres: 'María López',
-    categoria: 'GENERAL' as const,
-    tieneDiscapacidad: false,
-    edad: 28,
-  };
-
   beforeEach(() => {
     document.body.innerHTML = '';
   });
@@ -24,23 +16,21 @@ describe('ModalPagoBoleto.vue', () => {
     document.body.innerHTML = '';
   });
 
-  it('renderiza resumen de asiento, servicio y monto total cuando modelValue es true', () => {
+  it('renderiza resumen de asiento, tarifa base y campos de pasajero dentro del modal', () => {
     mount(ModalPagoBoleto, {
       props: {
         modelValue: true,
         asientoNumero: 4,
         asientoTipo: 'VIP',
         piso: 1,
-        pasajero: defaultPasajero,
-        montoTotal: 15.0,
+        precioBase: 15.0,
       },
       attachTo: document.body,
     });
 
-    expect(document.body.textContent).toContain('Confirmar Pago y Reserva');
-    expect(document.body.textContent).toContain('Nº 4 (Piso 1)');
-    expect(document.body.textContent).toContain('VIP');
-    expect(document.body.textContent).toContain('María López');
+    expect(document.body.textContent).toContain('Reserva y Pago de Asiento');
+    expect(document.body.textContent).toContain('Nº 4 · Piso 1 (VIP)');
+    expect(document.body.textContent).toContain('Categoría del Pasajero y Descuentos');
     expect(document.body.textContent).toContain('$15.00');
   });
 
@@ -52,8 +42,7 @@ describe('ModalPagoBoleto.vue', () => {
         asientoNumero: 4,
         asientoTipo: 'VIP',
         piso: 1,
-        pasajero: defaultPasajero,
-        montoTotal: 15.0,
+        precioBase: 15.0,
       },
       attachTo: document.body,
     });
