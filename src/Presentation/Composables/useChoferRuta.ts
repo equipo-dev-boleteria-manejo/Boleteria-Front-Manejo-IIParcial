@@ -12,7 +12,7 @@ import { ref, computed } from 'vue';
 import type { Ruta } from '../../Domain/Entities/Ruta';
 import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
-import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
+import type { IAbordajeBoletosRepository } from '../../Domain/Repositories/IAbordajeBoletosRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
 import {
   GestionarViajeRuta,
@@ -26,6 +26,7 @@ import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/Supaba
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 import { mensajeErrorParaUsuario } from '../Utils/errorMessage';
+import { fechaLocalISO } from '../../utils/fechaLocal';
 
 export interface ValidacionHistorialItem {
   codigo: string;
@@ -40,7 +41,7 @@ export interface ResultadoOperacionChofer {
 
 export function useChoferRuta(
   rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
-  boletosRepo?: IBoletosRepository,
+  boletosRepo?: IAbordajeBoletosRepository,
   busRepo?: IBusRepository,
   gestionarViajeUseCase?: GestionarViajeRuta,
   validarBoletoUseCase?: ValidarBoletoRuta,
@@ -96,7 +97,8 @@ export function useChoferRuta(
     error.value = null;
 
     try {
-      const fechaConsulta = fecha || new Date().toISOString().slice(0, 10);
+      // Fecha local: toISOString() devolvería la de UTC, que en Ecuador ya es mañana después de las 19:00.
+      const fechaConsulta = fecha || fechaLocalISO();
       const rutas = await rutaRepo.obtenerPorChoferYFecha(choferId, fechaConsulta);
 
       // Priorizar ruta en curso, luego programada

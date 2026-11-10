@@ -11,6 +11,8 @@ import type {
   BoletoPayload,
 } from '../../Domain/Repositories/IBoletosRepository';
 import type { ITicketRepository } from '../../Domain/Repositories/ITicketRepository';
+import type { IAbordajeBoletosRepository } from '../../Domain/Repositories/IAbordajeBoletosRepository';
+import { BoletoNoValidoParaRutaException } from '../../Domain/Exceptions/RutaException';
 import {
   BoletoException,
   BoletoInvalidoException,
@@ -35,7 +37,7 @@ interface BoletoRow {
 }
 
 export class SupabaseBoletosRepository
-  implements IBoletosRepository, ITicketRepository
+  implements IBoletosRepository, ITicketRepository, IAbordajeBoletosRepository
 {
   private readonly TABLA_BOLETOS = 'Boletos';
 
@@ -218,6 +220,51 @@ export class SupabaseBoletosRepository
 
     if (!data) return null;
     return this.mapRowToEntity(data as BoletoRow);
+  }
+
+  /**
+   * Busca por código QR y, si no hay coincidencia, por código de barras. Se consultan por separado
+   * (y no con .or()) para que un código con comas o paréntesis no altere el filtro de PostgREST.
+   */
+  async obtenerPorCodigo(codigo: string): Promise<Boleto | null> {
+    const codigoLimpio = (codigo ?? '').trim();
+    if (!codigoLimpio) return null;
+
+    for (const columna of ['CodigoQr', 'CodigoBarras'] as const) {
+      const { data, error } = await supabase
+        .from(this.TABLA_BOLETOS)
+        .select('*')
+        .eq(columna, codigoLimpio)
+        .limit(1)
+        .maybeSingle();
+
+      if (error) {
+        throw new BoletoException(`Error al buscar el boleto por código: ${error.message}`);
+      }
+      if (data) return this.mapRowToEntity(data as BoletoRow);
+    }
+
+    return null;
+  }
+
+  /**
+   * Actualización atómica: solo pasa a Abordado si el boleto sigue Emitido o Aprobado. Si otro dispositivo
+   * lo validó un instante antes, no se actualiza ninguna fila y el abordaje se rechaza.
+   */
+  async marcarAbordado(id: number): Promise<void> {
+    const { data, error } = await supabase
+      .from(this.TABLA_BOLETOS)
+      .update({ Estado: EstadoBoleto.ABORDADO })
+      .eq('Id', id)
+      .in('Estado', [EstadoBoleto.EMITIDO, EstadoBoleto.APROBADO])
+      .select('Id');
+
+    if (error) {
+      throw new BoletoException(`Error al registrar el abordaje del boleto ${id}: ${error.message}`);
+    }
+    if (!data || data.length === 0) {
+      throw new BoletoNoValidoParaRutaException('El boleto ya fue utilizado o no está habilitado para abordar.');
+    }
   }
 
   private mapRowToEntity(row: BoletoRow): Boleto {

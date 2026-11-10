@@ -4,12 +4,15 @@
  * Arquitectura:
  * - Capa de Aplicación: Centraliza las validaciones de negocio del abordaje de pasajeros.
  * - Desacopla la lógica de negocio de useChoferRuta.
- * - Inversión de Dependencias (DIP): Inyecta IBoletosRepository por constructor.
+ * - Inversión de Dependencias (DIP): Inyecta IAbordajeBoletosRepository por constructor.
+ *
+ * Reglas: la ruta debe estar En Curso; el boleto debe existir, pertenecer a esa ruta y estar habilitado
+ * (Emitido o Aprobado). Un boleto ya abordado no puede volver a usarse.
  */
 
-import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
+import type { IAbordajeBoletosRepository } from '../../Domain/Repositories/IAbordajeBoletosRepository';
 import type { Ruta } from '../../Domain/Entities/Ruta';
-import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
+import { EstadoBoleto, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import {
   RutaInvalidaException,
   RutaEstadoInvalidoException,
@@ -28,8 +31,10 @@ export interface ValidarBoletoOutput {
   boletoId?: number;
 }
 
+const ESTADOS_HABILITADOS_PARA_ABORDAR: readonly string[] = [EstadoBoleto.EMITIDO, EstadoBoleto.APROBADO];
+
 export class ValidarBoletoRuta {
-  constructor(private readonly boletosRepo?: IBoletosRepository) {}
+  constructor(private readonly boletosRepo: IAbordajeBoletosRepository) {}
 
   async ejecutar(input: ValidarBoletoInput): Promise<ValidarBoletoOutput> {
     const { ruta, codigo } = input;
@@ -47,29 +52,32 @@ export class ValidarBoletoRuta {
       throw new BoletoNoValidoParaRutaException('Debe ingresar un código de boleto válido.');
     }
 
-    let boletoId: number | undefined;
+    const boleto = await this.boletosRepo.obtenerPorCodigo(codigoLimpio);
 
-    if (this.boletosRepo) {
-      const repoAny = this.boletosRepo as any;
-      const boleto = typeof repoAny.obtenerPorCodigo === 'function'
-        ? await repoAny.obtenerPorCodigo(codigoLimpio)
-        : null;
-
-      if (!boleto) {
-        throw new BoletoNoValidoParaRutaException('Boleto no encontrado.');
-      }
-
-      boletoId = boleto.id;
-
-      if (typeof repoAny.marcarAbordado === 'function' && boleto.id) {
-        await repoAny.marcarAbordado(boleto.id);
-      }
+    if (!boleto || !boleto.id) {
+      throw new BoletoNoValidoParaRutaException('Boleto no encontrado.');
     }
+
+    if (boleto.rutaId !== ruta.id) {
+      throw new BoletoNoValidoParaRutaException('El boleto no corresponde a esta ruta.');
+    }
+
+    if (boleto.estado === EstadoBoleto.ABORDADO) {
+      throw new BoletoNoValidoParaRutaException('El boleto ya fue utilizado para abordar.');
+    }
+
+    if (!ESTADOS_HABILITADOS_PARA_ABORDAR.includes(boleto.estado)) {
+      throw new BoletoNoValidoParaRutaException(
+        `El boleto no está habilitado para abordar (estado: ${boleto.estado}).`,
+      );
+    }
+
+    await this.boletosRepo.marcarAbordado(boleto.id);
 
     return {
       ok: true,
       mensaje: 'Boleto validado correctamente.',
-      boletoId,
+      boletoId: boleto.id,
     };
   }
 
