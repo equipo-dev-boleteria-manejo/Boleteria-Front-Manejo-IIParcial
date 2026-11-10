@@ -20,7 +20,7 @@ CREATE TABLE IF NOT EXISTS "Cooperativas" (
 
 -- 2. TABLA USUARIOS (Roles y Gobernanza de Acceso)
 CREATE TABLE IF NOT EXISTS "Usuarios" (
-    "Id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    "Id" UUID PRIMARY KEY REFERENCES auth.users("id") ON DELETE CASCADE,
     "Email" VARCHAR(150) NOT NULL UNIQUE,
     "Cedula" VARCHAR(10) NOT NULL UNIQUE,
     "Nombres" VARCHAR(100) NOT NULL,
@@ -200,7 +200,19 @@ CREATE TABLE IF NOT EXISTS "Cambios" (
     "ImpactoEstimado" TEXT
 );
 
--- 9. CONFIGURACIÓN DE STORAGE BUCKETS (Públicos para la app)
+-- 9. TABLA AUDITORIA (Trazabilidad y Seguridad)
+CREATE TABLE IF NOT EXISTS "Auditoria" (
+    "Id" SERIAL PRIMARY KEY,
+    "Accion" VARCHAR(100) NOT NULL,
+    "UsuarioId" UUID REFERENCES "Usuarios"("Id") ON DELETE SET NULL,
+    "EntidadAfectada" VARCHAR(100),
+    "EntidadId" VARCHAR(100),
+    "Detalle" TEXT,
+    "Resultado" VARCHAR(30) DEFAULT 'Exito' CHECK ("Resultado" IN ('Exito', 'Fallo', 'Advertencia')),
+    "Fecha" TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 10. CONFIGURACIÓN DE STORAGE BUCKETS (Públicos para la app)
 -- Nota: En Supabase Storage, crear los buckets: 'comprobantes', 'logos', 'buses'
 INSERT INTO storage.buckets (id, name, public)
 VALUES 

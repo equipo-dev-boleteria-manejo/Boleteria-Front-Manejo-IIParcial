@@ -1,9 +1,11 @@
 import type { IVentaRepository, VentaPayload } from '../../Domain/Repositories/IVentaRepository';
 import type { IBoletosRepository, BoletoPayload } from '../../Domain/Repositories/IBoletosRepository';
+import type { IAuditRepository } from '../../Domain/Repositories/IAuditRepository';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
 import { EstadoVenta, EstadoBoleto, TipoPasajero } from '../../Domain/Constants/EstadosSistema';
 import { SupabaseVentasRepository } from '../../Infrastructure/Repositories/SupabaseVentasRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
+import { SupabaseAuditRepository } from '../../Infrastructure/Repositories/SupabaseAuditRepository';
 import { ResolverPrecioAsiento } from './ResolverPrecioAsiento';
 import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
 import { calcularEdad } from '../../Domain/Services/DescuentoService';
@@ -54,6 +56,7 @@ export class VenderBoleto {
     private boletosRepo: IBoletosRepository = new SupabaseBoletosRepository(),
     private resolverPrecios: ResolverPrecioAsiento = new ResolverPrecioAsiento(),
     private calcularDescuentoUseCase: CalcularDescuentoVenta = new CalcularDescuentoVenta(),
+    private auditRepo?: IAuditRepository,
   ) {}
 
   async ejecutar(input: VenderBoletoInput): Promise<ResultadoVentaBoleto> {
@@ -213,6 +216,17 @@ export class VenderBoleto {
 
     const boletos = await this.boletosRepo.insertarBoletos(boletosPayload);
 
+    if (this.auditRepo) {
+      this.auditRepo.registrarEvento({
+        accion: 'VENTA_BOLETO',
+        usuarioId: input.usuarioVendedorId,
+        entidadAfectada: 'Ventas',
+        entidadId: ventaId,
+        detalle: `Venta #${ventaId} generada por $${total.toFixed(2)} (${input.pasajeros.length} boletos) en Ruta #${input.ruta.id} (${input.ruta.origen} -> ${input.ciudadDestinoVenta})`,
+        resultado: 'Exito',
+      }).catch(() => {});
+    }
+
     return {
       ventaId,
       total,
@@ -221,4 +235,10 @@ export class VenderBoleto {
   }
 }
 
-export const venderBoletoUseCase = new VenderBoleto();
+export const venderBoletoUseCase = new VenderBoleto(
+  new SupabaseVentasRepository(),
+  new SupabaseBoletosRepository(),
+  new ResolverPrecioAsiento(),
+  new CalcularDescuentoVenta(),
+  new SupabaseAuditRepository()
+);

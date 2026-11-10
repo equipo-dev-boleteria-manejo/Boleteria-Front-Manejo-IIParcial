@@ -3,6 +3,12 @@
  */
 
 import { RolUsuario } from '../../Domain/Constants/EstadosSistema';
+import type {
+  FiltroFechaDashboard,
+  SerieVentaFecha,
+  DistribucionMetodoPago,
+  DesempenoRutaTop,
+} from '../../Domain/Repositories/IDashboardRepository';
 
 export type TipoDashboard = 'cliente' | 'cooperativa' | 'chofer' | 'admin';
 
@@ -12,6 +18,7 @@ export interface DashboardContextoDto {
   nombres?: string | null;
   cedula?: string | null;
   cooperativaId?: number | null;
+  filtroFecha?: FiltroFechaDashboard;
 }
 
 export interface DashboardKpiDto {
@@ -32,6 +39,14 @@ export interface DashboardResumenDto {
   mensajeRol: string;
   kpis: DashboardKpiDto[];
   ventasSemana: DashboardGraficoPuntoDto[];
+  ventasDetalladas: SerieVentaFecha[];
+  metodosPago: DistribucionMetodoPago[];
+  topRutas: DesempenoRutaTop[];
+  estadoFlota: {
+    activos: number;
+    mantenimiento: number;
+    inactivos: number;
+  };
   metricasGenerales: {
     totalUsuarios: number;
     totalBusesActivos: number;

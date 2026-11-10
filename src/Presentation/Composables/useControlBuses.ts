@@ -159,6 +159,11 @@ export function useControlBuses(options: UseControlBusesOptions = {}) {
     return activarBus(busId);
   }
 
+  function limpiarMensajes() {
+    error.value = '';
+    success.value = '';
+  }
+
   return {
     buses,
     loading,
@@ -170,5 +175,6 @@ export function useControlBuses(options: UseControlBusesOptions = {}) {
     activarBus,
     desactivarBus,
     liberarBus,
+    limpiarMensajes,
   };
 }

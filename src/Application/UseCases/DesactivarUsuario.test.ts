@@ -54,4 +54,19 @@ describe('DesactivarUsuario UseCase', () => {
     );
     expect(mockUsuarioRepo.desactivar).not.toHaveBeenCalled();
   });
+
+  it('debe impedir dar de baja al Super Administrador base del sistema', async () => {
+    const adminIntocable = new Usuario(
+      'admin@transporte.ec',
+      new Cedula('1710034065'),
+      'Super',
+      'Administrador',
+      RolUsuario.ADMIN
+    );
+    adminIntocable.id = 'admin-base-id';
+    mockUsuarioRepo.obtenerPorId = vi.fn().mockResolvedValue(adminIntocable);
+
+    await expect(useCase.execute('admin-base-id')).rejects.toThrow(DomainException);
+    expect(mockUsuarioRepo.desactivar).not.toHaveBeenCalled();
+  });
 });
