@@ -616,7 +616,7 @@ describe('BusesAdmin', () => {
       3000,
     )
 
-    expect(wrapper.text()).toContain('🔄 Reemplazado por Bus 30')
-    expect(wrapper.text()).toContain('🛡️ Cubriendo contingencia de Bus 25')
+    expect(wrapper.text()).toContain('Reemplazado por Bus 30')
+    expect(wrapper.text()).toContain('Cubriendo contingencia de Bus 25')
   })
 })

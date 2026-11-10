@@ -197,18 +197,33 @@
                       {{ bus.marcaChasis || 'Marca no registrada' }}
                     </p>
                     <!-- Insignias de contingencia / reemplazo operativo -->
-                    <div v-if="obtenerContingencia(bus)" class="mt-1">
+                    <div v-if="obtenerContingencia(bus)" class="mt-1.5 flex flex-col gap-1">
                       <span
                         v-if="obtenerContingencia(bus)?.tipo === 'afectado'"
-                        class="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-200 shadow-2xs"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-800 border border-amber-200 shadow-2xs"
                       >
-                        🔄 Reemplazado por Bus {{ obtenerContingencia(bus)?.reemplazo }}
+                        <span class="text-xs">🔄</span>
+                        <span>Reemplazado por <strong>Bus {{ obtenerContingencia(bus)?.reemplazo }}</strong></span>
                       </span>
                       <span
-                        v-else-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
-                        class="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 border border-blue-200 shadow-2xs"
+                        v-if="obtenerContingencia(bus)?.tipo === 'afectado'"
+                        class="text-[10px] font-semibold text-amber-700/90 pl-0.5"
                       >
-                        🛡️ Cubriendo contingencia de Bus {{ obtenerContingencia(bus)?.afectado }}
+                        ⚠️ Rutas y frecuencias transferidas temporalmente al Bus {{ obtenerContingencia(bus)?.reemplazo }}
+                      </span>
+
+                      <span
+                        v-else-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-800 border border-blue-200 shadow-2xs"
+                      >
+                        <span class="text-xs">🛡️</span>
+                        <span>Cubriendo contingencia de <strong>Bus {{ obtenerContingencia(bus)?.afectado }}</strong></span>
+                      </span>
+                      <span
+                        v-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
+                        class="text-[10px] font-semibold text-blue-700/90 pl-0.5"
+                      >
+                        ⚡ Operando y cubriendo rutas asignadas al Bus {{ obtenerContingencia(bus)?.afectado }}
                       </span>
                     </div>
                   </div>
@@ -235,6 +250,18 @@
                     aria-hidden="true"
                   ></span>
                   {{ estadoInfo(bus.estado).label }}
+                </span>
+                <span
+                  v-if="obtenerContingencia(bus)?.tipo === 'reemplazo'"
+                  class="mt-1 block text-[9px] font-bold uppercase tracking-wider text-blue-600"
+                >
+                  En contingencia
+                </span>
+                <span
+                  v-else-if="obtenerContingencia(bus)?.tipo === 'afectado'"
+                  class="mt-1 block text-[9px] font-bold uppercase tracking-wider text-amber-600"
+                >
+                  Con reemplazo activo
                 </span>
               </td>
               <td class="px-5 py-3.5 sm:px-6">
@@ -705,7 +732,68 @@ interface ContingenciaOperativa {
   busReemplazoNumero: string
 }
 
-const contingencias = ref<ContingenciaOperativa[]>([])
+const STORAGE_KEY_CONTINGENCIAS = `boleteria_contingencias_${cooperativaId}`
+
+function cargarContingenciasStorage(): ContingenciaOperativa[] {
+  try {
+    const raw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_CONTINGENCIAS) : null
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) return parsed
+    }
+  } catch {
+    // fallback
+  }
+  return []
+}
+
+function guardarContingenciasStorage(lista: ContingenciaOperativa[]) {
+  try {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_CONTINGENCIAS, JSON.stringify(lista))
+    }
+  } catch {
+    // fallback
+  }
+}
+
+const contingencias = ref<ContingenciaOperativa[]>(cargarContingenciasStorage())
+
+// Sincronización automática de contingencias según el estado real de la flota
+watch(
+  buses,
+  (nuevosBuses) => {
+    if (!nuevosBuses || nuevosBuses.length === 0) return
+
+    // 1. Mantener contingencias cuyo bus afectado siga en MANTENIMIENTO
+    let activas = contingencias.value.filter((c) => {
+      const afectado = nuevosBuses.find(
+        (b) => String(b.numero) === String(c.busAfectadoNumero),
+      )
+      return afectado && afectado.estado === EstadoBus.MANTENIMIENTO
+    })
+
+    // 2. Si no había contingencia persistida pero existe un bus en MANTENIMIENTO y uno ACTIVO
+    if (activas.length === 0) {
+      const enMantenimiento = nuevosBuses.find(
+        (b) => b.estado === EstadoBus.MANTENIMIENTO,
+      )
+      const reemplazo = nuevosBuses.find(
+        (b) => b.estado === EstadoBus.ACTIVO && b.numero !== enMantenimiento?.numero,
+      )
+      if (enMantenimiento && reemplazo) {
+        activas.push({
+          busAfectadoNumero: String(enMantenimiento.numero),
+          busReemplazoNumero: String(reemplazo.numero),
+        })
+      }
+    }
+
+    contingencias.value = activas
+    guardarContingenciasStorage(activas)
+  },
+  { immediate: true },
+)
 
 function obtenerContingencia(bus: Bus) {
   const num = String(bus.numero)
@@ -849,7 +937,16 @@ function abrirReporte(bus: Bus) {
   void cargarBusesActivos()
 }
 
+const ultimoReporte = ref<{ busNumero: string; replacementBusNumero: string }>({
+  busNumero: '',
+  replacementBusNumero: '',
+})
+
 async function manejarReportarIncidente() {
+  ultimoReporte.value = {
+    busNumero: formIncidente.busNumero,
+    replacementBusNumero: formIncidente.replacementBusNumero,
+  }
   await reportarIncidente()
 }
 
@@ -862,21 +959,28 @@ function cerrarReporte() {
 watch(reporteSuccess, async (exito) => {
   if (!exito) return
 
-  const busAfectado = formIncidente.busNumero
-  const busReemplazo = formIncidente.replacementBusNumero
+  const busAfectado =
+    reporteResponse.value?.busActualizado?.numero ||
+    ultimoReporte.value.busNumero ||
+    formIncidente.busNumero
+  const busReemplazo =
+    reporteResponse.value?.acciones.busReemplazoSugerido?.numero ||
+    ultimoReporte.value.replacementBusNumero ||
+    formIncidente.replacementBusNumero
 
-  if (busReemplazo) {
+  if (busReemplazo && busAfectado) {
     contingencias.value = contingencias.value.filter(
-      (c) => c.busAfectadoNumero !== busAfectado,
+      (c) => c.busAfectadoNumero !== String(busAfectado),
     )
     contingencias.value.push({
-      busAfectadoNumero: busAfectado,
-      busReemplazoNumero: busReemplazo,
+      busAfectadoNumero: String(busAfectado),
+      busReemplazoNumero: String(busReemplazo),
     })
+    guardarContingenciasStorage(contingencias.value)
   }
 
   const mensaje = busReemplazo
-    ? `Bus ${busAfectado} enviado a Mantenimiento. El Bus ${busReemplazo} ha sido asignado como reemplazo operativo para cubrir sus frecuencias.`
+    ? `Bus ${busAfectado} enviado a Mantenimiento. El Bus ${busReemplazo} ha sido asignado como reemplazo operativo para cubrir sus frecuencias y rutas.`
     : (reporteResponse.value?.acciones.mensaje ||
        'El incidente se registró correctamente y el bus fue actualizado.')
   const estabaAbierto = mostrarIncidente.value
@@ -962,6 +1066,7 @@ async function confirmarCambioEstado(bus: Bus, accion: AccionEstado) {
     contingencias.value = contingencias.value.filter(
       (c) => c.busAfectadoNumero !== String(bus.numero),
     )
+    guardarContingenciasStorage(contingencias.value)
   }
 
   // Notificación de éxito consistente vía showSuccess (Toast 3s arriba a la derecha)
