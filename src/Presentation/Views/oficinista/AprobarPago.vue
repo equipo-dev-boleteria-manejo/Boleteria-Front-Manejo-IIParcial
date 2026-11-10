@@ -1,133 +1,183 @@
 <template>
-  <div class="space-y-6">
-    <CardBase
-      title="Aprobación de Transferencias"
-      subtitle="Valida comprobantes bancarios y emite los boletos pendientes"
-    >
-      <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div class="grid w-full grid-cols-2 gap-3 sm:w-auto">
-          <div class="rounded-2xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200 sm:px-4 sm:py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700">
-              Ventas pendientes
-            </p>
-            <p class="text-xl font-black leading-tight text-amber-800 sm:text-2xl">{{ totalPendientes }}</p>
-          </div>
-          <div class="rounded-2xl bg-slate-50 px-3 py-2.5 ring-1 ring-slate-200 sm:px-4 sm:py-3">
-            <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Monto por validar
-            </p>
-            <p class="text-xl font-black leading-tight text-slate-900 sm:text-2xl">
-              ${{ formatearPrecio(montoPendiente) }}
-            </p>
-          </div>
-        </div>
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
+    <!-- Tarjetas de Métricas / KPIs -->
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de pagos por validar">
+      <MetricCard
+        title="Ventas pendientes"
+        :value="cargandoLista && !ventasPendientes.length ? '—' : totalPendientes"
+        icon="🧾"
+        description="Transferencias por validar"
+        variant="default"
+      />
+      <MetricCard
+        title="Monto por validar"
+        :value="cargandoLista && !ventasPendientes.length ? '—' : `$${formatearPrecio(montoPendiente)}`"
+        icon="💰"
+        description="Total en comprobantes"
+        variant="info"
+      />
+      <MetricCard
+        title="Con comprobante"
+        :value="cargandoLista && !ventasPendientes.length ? '—' : conComprobante"
+        icon="📎"
+        description="Listas para revisar"
+        variant="success"
+      />
+      <MetricCard
+        title="Sin comprobante"
+        :value="cargandoLista && !ventasPendientes.length ? '—' : sinComprobante"
+        icon="⚠️"
+        description="Requieren atención"
+        variant="danger"
+      />
+    </section>
 
-        <div class="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-          <a
-            href="/oficinista/venta-boletos"
-            class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-transparent px-3 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
-          >
-            <span aria-hidden="true">🎟️</span>
-            Vender en taquilla
-          </a>
-          <ButtonBase
-            variant="outline"
-            :loading="cargandoLista"
-            :disabled="cargandoLista"
-            @click="recargar"
-          >
-            <span aria-hidden="true">🔄</span>
-            Recargar
-          </ButtonBase>
-        </div>
+    <!-- Barra de Búsqueda y Filtros Unificada -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="w-full md:w-80">
+        <SearchInput
+          v-model="busqueda"
+          placeholder="Buscar por venta, ruta o vendedor..."
+        />
       </div>
-    </CardBase>
 
-    <div
-      v-if="errorCarga"
-      class="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-    >
-      <span aria-hidden="true">⚠️</span>
-      <span>{{ errorCarga }}</span>
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <SelectFilter
+          label="Comprobante:"
+          v-model="filtroComprobante"
+          :options="opcionesComprobante"
+        />
+
+        <SelectFilter
+          label="Mostrar:"
+          v-model="registrosPorPagina"
+          :options="[
+            { value: 5, label: '5 filas' },
+            { value: 10, label: '10 filas' },
+            { value: 20, label: '20 filas' },
+          ]"
+        />
+
+        <RefreshButton :loading="cargandoLista" @click="recargar" />
+
+        <router-link
+          to="/oficinista/venta-boletos"
+          class="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-transparent px-3.5 py-1.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50"
+        >
+          <span aria-hidden="true">🎟️</span>
+          Vender en taquilla
+        </router-link>
+      </div>
     </div>
 
+    <!-- Estado 1: CARGANDO -->
     <div
       v-if="cargandoLista && !ventasPendientes.length"
-      class="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-sm text-slate-500"
+      class="rounded-2xl bg-white border border-slate-200 p-12 text-center shadow-sm space-y-4"
+      aria-busy="true"
     >
-      <span class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-      Buscando transferencias pendientes…
+      <div class="animate-spin h-8 w-8 text-blue-600 mx-auto">
+        <svg class="w-full h-full" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Buscando transferencias pendientes…</p>
     </div>
 
+    <!-- Estado 2: VACÍO -->
     <div
-      v-else-if="!ventasPendientes.length && !errorCarga"
-      class="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center"
+      v-else-if="!ventasPendientes.length"
+      class="rounded-2xl bg-white border border-slate-200 p-16 text-center shadow-sm space-y-3"
     >
-      <span class="block text-4xl" aria-hidden="true">✅</span>
-      <h3 class="mt-2 text-sm font-bold text-slate-700">No hay pagos por validar</h3>
-      <p class="mt-1 text-xs text-slate-500">
+      <div class="text-4xl text-slate-300">✅</div>
+      <h3 class="text-base font-black text-slate-800">No hay pagos por validar</h3>
+      <p class="text-xs text-slate-500 max-w-sm mx-auto">
         Las compras por transferencia aparecerán aquí hasta que apruebes o rechaces el comprobante.
       </p>
     </div>
 
-    <div v-else class="grid grid-cols-1 gap-4">
-      <CardBase
-        v-for="venta in ventasPendientes"
-        :key="venta.id"
-        hover
-        padding="sm"
-      >
-        <div class="flex flex-wrap items-start justify-between gap-4">
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                Venta #{{ venta.id }}
-              </p>
-              <span class="rounded-full bg-amber-50 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-700 ring-1 ring-amber-200">
-                {{ venta.estado }}
-              </span>
-              <span
-                class="rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                :class="
-                  tieneComprobante(venta)
-                    ? 'bg-emerald-50 text-emerald-700'
-                    : 'bg-red-50 text-red-700'
-                "
-              >
-                {{ tieneComprobante(venta) ? 'Comprobante adjunto' : 'Sin comprobante' }}
-              </span>
-            </div>
-
-            <h3 class="mt-1 text-base font-black leading-tight text-slate-900">
-              {{ venta.ciudadOrigenVenta }} → {{ venta.ciudadDestinoVenta }}
-            </h3>
-            <p class="mt-1 text-xs font-semibold text-slate-500">
-              {{ formatearFecha(venta.fechaVenta) }} · Ruta #{{ venta.rutaId }} ·
-              {{ venta.metodoPago }}
-            </p>
-
-            <p class="mt-2 truncate font-mono text-[11px] text-slate-400">
-              Vendedor: {{ venta.usuarioVendedorId || 'No registrado' }}
-            </p>
-          </div>
-
-          <div class="flex w-full flex-col gap-2 sm:w-auto sm:items-end">
-            <div class="flex items-center justify-between gap-3 sm:block sm:text-right">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Total</p>
-              <p class="text-lg font-black text-slate-900 sm:text-xl">${{ formatearPrecio(venta.total) }}</p>
-            </div>
-            <ButtonBase
-              size="sm"
-              :loading="cargandoDetalle && ventaSeleccionada?.id === venta.id"
-              :disabled="procesando"
-              @click="abrirVenta(venta)"
+    <!-- Estado 3: TABLA DE DATOS -->
+    <div v-else class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm border-collapse" aria-label="Ventas pendientes de validación">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-3.5">Venta</th>
+              <th scope="col" class="px-6 py-3.5">Ruta</th>
+              <th scope="col" class="px-6 py-3.5">Fecha</th>
+              <th scope="col" class="px-6 py-3.5">Vendedor</th>
+              <th scope="col" class="px-6 py-3.5 text-center">Comprobante</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Total</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+            <tr
+              v-for="venta in ventasPaginadas"
+              :key="venta.id"
+              class="hover:bg-blue-50/50 transition-colors"
             >
-              <span aria-hidden="true">🔍</span>
-              Revisar pago
-            </ButtonBase>
-          </div>
-        </div>
-      </CardBase>
+              <td class="px-6 py-3">
+                <div class="font-bold text-slate-900 text-sm leading-tight">Venta #{{ venta.id }}</div>
+                <div class="text-slate-400 text-xs">{{ venta.metodoPago }}</div>
+              </td>
+              <td class="px-6 py-3">
+                <div class="font-bold text-slate-900">
+                  {{ venta.ciudadOrigenVenta }} → {{ venta.ciudadDestinoVenta }}
+                </div>
+                <div class="text-slate-400 text-xs">Ruta #{{ venta.rutaId }}</div>
+              </td>
+              <td class="px-6 py-3 text-slate-500">{{ formatearFecha(venta.fechaVenta) }}</td>
+              <td class="px-6 py-3">
+                <span class="truncate font-mono text-[11px] text-slate-500">
+                  {{ venta.usuarioVendedorId || 'No registrado' }}
+                </span>
+              </td>
+              <td class="px-6 py-3 text-center">
+                <span
+                  class="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-2xs"
+                  :class="
+                    tieneComprobante(venta)
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      : 'bg-red-50 text-red-700 border-red-200'
+                  "
+                >
+                  {{ tieneComprobante(venta) ? 'Adjunto' : 'Sin comprobante' }}
+                </span>
+              </td>
+              <td class="px-6 py-3 text-right font-black text-slate-900">
+                ${{ formatearPrecio(venta.total) }}
+              </td>
+              <td class="px-6 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <ButtonBase
+                    size="sm"
+                    :loading="cargandoDetalle && ventaSeleccionada?.id === venta.id"
+                    :disabled="procesando"
+                    @click="abrirVenta(venta)"
+                  >
+                    <span aria-hidden="true">🔍</span>
+                    Revisar pago
+                  </ButtonBase>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <PaginationControls
+        :current-page="paginaActual"
+        :total-pages="totalPaginas"
+        :total-items="ventasFiltradas.length"
+        :items-per-page="registrosPorPagina"
+        :has-prev-page="paginaActual > 1"
+        :has-next-page="paginaActual < totalPaginas"
+        @prev="paginaActual--"
+        @next="paginaActual++"
+        @set-page="(p) => (paginaActual = p)"
+      />
     </div>
 
     <ModalDetalleVenta
@@ -142,13 +192,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import CardBase from '../../Components/CardBase.vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import MetricCard from '../../Components/MetricCard.vue'
 import ModalDetalleVenta from '../../Components/ModalDetalleVenta.vue'
+import PaginationControls from '../../Components/PaginationControls.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
+import SearchInput from '../../Components/SearchInput.vue'
+import SelectFilter from '../../Components/SelectFilter.vue'
 import { useAuthStore } from '../../Store/authStore'
-import { useUiStore } from '../../Store/uiStore'
 import { useControlBoletos } from '../../Composables/useControlBoletos'
+import { useFeedback } from '../../Composables/useFeedback'
 import type { Venta } from '../../../Domain/Entities/Venta'
 import {
   MENSAJE_SESION_REQUERIDA,
@@ -158,7 +212,7 @@ import {
 } from '../../Utils/configuracion'
 
 const authStore = useAuthStore()
-const uiStore = useUiStore()
+const { showError, showSuccess, confirm } = useFeedback()
 const {
   ventasPendientes,
   boletosVenta,
@@ -171,12 +225,23 @@ const {
   rechazarPago,
 } = useControlBoletos()
 
-const errorCarga = ref<string | null>(null)
 const modalAbierto = ref(false)
 const ventaSeleccionada = ref<Venta | null>(null)
 const cargandoDetalle = ref(false)
 const procesando = ref(false)
 const cargandoLista = computed(() => loading.value && !procesando.value)
+
+// Filtros y paginación
+const busqueda = ref('')
+const filtroComprobante = ref<string>('Todos')
+const paginaActual = ref(1)
+const registrosPorPagina = ref(10)
+
+const opcionesComprobante = [
+  { value: 'Todos', label: 'Todos' },
+  { value: 'ConComprobante', label: 'Con comprobante' },
+  { value: 'SinComprobante', label: 'Sin comprobante' },
+]
 
 function formatearPrecio(valor: number): string {
   return Number(valor ?? 0).toFixed(2)
@@ -199,30 +264,69 @@ function tieneComprobante(venta: Venta): boolean {
   return Boolean(venta.comprobanteUrl && venta.comprobanteUrl.trim())
 }
 
+const conComprobante = computed(
+  () => ventasPendientes.value.filter(tieneComprobante).length,
+)
+const sinComprobante = computed(
+  () => ventasPendientes.value.length - conComprobante.value,
+)
+
+const ventasFiltradas = computed(() =>
+  ventasPendientes.value.filter((venta) => {
+    const termino = busqueda.value.toLowerCase().trim()
+    const coincideBusqueda =
+      !termino ||
+      String(venta.id ?? '').includes(termino) ||
+      `${venta.ciudadOrigenVenta} ${venta.ciudadDestinoVenta}`
+        .toLowerCase()
+        .includes(termino) ||
+      String(venta.usuarioVendedorId ?? '').toLowerCase().includes(termino)
+
+    const tiene = tieneComprobante(venta)
+    const coincideComprobante =
+      filtroComprobante.value === 'Todos' ||
+      (filtroComprobante.value === 'ConComprobante' && tiene) ||
+      (filtroComprobante.value === 'SinComprobante' && !tiene)
+
+    return coincideBusqueda && coincideComprobante
+  }),
+)
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(ventasFiltradas.value.length / registrosPorPagina.value)),
+)
+
+const ventasPaginadas = computed(() => {
+  const inicio = (paginaActual.value - 1) * registrosPorPagina.value
+  return ventasFiltradas.value.slice(inicio, inicio + registrosPorPagina.value)
+})
+
+watch([busqueda, filtroComprobante, registrosPorPagina], () => {
+  paginaActual.value = 1
+})
+
 async function recargar(): Promise<void> {
   if (!supabaseConfigurado) {
-    errorCarga.value = MENSAJE_SUPABASE_NO_CONFIGURADO
+    showError(MENSAJE_SUPABASE_NO_CONFIGURADO)
     return
   }
 
-  errorCarga.value = null
   try {
     await cargarVentasPendientes()
+    paginaActual.value = 1
   } catch (error) {
-    errorCarga.value = obtenerMensajeError(
-      error,
-      'No se pudieron cargar las ventas pendientes de validación.',
+    showError(
+      obtenerMensajeError(error, 'No se pudieron cargar las ventas pendientes de validación.'),
     )
   }
 }
 
 async function abrirVenta(venta: Venta): Promise<void> {
   if (!venta.id) {
-    errorCarga.value = 'La venta seleccionada no tiene un identificador válido.'
+    showError('La venta seleccionada no tiene un identificador válido.')
     return
   }
 
-  errorCarga.value = null
   ventaSeleccionada.value = venta
   cargandoDetalle.value = true
 
@@ -230,9 +334,8 @@ async function abrirVenta(venta: Venta): Promise<void> {
     await cargarBoletosVenta(venta.id)
     modalAbierto.value = true
   } catch (error) {
-    errorCarga.value = obtenerMensajeError(
-      error,
-      'No se pudieron cargar los boletos de la venta seleccionada.',
+    showError(
+      obtenerMensajeError(error, 'No se pudieron cargar los boletos de la venta seleccionada.'),
     )
   } finally {
     cargandoDetalle.value = false
@@ -249,38 +352,26 @@ async function aprobar(): Promise<void> {
   if (!venta?.id) return
 
   if (!authStore.user?.id) {
-    uiStore.showAlert({
-      title: 'Sesión requerida',
-      message: MENSAJE_SESION_REQUERIDA,
-      type: 'error',
-    })
+    showError(MENSAJE_SESION_REQUERIDA)
     return
   }
   if (!tieneComprobante(venta)) {
-    uiStore.showAlert({
-      title: 'Comprobante requerido',
-      message: 'Esta venta no tiene un comprobante asociado y no puede aprobarse.',
-      type: 'warning',
-    })
+    showError('Esta venta no tiene un comprobante asociado y no puede aprobarse.')
     return
   }
   if (!boletosVenta.value.length) {
-    uiStore.showAlert({
-      title: 'Boletos no encontrados',
-      message: 'No se encontraron boletos asociados a esta venta. No es posible aprobarla.',
-      type: 'warning',
-    })
+    showError('No se encontraron boletos asociados a esta venta. No es posible aprobarla.')
     return
   }
 
-  const confirmado = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Aprobar pago',
     message: `¿Confirmas que el comprobante de la venta #${venta.id} por $${formatearPrecio(
       venta.total,
     )} es válido? Los boletos quedarán emitidos.`,
-    type: 'warning',
     confirmText: 'Aprobar pago',
     cancelText: 'Cancelar',
+    type: 'warning',
   })
   if (!confirmado) return
 
@@ -288,18 +379,10 @@ async function aprobar(): Promise<void> {
   try {
     await aprobarPago(venta.id, authStore.user.id)
     cerrarModal()
-    uiStore.showAlert({
-      title: 'Pago aprobado',
-      message: `La venta #${venta.id} fue aprobada y sus boletos ya están emitidos.`,
-      type: 'success',
-    })
+    showSuccess(`La venta #${venta.id} fue aprobada y sus boletos ya están emitidos.`)
     await recargar()
   } catch (error) {
-    uiStore.showAlert({
-      title: 'No se pudo aprobar el pago',
-      message: obtenerMensajeError(error, 'Ocurrió un error al aprobar la venta.'),
-      type: 'error',
-    })
+    showError(obtenerMensajeError(error, 'Ocurrió un error al aprobar la venta.'))
   } finally {
     procesando.value = false
   }
@@ -310,22 +393,18 @@ async function rechazar(observacion: string): Promise<void> {
   if (!venta?.id) return
 
   if (!authStore.user?.id) {
-    uiStore.showAlert({
-      title: 'Sesión requerida',
-      message: MENSAJE_SESION_REQUERIDA,
-      type: 'error',
-    })
+    showError(MENSAJE_SESION_REQUERIDA)
     return
   }
 
-  const confirmado = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Rechazar pago',
     message: observacion
       ? `¿Confirmas rechazar la venta #${venta.id}? Motivo: ${observacion}`
       : `¿Confirmas rechazar la venta #${venta.id}? Sus boletos serán cancelados.`,
-    type: 'warning',
     confirmText: 'Rechazar pago',
     cancelText: 'Cancelar',
+    type: 'warning',
   })
   if (!confirmado) return
 
@@ -333,18 +412,10 @@ async function rechazar(observacion: string): Promise<void> {
   try {
     await rechazarPago(venta.id, authStore.user.id, observacion || undefined)
     cerrarModal()
-    uiStore.showAlert({
-      title: 'Pago rechazado',
-      message: `La venta #${venta.id} fue rechazada y sus boletos quedaron cancelados.`,
-      type: 'success',
-    })
+    showSuccess(`La venta #${venta.id} fue rechazada y sus boletos quedaron cancelados.`)
     await recargar()
   } catch (error) {
-    uiStore.showAlert({
-      title: 'No se pudo rechazar el pago',
-      message: obtenerMensajeError(error, 'Ocurrió un error al rechazar la venta.'),
-      type: 'error',
-    })
+    showError(obtenerMensajeError(error, 'Ocurrió un error al rechazar la venta.'))
   } finally {
     procesando.value = false
   }

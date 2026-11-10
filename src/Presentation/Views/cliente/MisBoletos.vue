@@ -1,155 +1,168 @@
 <template>
-  <div class="space-y-6">
-    <CardBase
-      title="Mis Boletos y Pasajes"
-      subtitle="Historial de compras y descarga de comprobantes"
-    >
-      <form class="grid grid-cols-1 items-end gap-4 sm:grid-cols-[minmax(0,1fr)_auto]" @submit.prevent="buscar">
-        <InputBase
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
+    <!-- Tarjetas de Métricas / KPIs -->
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de boletos">
+      <MetricCard
+        title="Total Boletos"
+        :value="loading && !boletos.length ? '—' : totalBoletos"
+        icon="🎫"
+        description="En tus compras registradas"
+        variant="default"
+      />
+      <MetricCard
+        title="Emitidos"
+        :value="loading && !boletos.length ? '—' : boletosEmitidos"
+        icon="✅"
+        description="Listos para abordar"
+        variant="success"
+      />
+      <MetricCard
+        title="Por validar"
+        :value="loading && !boletos.length ? '—' : boletosPendientes"
+        icon="⏳"
+        description="Esperando aprobación"
+        variant="warning"
+      />
+      <MetricCard
+        title="Total gastado"
+        :value="loading && !boletos.length ? '—' : `$${formatearPrecio(totalGastado)}`"
+        icon="💳"
+        description="Invertido en pasajes"
+        variant="info"
+      />
+    </section>
+
+    <!-- Barra de Búsqueda y Filtros Unificada -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="w-full md:w-80">
+        <SearchInput
           v-model="cedula"
-          label="Cédula del pasajero"
-          placeholder="10 dígitos"
-          :maxlength="10"
-          inputmode="numeric"
-          autocomplete="off"
+          placeholder="Ingresa la cédula del pasajero (10 dígitos)..."
         />
-        <ButtonBase type="submit" :loading="loading" :disabled="loading">
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <SelectFilter
+          label="Mostrar:"
+          v-model="registrosPorPagina"
+          :options="[
+            { value: 5, label: '5 filas' },
+            { value: 10, label: '10 filas' },
+            { value: 20, label: '20 filas' },
+          ]"
+        />
+
+        <ButtonBase type="submit" :loading="loading" :disabled="loading" @click="buscar">
           <span aria-hidden="true">🔎</span>
-          Consultar boletos
+          Consultar
         </ButtonBase>
-      </form>
 
-      <p class="mt-3 text-[11px] leading-relaxed text-slate-400">
-        Consulta con la cédula registrada al momento de la compra. Si iniciaste sesión,
-        usamos automáticamente la cédula de tu perfil.
-      </p>
-    </CardBase>
-
-    <div
-      v-if="errorCarga"
-      class="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-    >
-      <span aria-hidden="true">⚠️</span>
-      <span>{{ errorCarga }}</span>
+        <RefreshButton :loading="loading" @click="buscar" />
+      </div>
     </div>
 
+    <p class="text-[11px] leading-relaxed text-slate-400">
+      Consulta con la cédula registrada al momento de la compra. Si iniciaste sesión,
+      usamos automáticamente la cédula de tu perfil.
+    </p>
+
+    <!-- Estado 1: CARGANDO -->
     <div
       v-if="loading && !boletos.length"
-      class="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-sm text-slate-500"
+      class="rounded-2xl bg-white border border-slate-200 p-12 text-center shadow-sm space-y-4"
+      aria-busy="true"
     >
-      <span class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-      Buscando tus boletos…
+      <div class="animate-spin h-8 w-8 text-blue-600 mx-auto">
+        <svg class="w-full h-full" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+      </div>
+      <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Buscando tus boletos…</p>
     </div>
 
-    <template v-else>
-      <div v-if="boletos.length" class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Boletos</p>
-          <p class="text-2xl font-black leading-tight text-slate-900">{{ totalBoletos }}</p>
-          <p class="text-[11px] text-slate-500">En {{ grupos.length }} compra(s)</p>
-        </div>
-        <div class="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-          <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Emitidos</p>
-          <p class="text-2xl font-black leading-tight text-emerald-800">{{ boletosEmitidos }}</p>
-          <p class="text-[11px] text-emerald-700/80">Listos para abordar</p>
-        </div>
-        <div class="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-          <p class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Por validar</p>
-          <p class="text-2xl font-black leading-tight text-amber-800">{{ boletosPendientes }}</p>
-          <p class="text-[11px] text-amber-700/80">Esperando aprobación</p>
-        </div>
-      </div>
+    <!-- Estado 2: VACÍO -->
+    <div
+      v-else-if="!grupos.length"
+      class="rounded-2xl bg-white border border-slate-200 p-16 text-center shadow-sm space-y-3"
+    >
+      <div class="text-4xl text-slate-300">🎫</div>
+      <h3 class="text-base font-black text-slate-800">No encontramos boletos</h3>
+      <p class="text-xs text-slate-500 max-w-sm mx-auto">
+        Revisa que la cédula sea correcta o realiza una compra en la sección de búsqueda de rutas.
+      </p>
+    </div>
 
-      <div
-        v-if="!grupos.length && !loading"
-        class="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center"
-      >
-        <span class="block text-4xl" aria-hidden="true">🎫</span>
-        <h3 class="mt-2 text-sm font-bold text-slate-700">No encontramos boletos</h3>
-        <p class="mt-1 text-xs text-slate-500">
-          Revisa que la cédula sea correcta o realiza una compra en la sección de búsqueda de rutas.
-        </p>
-      </div>
-
-      <div v-else class="space-y-4">
-        <CardBase
-          v-for="grupo in grupos"
-          :key="grupo.ventaId"
-          hover
-          padding="sm"
-          class="overflow-hidden"
-        >
-          <div class="space-y-4">
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Venta #{{ grupo.ventaId }} · Ruta #{{ grupo.rutaId }}
-                </p>
-                <h3 class="mt-0.5 text-base font-black leading-tight text-slate-900">
-                  {{ etiquetaRuta(grupo) }}
-                </h3>
-                <p class="mt-1 text-xs font-semibold text-slate-500">
-                  {{ formatearFechaGrupo(grupo) }}
-                  <span v-if="grupo.ruta?.horaSalida"> · Salida {{ formatearHora(grupo.ruta.horaSalida) }}</span>
-                </p>
-              </div>
-
-              <div class="flex flex-col items-end gap-2">
+    <!-- Estado 3: TABLA DE DATOS -->
+    <div v-else class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-sm border-collapse" aria-label="Historial de boletos">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
+            <tr>
+              <th scope="col" class="px-6 py-3.5">Venta</th>
+              <th scope="col" class="px-6 py-3.5">Ruta</th>
+              <th scope="col" class="px-6 py-3.5">Fecha</th>
+              <th scope="col" class="px-6 py-3.5 text-center">Boletos</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Total</th>
+              <th scope="col" class="px-6 py-3.5 text-center">Estado</th>
+              <th scope="col" class="px-6 py-3.5 text-right">Acciones</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+            <tr
+              v-for="grupo in gruposPaginados"
+              :key="grupo.ventaId"
+              class="hover:bg-blue-50/50 transition-colors"
+            >
+              <td class="px-6 py-3">
+                <div class="font-bold text-slate-900 text-sm leading-tight">Venta #{{ grupo.ventaId }}</div>
+                <div class="text-slate-400 text-xs">Ruta #{{ grupo.rutaId }}</div>
+              </td>
+              <td class="px-6 py-3">
+                <span class="font-bold text-slate-900">{{ etiquetaRuta(grupo) }}</span>
+              </td>
+              <td class="px-6 py-3 text-slate-500">{{ formatearFechaGrupo(grupo) }}</td>
+              <td class="px-6 py-3 text-center">
+                <span class="inline-flex items-center justify-center rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 text-[11px] font-bold">
+                  {{ grupo.boletos.length }}
+                </span>
+              </td>
+              <td class="px-6 py-3 text-right font-black text-slate-900">
+                ${{ formatearPrecio(grupo.total) }}
+              </td>
+              <td class="px-6 py-3 text-center">
                 <span
-                  class="rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
+                  class="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-2xs"
                   :class="claseEstado(grupo.estado)"
                 >
                   {{ grupo.estado }}
                 </span>
-                <p class="text-lg font-black text-slate-900">${{ formatearPrecio(grupo.total) }}</p>
-              </div>
-            </div>
-
-            <div class="divide-y divide-slate-100 rounded-2xl border border-slate-200">
-              <div
-                v-for="boleto in grupo.boletos"
-                :key="boleto.id ?? `${grupo.ventaId}-${boleto.asientoId}`"
-                class="flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-xs"
-              >
-                <div class="flex items-center gap-3">
-                  <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-[11px] font-black text-white">
-                    {{ boleto.asientoId }}
-                  </span>
-                  <div class="min-w-0">
-                    <p class="truncate font-bold text-slate-900">
-                      {{ boleto.nombresPasajero }} {{ boleto.apellidosPasajero }}
-                    </p>
-                    <p class="text-[11px] text-slate-500">
-                      {{ boleto.cedulaPasajero }} · {{ boleto.tipoPasajero }}
-                    </p>
-                  </div>
+              </td>
+              <td class="px-6 py-3 text-right">
+                <div class="flex items-center justify-end gap-2">
+                  <ButtonBase size="sm" variant="outline" @click="abrirComprobante(grupo)">
+                    <span aria-hidden="true">🧾</span>
+                    Comprobante
+                  </ButtonBase>
                 </div>
-
-                <div class="flex items-center gap-3">
-                  <span
-                    class="rounded-full px-2.5 py-0.5 text-[10px] font-bold"
-                    :class="claseEstado(boleto.estado)"
-                  >
-                    {{ boleto.estado }}
-                  </span>
-                  <span class="font-black text-slate-900">${{ formatearPrecio(boleto.precioFinal) }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <p class="text-[11px] text-slate-400">
-                {{ grupo.boletos.length }} {{ grupo.boletos.length === 1 ? 'boleto' : 'boletos' }} en esta compra
-              </p>
-              <ButtonBase size="sm" variant="outline" @click="abrirComprobante(grupo)">
-                <span aria-hidden="true">🧾</span>
-                Ver comprobante
-              </ButtonBase>
-            </div>
-          </div>
-        </CardBase>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
-    </template>
+
+      <PaginationControls
+        :current-page="paginaActual"
+        :total-pages="totalPaginas"
+        :total-items="grupos.length"
+        :items-per-page="registrosPorPagina"
+        :has-prev-page="paginaActual > 1"
+        :has-next-page="paginaActual < totalPaginas"
+        @prev="paginaActual--"
+        @next="paginaActual++"
+        @set-page="(p) => (paginaActual = p)"
+      />
+    </div>
 
     <ComprobanteBoletoModal
       v-model="mostrarComprobante"
@@ -160,20 +173,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import CardBase from '../../Components/CardBase.vue'
-import InputBase from '../../Components/InputBase.vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import MetricCard from '../../Components/MetricCard.vue'
+import PaginationControls from '../../Components/PaginationControls.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
+import SearchInput from '../../Components/SearchInput.vue'
+import SelectFilter from '../../Components/SelectFilter.vue'
 import ComprobanteBoletoModal from '../../Components/ComprobanteBoletoModal.vue'
 import { useAuthStore } from '../../Store/authStore'
 import { useTickets } from '../../Composables/useTickets'
 import { useRutas } from '../../Composables/useRutas'
+import { useFeedback } from '../../Composables/useFeedback'
 import type { Boleto } from '../../../Domain/Entities/Boleto'
 import type { RutaDisponible } from '../../Utils/rutasDisponibles'
-import {
-  construirRutasDisponibles,
-  formatearHora,
-} from '../../Utils/rutasDisponibles'
+import { construirRutasDisponibles } from '../../Utils/rutasDisponibles'
 import {
   MENSAJE_SUPABASE_NO_CONFIGURADO,
   obtenerMensajeError,
@@ -201,7 +215,7 @@ interface ContextoComprobanteVista {
 }
 
 const authStore = useAuthStore()
-const { boletos, loading, gruposPorVenta, totalBoletos, cargarHistorial } = useTickets()
+const { boletos, loading, gruposPorVenta, totalBoletos, totalGastado, cargarHistorial } = useTickets()
 const {
   rutas,
   buses,
@@ -210,11 +224,14 @@ const {
   cargarBuses,
   cargarFrecuencias,
 } = useRutas()
+const { showError } = useFeedback()
 
 const cedula = ref(authStore.user?.cedula ?? '')
-const errorCarga = ref<string | null>(null)
 const mostrarComprobante = ref(false)
 const grupoSeleccionado = ref<GrupoBoletos | null>(null)
+
+const paginaActual = ref(1)
+const registrosPorPagina = ref(10)
 
 const rutasPorId = computed(() => {
   const mapa = new Map<number, RutaDisponible>()
@@ -232,6 +249,15 @@ const grupos = computed<GrupoBoletos[]>(() =>
     ruta: rutasPorId.value.get(grupo.rutaId) ?? null,
   })),
 )
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(grupos.value.length / registrosPorPagina.value)),
+)
+
+const gruposPaginados = computed(() => {
+  const inicio = (paginaActual.value - 1) * registrosPorPagina.value
+  return grupos.value.slice(inicio, inicio + registrosPorPagina.value)
+})
 
 const boletosEmitidos = computed(
   () =>
@@ -268,6 +294,10 @@ const comprobanteContexto = computed<ContextoComprobanteVista | null>(() => {
     total: grupo.total,
     ventaId: grupo.ventaId,
   }
+})
+
+watch(registrosPorPagina, () => {
+  paginaActual.value = 1
 })
 
 function formatearPrecio(valor: number): string {
@@ -335,21 +365,20 @@ async function cargarHistorialActual(): Promise<void> {
   cedula.value = valor
 
   if (!supabaseConfigurado) {
-    errorCarga.value = MENSAJE_SUPABASE_NO_CONFIGURADO
+    showError(MENSAJE_SUPABASE_NO_CONFIGURADO)
     return
   }
   if (!valor) {
-    errorCarga.value = 'Ingresa la cédula del pasajero para consultar sus boletos.'
+    showError('Ingresa la cédula del pasajero para consultar sus boletos.')
     return
   }
 
-  errorCarga.value = null
   try {
     await cargarHistorial(valor)
+    paginaActual.value = 1
   } catch (error) {
-    errorCarga.value = obtenerMensajeError(
-      error,
-      'No se pudo cargar el historial de boletos.',
+    showError(
+      obtenerMensajeError(error, 'No se pudo cargar el historial de boletos.'),
     )
   }
 }
@@ -365,7 +394,7 @@ function abrirComprobante(grupo: GrupoBoletos): void {
 
 onMounted(() => {
   if (!supabaseConfigurado) {
-    errorCarga.value = MENSAJE_SUPABASE_NO_CONFIGURADO
+    showError(MENSAJE_SUPABASE_NO_CONFIGURADO)
     return
   }
 

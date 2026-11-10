@@ -1,142 +1,192 @@
 <template>
-  <div class="space-y-6">
-    <CardBase
-      title="Búsqueda y Compra de Pasajes"
-      subtitle="Consulta frecuencias, elige tus asientos y paga en línea"
-    >
-      <form class="grid grid-cols-1 gap-4 md:grid-cols-4" @submit.prevent="buscar">
-        <InputBase
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
+    <!-- Tarjetas de Métricas / KPIs -->
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de rutas disponibles">
+      <MetricCard
+        title="Rutas disponibles"
+        :value="cargando && !rutasFiltradas.length ? '—' : resumenRutas.total"
+        icon="🛣️"
+        description="Para los filtros aplicados"
+        variant="default"
+      />
+      <MetricCard
+        title="Buses asignados"
+        :value="cargando && !rutasFiltradas.length ? '—' : resumenRutas.conBus"
+        icon="🚌"
+        description="Unidades operativas"
+        variant="info"
+      />
+      <MetricCard
+        title="Asientos totales"
+        :value="cargando && !rutasFiltradas.length ? '—' : resumenRutas.asientos"
+        icon="💺"
+        description="Capacidad ofertada"
+        variant="success"
+      />
+      <MetricCard
+        title="Rutas directas"
+        :value="cargando && !rutasFiltradas.length ? '—' : resumenRutas.directas"
+        icon="⚡"
+        description="Sin paradas intermedias"
+        variant="warning"
+      />
+    </section>
+
+    <!-- Barra de Búsqueda y Filtros Unificada -->
+    <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+        <SelectFilter
+          label="Origen:"
           v-model="filtroOrigen"
-          label="Origen"
-          placeholder="Ej. Quito"
-          list="ciudades-rutas-cliente"
-          autocomplete="off"
+          :options="ciudadesOpciones"
         />
-        <InputBase
+        <SelectFilter
+          label="Destino:"
           v-model="filtroDestino"
-          label="Destino"
-          placeholder="Ej. Guayaquil"
-          list="ciudades-rutas-cliente"
-          autocomplete="off"
+          :options="ciudadesOpciones"
         />
-        <InputBase
-          v-model="filtroFecha"
-          label="Fecha de viaje"
-          type="date"
-          :min="hoy"
-        />
-
-        <div class="flex items-end gap-2">
-          <ButtonBase type="submit" full-width :loading="cargando" :disabled="cargando">
-            <span aria-hidden="true">🔎</span>
-            Buscar
-          </ButtonBase>
-          <ButtonBase
-            v-if="hayFiltros"
-            variant="outline"
-            :disabled="cargando"
-            @click="limpiarFiltros"
-          >
-            Limpiar
-          </ButtonBase>
+        <div class="w-36">
+          <InputBase v-model="filtroFecha" type="date" :min="hoy" placeholder="Fecha" />
         </div>
-      </form>
+      </div>
 
-      <datalist id="ciudades-rutas-cliente">
-        <option v-for="ciudad in ciudadesDisponibles" :key="ciudad" :value="ciudad" />
-      </datalist>
-    </CardBase>
+      <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+        <SelectFilter
+          label="Mostrar:"
+          v-model="registrosPorPagina"
+          :options="[
+            { value: 5, label: '5 filas' },
+            { value: 10, label: '10 filas' },
+            { value: 20, label: '20 filas' },
+          ]"
+        />
 
-    <div
-      v-if="errorCarga"
-      class="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-    >
-      <span aria-hidden="true">⚠️</span>
-      <span>{{ errorCarga }}</span>
+        <ButtonBase type="submit" :loading="cargando" :disabled="cargando" @click="buscar">
+          <span aria-hidden="true">🔎</span>
+          Buscar
+        </ButtonBase>
+        <ButtonBase
+          v-if="hayFiltros"
+          variant="outline"
+          :disabled="cargando"
+          @click="limpiarFiltros"
+        >
+          Limpiar
+        </ButtonBase>
+      </div>
     </div>
 
     <template v-if="!rutaSeleccionada">
+      <!-- Estado 1: CARGANDO -->
       <div
         v-if="cargando"
-        class="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-sm text-slate-500"
+        class="rounded-2xl bg-white border border-slate-200 p-12 text-center shadow-sm space-y-4"
+        aria-busy="true"
       >
-        <span class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
-        Buscando rutas disponibles…
+        <div class="animate-spin h-8 w-8 text-blue-600 mx-auto">
+          <svg class="w-full h-full" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Buscando rutas disponibles…</p>
       </div>
 
+      <!-- Estado 2: VACÍO -->
       <div
         v-else-if="!rutasFiltradas.length"
-        class="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center"
+        class="rounded-2xl bg-white border border-slate-200 p-16 text-center shadow-sm space-y-3"
       >
-        <span class="block text-4xl" aria-hidden="true">🗺️</span>
-        <h3 class="mt-2 text-sm font-bold text-slate-700">No hay rutas para esos filtros</h3>
-        <p class="mt-1 text-xs text-slate-500">
+        <div class="text-4xl text-slate-300">🗺️</div>
+        <h3 class="text-base font-black text-slate-800">No hay rutas para esos filtros</h3>
+        <p class="text-xs text-slate-500 max-w-sm mx-auto">
           Prueba con otro origen, destino o fecha. Solo se muestran rutas programadas o en curso.
         </p>
+        <div class="pt-2">
+          <ButtonBase variant="outline" size="sm" @click="limpiarFiltros">
+            Restablecer Filtros
+          </ButtonBase>
+        </div>
       </div>
 
-      <div v-else class="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-3">
-        <CardBase
-          v-for="ruta in rutasFiltradas"
-          :key="ruta.ruta.id"
-          hover
-          padding="sm"
-          class="flex flex-col"
-        >
-          <div class="flex flex-1 flex-col gap-4">
-            <div class="flex items-start justify-between gap-3">
-              <div class="min-w-0">
-                <p class="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {{ ruta.frecuencia?.identificadorFrecuencia || `Ruta #${ruta.ruta.id}` }}
-                </p>
-                <h3 class="mt-0.5 text-base font-black leading-tight text-slate-900">
-                  {{ ruta.origen }} → {{ ruta.destino }}
-                </h3>
-                <p class="mt-1 text-xs font-semibold text-slate-500">
-                  {{ formatearFechaRuta(ruta.fecha) }} · {{ formatearHora(ruta.horaSalida) }}
-                </p>
-              </div>
-
-              <span
-                class="shrink-0 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider"
-                :class="claseEstadoRuta(ruta.estado)"
+      <!-- Estado 3: TABLA DE RUTAS -->
+      <div v-else class="rounded-2xl bg-white border border-slate-200 shadow-sm overflow-hidden flex flex-col">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-sm border-collapse" aria-label="Rutas disponibles para compra">
+            <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
+              <tr>
+                <th scope="col" class="px-6 py-3.5">Ruta</th>
+                <th scope="col" class="px-6 py-3.5">Origen → Destino</th>
+                <th scope="col" class="px-6 py-3.5">Salida</th>
+                <th scope="col" class="px-6 py-3.5">Bus</th>
+                <th scope="col" class="px-6 py-3.5 text-center">Asientos</th>
+                <th scope="col" class="px-6 py-3.5 text-center">Estado</th>
+                <th scope="col" class="px-6 py-3.5 text-right">Acciones</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+              <tr
+                v-for="ruta in rutasPaginadas"
+                :key="ruta.ruta.id"
+                class="hover:bg-blue-50/50 transition-colors"
               >
-                {{ ruta.estado }}
-              </span>
-            </div>
+                <td class="px-6 py-3">
+                  <div class="font-bold text-slate-900 text-sm leading-tight">
+                    {{ ruta.frecuencia?.identificadorFrecuencia || `Ruta #${ruta.ruta.id}` }}
+                  </div>
+                  <div class="text-slate-400 text-xs">Ruta #{{ ruta.ruta.id }}</div>
+                </td>
+                <td class="px-6 py-3">
+                  <div class="font-bold text-slate-900">{{ ruta.origen }} → {{ ruta.destino }}</div>
+                  <div class="text-slate-400 text-xs">{{ ruta.esDirecta ? 'Directo' : 'Con paradas' }}</div>
+                </td>
+                <td class="px-6 py-3 text-slate-500">
+                  <div>{{ formatearFechaRuta(ruta.fecha) }}</div>
+                  <div class="text-slate-400">{{ formatearHora(ruta.horaSalida) }}</div>
+                </td>
+                <td class="px-6 py-3">
+                  <div class="font-bold text-slate-900">{{ ruta.bus?.numero || 'No asignado' }}</div>
+                  <div v-if="ruta.bus?.placa" class="text-slate-400 text-xs">{{ ruta.bus.placa }}</div>
+                </td>
+                <td class="px-6 py-3 text-center">
+                  <span class="inline-flex items-center justify-center rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 text-[11px] font-bold">
+                    {{ ruta.totalAsientos || 'Sin configurar' }}
+                  </span>
+                </td>
+                <td class="px-6 py-3 text-center">
+                  <span
+                    class="inline-block text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border shadow-2xs"
+                    :class="claseEstadoRuta(ruta.estado)"
+                  >
+                    {{ ruta.estado }}
+                  </span>
+                </td>
+                <td class="px-6 py-3 text-right">
+                  <ButtonBase
+                    size="sm"
+                    :disabled="!ruta.bus || !ruta.totalAsientos"
+                    @click="seleccionarRuta(ruta)"
+                  >
+                    <span aria-hidden="true">🎟️</span>
+                    {{ ruta.bus && ruta.totalAsientos ? 'Seleccionar' : 'No disponible' }}
+                  </ButtonBase>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
-            <div class="grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-xs">
-              <div>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Bus</p>
-                <p class="font-bold text-slate-800">
-                  {{ ruta.bus?.numero || 'No asignado' }}
-                  <span v-if="ruta.bus?.placa" class="font-normal text-slate-500">· {{ ruta.bus.placa }}</span>
-                </p>
-              </div>
-              <div>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Asientos</p>
-                <p class="font-bold text-slate-800">{{ ruta.totalAsientos || 'Sin configurar' }}</p>
-              </div>
-              <div>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Recorrido</p>
-                <p class="font-bold text-slate-800">{{ ruta.esDirecta ? 'Directo' : 'Con paradas' }}</p>
-              </div>
-              <div>
-                <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Tarifa</p>
-                <p class="font-bold text-slate-800">Según tipo de asiento</p>
-              </div>
-            </div>
-
-            <ButtonBase
-              full-width
-              :disabled="!ruta.bus || !ruta.totalAsientos"
-              @click="seleccionarRuta(ruta)"
-            >
-              <span aria-hidden="true">🎟️</span>
-              {{ ruta.bus && ruta.totalAsientos ? 'Seleccionar asientos' : 'Bus no disponible' }}
-            </ButtonBase>
-          </div>
-        </CardBase>
+        <PaginationControls
+          :current-page="paginaActual"
+          :total-pages="totalPaginas"
+          :total-items="rutasFiltradas.length"
+          :items-per-page="registrosPorPagina"
+          :has-prev-page="paginaActual > 1"
+          :has-next-page="paginaActual < totalPaginas"
+          @prev="paginaActual--"
+          @next="paginaActual++"
+          @set-page="(p) => (paginaActual = p)"
+        />
       </div>
     </template>
 
@@ -171,14 +221,6 @@
           </span>
         </div>
       </CardBase>
-
-      <div
-        v-if="errorCompra"
-        class="flex items-start gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700"
-      >
-        <span aria-hidden="true">⚠️</span>
-        <span>{{ errorCompra }}</span>
-      </div>
 
       <div class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,1fr)]">
         <div class="space-y-6">
@@ -319,13 +361,6 @@
                 @error="errorStripe = $event"
               />
 
-              <p
-                v-if="errorStripe"
-                class="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-semibold text-red-700"
-              >
-                {{ errorStripe }}
-              </p>
-
               <ButtonBase
                 full-width
                 size="lg"
@@ -356,10 +391,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import MetricCard from '../../Components/MetricCard.vue'
+import PaginationControls from '../../Components/PaginationControls.vue'
+import SelectFilter from '../../Components/SelectFilter.vue'
 import SelectorAsientos from '../../Components/SelectorAsientos.vue'
 import FormularioPasajeros from '../../Components/FormularioPasajeros.vue'
 import StripePaymentForm from '../../Components/StripePaymentForm.vue'
@@ -368,6 +406,7 @@ import { useAuthStore } from '../../Store/authStore'
 import { useRutas } from '../../Composables/useRutas'
 import { useSeleccionCompra } from '../../Composables/useSeleccionCompra'
 import { useCompraOnline } from '../../Composables/useCompraOnline'
+import { useFeedback } from '../../Composables/useFeedback'
 import {
   construirRutasDisponibles,
   formatearFechaRuta,
@@ -396,6 +435,7 @@ interface ContextoComprobanteVista {
 }
 
 const authStore = useAuthStore()
+const { showError, showSuccess } = useFeedback()
 const {
   rutas,
   buses,
@@ -433,17 +473,18 @@ const filtroOrigen = ref('')
 const filtroDestino = ref('')
 const filtroFecha = ref('')
 const cargando = ref(false)
-const errorCarga = ref<string | null>(null)
 const rutaSeleccionada = ref<RutaDisponible | null>(null)
 const metodoPago = ref<MetodoPagoOnline>('Transferencia')
 const comprobante = ref<File | null>(null)
 const archivoInput = ref<HTMLInputElement | null>(null)
 const stripeForm = ref<{ pagar: (monto?: number) => Promise<string>; reiniciar: () => void } | null>(null)
-const errorCompra = ref<string | null>(null)
 const errorStripe = ref<string | null>(null)
 const mostrarComprobante = ref(false)
 const comprobanteBoletos = ref<Boleto[]>([])
 const comprobanteContexto = ref<ContextoComprobanteVista | null>(null)
+
+const paginaActual = ref(1)
+const registrosPorPagina = ref(10)
 
 const metodosPago: MetodoPagoOnline[] = ['Transferencia', 'Tarjeta']
 
@@ -460,6 +501,11 @@ const ciudadesDisponibles = computed(() => {
   })
   return Array.from(ciudades).sort((a, b) => a.localeCompare(b))
 })
+
+const ciudadesOpciones = computed(() => [
+  { value: '', label: 'Todos' },
+  ...ciudadesDisponibles.value.map((ciudad) => ({ value: ciudad, label: ciudad })),
+])
 
 const rutasFiltradas = computed(() =>
   rutasDisponibles.value.filter((item) => {
@@ -480,6 +526,25 @@ const rutasFiltradas = computed(() =>
   }),
 )
 
+const resumenRutas = computed(() => {
+  const lista = rutasFiltradas.value
+  return {
+    total: lista.length,
+    conBus: lista.filter((ruta) => ruta.bus).length,
+    asientos: lista.reduce((acc, ruta) => acc + (ruta.totalAsientos || 0), 0),
+    directas: lista.filter((ruta) => ruta.esDirecta).length,
+  }
+})
+
+const totalPaginas = computed(() =>
+  Math.max(1, Math.ceil(rutasFiltradas.value.length / registrosPorPagina.value)),
+)
+
+const rutasPaginadas = computed(() => {
+  const inicio = (paginaActual.value - 1) * registrosPorPagina.value
+  return rutasFiltradas.value.slice(inicio, inicio + registrosPorPagina.value)
+})
+
 const hayFiltros = computed(
   () => Boolean(filtroOrigen.value.trim() || filtroDestino.value.trim() || filtroFecha.value),
 )
@@ -491,6 +556,10 @@ const puedeConfirmar = computed(
     !enviando.value &&
     (metodoPago.value !== 'Transferencia' || Boolean(comprobante.value)),
 )
+
+watch([filtroOrigen, filtroDestino, filtroFecha, registrosPorPagina], () => {
+  paginaActual.value = 1
+})
 
 function coincideCiudad(
   item: RutaDisponible,
@@ -512,19 +581,17 @@ function coincideCiudad(
 
 async function cargarDatos(): Promise<void> {
   if (!supabaseConfigurado) {
-    errorCarga.value = MENSAJE_SUPABASE_NO_CONFIGURADO
+    showError(MENSAJE_SUPABASE_NO_CONFIGURADO)
     return
   }
 
   cargando.value = true
-  errorCarga.value = null
 
   try {
     await Promise.all([cargarRutas(), cargarFrecuencias(), cargarBuses()])
   } catch (error) {
-    errorCarga.value = obtenerMensajeError(
-      error,
-      'No se pudieron cargar las rutas disponibles.',
+    showError(
+      obtenerMensajeError(error, 'No se pudieron cargar las rutas disponibles.'),
     )
   } finally {
     cargando.value = false
@@ -539,22 +606,22 @@ function limpiarFiltros(): void {
   filtroOrigen.value = ''
   filtroDestino.value = ''
   filtroFecha.value = ''
+  paginaActual.value = 1
 }
 
 async function seleccionarRuta(item: RutaDisponible): Promise<void> {
-  errorCompra.value = null
   errorStripe.value = null
   comprobante.value = null
   metodoPago.value = 'Transferencia'
   rutaSeleccionada.value = item
 
   if (!item.ruta.id) {
-    errorCompra.value = 'La ruta seleccionada no tiene un identificador válido.'
+    showError('La ruta seleccionada no tiene un identificador válido.')
     return
   }
 
   if (!item.bus) {
-    errorCompra.value = 'No se encontró el bus asignado a esta ruta.'
+    showError('No se encontró el bus asignado a esta ruta.')
     return
   }
 
@@ -566,9 +633,8 @@ async function seleccionarRuta(item: RutaDisponible): Promise<void> {
       estructura: item.estructura,
     })
   } catch (error) {
-    errorCompra.value = obtenerMensajeError(
-      error,
-      'No se pudo cargar el mapa de asientos de la ruta.',
+    showError(
+      obtenerMensajeError(error, 'No se pudo cargar el mapa de asientos de la ruta.'),
     )
   }
 }
@@ -576,7 +642,6 @@ async function seleccionarRuta(item: RutaDisponible): Promise<void> {
 function volverAlListado(): void {
   rutaSeleccionada.value = null
   comprobante.value = null
-  errorCompra.value = null
   errorStripe.value = null
   limpiarSeleccion()
 }
@@ -608,26 +673,27 @@ async function recargarMapa(): Promise<void> {
 }
 
 async function confirmar(): Promise<void> {
-  errorCompra.value = null
   errorStripe.value = null
 
   const actual = rutaSeleccionada.value
   if (!actual?.ruta.id) {
-    errorCompra.value = 'Selecciona una ruta antes de confirmar la compra.'
+    showError('Selecciona una ruta antes de confirmar la compra.')
     return
   }
   if (!pasajerosValidos.value) {
-    errorCompra.value = hayCedulasDuplicadas.value
-      ? 'No se puede repetir la cédula entre asientos. Corrige los datos de los pasajeros.'
-      : 'Completa correctamente los datos de todos los pasajeros.'
+    showError(
+      hayCedulasDuplicadas.value
+        ? 'No se puede repetir la cédula entre asientos. Corrige los datos de los pasajeros.'
+        : 'Completa correctamente los datos de todos los pasajeros.',
+    )
     return
   }
   if (metodoPago.value === 'Transferencia' && !comprobante.value) {
-    errorCompra.value = 'Adjunta el comprobante para registrar el pago por transferencia.'
+    showError('Adjunta el comprobante para registrar el pago por transferencia.')
     return
   }
   if (metodoPago.value === 'Tarjeta' && !stripeForm.value) {
-    errorCompra.value = 'El formulario de pago con tarjeta todavía no está disponible.'
+    showError('El formulario de pago con tarjeta todavía no está disponible.')
     return
   }
 
@@ -676,9 +742,8 @@ async function confirmar(): Promise<void> {
     stripeForm.value?.reiniciar()
     await recargarMapa()
   } catch (error) {
-    errorCompra.value = obtenerMensajeError(
-      error,
-      'No se pudo completar la compra de los boletos.',
+    showError(
+      obtenerMensajeError(error, 'No se pudo completar la compra de los boletos.'),
     )
   }
 }
