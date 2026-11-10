@@ -17,6 +17,14 @@
         <span class="flex-1">{{ error }}</span>
       </div>
 
+      <div
+        v-if="choferesError"
+        role="alert"
+        class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium"
+      >
+        No se pudieron cargar los choferes: {{ choferesError }}
+      </div>
+
       <!-- Estado Vacío: Sin frecuencias -->
       <div
         v-if="!loading && frecuencias.length === 0"
@@ -61,7 +69,7 @@
             :min="fechaMinima"
             :disabled="loading"
             class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
-            :class="{ 'border-amber-400 bg-amber-50/50': !esDiaValido && formulario.fecha }"
+            :class="{ 'border-amber-400 bg-amber-50/50': diaNoOperativo }"
             @change="onFechaChange"
           />
         </div>
@@ -69,11 +77,11 @@
 
       <!-- Alerta de Día No Operativo -->
       <div
-        v-if="formulario.fecha && !esDiaValido"
+        v-if="diaNoOperativo"
         class="p-2.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-200 flex items-center gap-2"
       >
         <span>⚠️</span>
-        <span>La frecuencia seleccionada normalmente no opera los días {{ nombreDiaSeleccionado }}.</span>
+        <span>La frecuencia seleccionada no opera en la fecha elegida.</span>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
@@ -107,18 +115,21 @@
           <select
             id="select-chofer"
             v-model="formulario.choferId"
-            :disabled="loading"
+            :disabled="loading || choferesLoading"
             class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
           >
             <option value="">Sin chofer asignado</option>
             <option
               v-for="c in choferes"
-              :key="c.cedula || c.id"
-              :value="c.cedula || c.id"
+              :key="c.id"
+              :value="c.id"
             >
-              {{ c.nombres }} {{ c.apellidos || '' }} ({{ c.cedula || c.id }})
+              {{ c.nombreCompleto }} (ID: {{ c.id }})
             </option>
           </select>
+          <p v-if="!choferes.length && !choferesLoading && !choferesError" class="text-[11px] text-amber-600 font-medium">
+            No hay choferes activos disponibles.
+          </p>
         </div>
       </div>
 
@@ -129,9 +140,9 @@
           v-model="formulario.tiempoViajeMinutos"
           label="Tiempo Estimado (Minutos)"
           type="number"
-          placeholder="Ej. 180"
+          placeholder="Se calcula desde las paradas"
           :disabled="loading"
-          helper-text="Por defecto: 180 minutos (3 horas)."
+          helper-text="Si la frecuencia tiene paradas, se usa el tiempo de su última parada."
         />
 
         <!-- Checkbox Servicio Directo -->
@@ -191,18 +202,14 @@ import type { Frecuencia } from '../../Domain/Entities/Frecuencia'
 import type { Bus } from '../../Domain/Entities/Bus'
 import type { HabilitarRutaInput } from '../../Application/UseCases/HabilitarRutaDiaria'
 
-interface ChoferItem {
-  cedula?: string
-  id?: string
-  nombres: string
-  apellidos?: string
-}
-
 interface Props {
   modelValue: boolean
   frecuencias?: Frecuencia[]
   buses?: Bus[]
-  choferes?: ChoferItem[]
+  choferes?: { id: string; nombreCompleto: string }[]
+  choferesLoading?: boolean
+  choferesError?: string | null
+  esDiaOperativo: (frecuencia: Frecuencia, fecha: string) => boolean
   loading?: boolean
   error?: string | null
   fechaDefecto?: string
@@ -212,6 +219,8 @@ const props = withDefaults(defineProps<Props>(), {
   frecuencias: () => [],
   buses: () => [],
   choferes: () => [],
+  choferesLoading: false,
+  choferesError: null,
   loading: false,
   error: null,
   fechaDefecto: '',
@@ -234,7 +243,7 @@ function getFormularioInicial() {
     fecha: props.fechaDefecto || fechaHoy,
     choferId: '',
     esDirecta: true,
-    tiempoViajeMinutos: 180 as number | '',
+    tiempoViajeMinutos: '' as number | '',
     observacionChofer: '',
   }
 }
@@ -256,33 +265,22 @@ const selectedFrecuencia = computed(() => {
   return props.frecuencias.find((f) => f.id === Number(formulario.frecuenciaId)) || null
 })
 
-const nombreDiaSeleccionado = computed(() => {
-  if (!formulario.fecha) return ''
-  const d = new Date(formulario.fecha + 'T12:00:00')
-  const dias = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
-  return dias[d.getDay()] || ''
-})
-
-const esDiaValido = computed(() => {
-  const f = selectedFrecuencia.value
-  if (!formulario.fecha || !f || !f.diasOperacion || f.diasOperacion.length === 0) {
-    return true
-  }
-  const diaNorm = nombreDiaSeleccionado.value
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-
-  return f.diasOperacion.some((d: string) => {
-    const dNorm = d.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    return dNorm === diaNorm
-  })
+const diaNoOperativo = computed(() => {
+  const frecuencia = selectedFrecuencia.value
+  return Boolean(
+    frecuencia &&
+      formulario.fecha &&
+      !props.esDiaOperativo(frecuencia, formulario.fecha),
+  )
 })
 
 function onFrecuenciaChange() {
   const f = selectedFrecuencia.value
   if (f) {
     formulario.esDirecta = f.esDirecto
+    const paradas = f.obtenerParadasOrdenadas()
+    formulario.tiempoViajeMinutos =
+      paradas[paradas.length - 1]?.minutosDesdeOrigen || ''
   }
 }
 
@@ -303,10 +301,9 @@ function onEnviar() {
     observacionChofer: formulario.observacionChofer || undefined,
     tiempoViajeMinutos: formulario.tiempoViajeMinutos
       ? Number(formulario.tiempoViajeMinutos)
-      : 180,
+      : undefined,
   }
 
   emit('habilitar', payload)
 }
 </script>
-

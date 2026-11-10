@@ -3,6 +3,7 @@ import ModalHabilitarRuta from './ModalHabilitarRuta.vue';
 import { renderizar } from '../testing/renderizarSsr';
 import { Frecuencia } from '../../Domain/Entities/Frecuencia';
 import { Bus } from '../../Domain/Entities/Bus';
+import { EstadoBus } from '../../Domain/Constants/EstadosSistema';
 
 describe('ModalHabilitarRuta Component', () => {
   const frecuenciaEjemplo = new Frecuencia(
@@ -12,15 +13,19 @@ describe('ModalHabilitarRuta Component', () => {
     '08:00',
     'FR-01',
     true,
-    ['Lunes', 'Martes', 'Miércoles']
+    ['Lunes', 'Martes', 'Miercoles']
   );
   frecuenciaEjemplo.id = 1;
 
-  const busEjemplo = new Bus(1, '25', 'PBA-1234', 40, 'UnPiso');
+  const busEjemplo = new Bus(1, '25', 'PBA-1234', 40, EstadoBus.ACTIVO);
+  busEjemplo.estructura = 'UnPiso';
   busEjemplo.id = 10;
 
   it('cerrado: no renderiza el formulario', async () => {
-    const { html, cuerpo } = await renderizar(ModalHabilitarRuta, { modelValue: false });
+    const { html, cuerpo } = await renderizar(ModalHabilitarRuta, {
+      modelValue: false,
+      esDiaOperativo: () => true,
+    });
 
     expect(html).not.toContain('form-habilitar-ruta');
     expect(cuerpo).not.toContain('form-habilitar-ruta');
@@ -31,6 +36,7 @@ describe('ModalHabilitarRuta Component', () => {
       modelValue: true,
       frecuencias: [frecuenciaEjemplo],
       buses: [busEjemplo],
+      esDiaOperativo: () => true,
     });
 
     expect(cuerpo).toContain('id="form-habilitar-ruta"');
@@ -49,6 +55,7 @@ describe('ModalHabilitarRuta Component', () => {
       modelValue: true,
       frecuencias: [frecuenciaEjemplo],
       buses: [busEjemplo],
+      esDiaOperativo: () => true,
       error: 'La unidad ya tiene un viaje asignado en este horario.',
     });
 
@@ -61,6 +68,7 @@ describe('ModalHabilitarRuta Component', () => {
       modelValue: true,
       frecuencias: [frecuenciaEjemplo],
       buses: [busEjemplo],
+      esDiaOperativo: () => true,
       loading: true,
     });
 
@@ -73,10 +81,11 @@ describe('ModalHabilitarRuta Component', () => {
       modelValue: true,
       frecuencias: [],
       buses: [busEjemplo],
+      esDiaOperativo: () => true,
     });
 
     expect(cuerpo).toContain('role="status"');
     expect(cuerpo).toContain('No se encontraron frecuencias activas');
   });
-});
 
+});

@@ -8,7 +8,7 @@
  * - Soporta inyección de dependencias (DIP).
  */
 
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import type { Ruta } from '../../Domain/Entities/Ruta';
 import type { Bus } from '../../Domain/Entities/Bus';
 import type { Frecuencia } from '../../Domain/Entities/Frecuencia';
@@ -23,6 +23,13 @@ import {
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
+import { mensajeErrorParaUsuario } from '../Utils/errorMessage';
+
+export interface RutaFilaPresentacion {
+  ruta: Ruta;
+  trayectoEtiqueta: string;
+  busEtiqueta: string;
+}
 
 export function useRutas(
   rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
@@ -41,15 +48,44 @@ export function useRutas(
 
   const filtroEstado = ref<string>('Todas');
   const filtroFecha = ref<string>('');
+  const filtroTexto = ref('');
+  const paginaActual = ref(1);
+  const itemsPorPagina = 8;
 
   const rutasFiltradas = computed(() => {
+    const consulta = filtroTexto.value.trim().toLocaleLowerCase();
+
     return rutas.value.filter((ruta) => {
       const coincideEstado =
         filtroEstado.value === 'Todas' || ruta.estado === filtroEstado.value;
       const coincideFecha =
         !filtroFecha.value || ruta.fecha === filtroFecha.value;
-      return coincideEstado && coincideFecha;
+      const coincideTexto =
+        !consulta ||
+        obtenerRutaTrayecto(ruta).toLocaleLowerCase().includes(consulta) ||
+        obtenerBusEtiqueta(ruta.busId).toLocaleLowerCase().includes(consulta) ||
+        (ruta.choferId || '').toLocaleLowerCase().includes(consulta);
+      return coincideEstado && coincideFecha && coincideTexto;
     });
+  });
+
+  const totalFiltradas = computed(() => rutasFiltradas.value.length);
+  const totalPaginas = computed(() =>
+    Math.max(1, Math.ceil(totalFiltradas.value / itemsPorPagina))
+  );
+  const rutasPaginadas = computed<RutaFilaPresentacion[]>(() => {
+    const inicio = (paginaActual.value - 1) * itemsPorPagina;
+    return rutasFiltradas.value
+      .slice(inicio, inicio + itemsPorPagina)
+      .map((ruta) => ({
+        ruta,
+        trayectoEtiqueta: obtenerRutaTrayecto(ruta),
+        busEtiqueta: obtenerBusEtiqueta(ruta.busId),
+      }));
+  });
+
+  watch([filtroEstado, filtroFecha, filtroTexto], () => {
+    paginaActual.value = 1;
   });
 
   const rutasProgramadas = computed(() =>
@@ -72,8 +108,8 @@ export function useRutas(
       const lista = await viajeUseCase.obtenerRutas(filtros);
       rutas.value = lista;
       return lista;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar las rutas.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cargar las rutas.');
       throw err;
     } finally {
       loading.value = false;
@@ -90,8 +126,8 @@ export function useRutas(
         : await busRepo.obtenerTodos();
       buses.value = lista;
       return lista;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar los buses.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cargar los buses.');
       throw err;
     } finally {
       loading.value = false;
@@ -108,8 +144,8 @@ export function useRutas(
         : await frecuenciaRepo.obtenerTodas();
       frecuencias.value = lista;
       return lista;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar las frecuencias.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cargar las frecuencias.');
       throw err;
     } finally {
       loading.value = false;
@@ -129,8 +165,8 @@ export function useRutas(
       }
       success.value = `Estado de ruta actualizado a ${nuevoEstado}.`;
       return actualizada;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cambiar estado de la ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cambiar estado de la ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -150,8 +186,8 @@ export function useRutas(
       }
       success.value = 'Estado de ruta actualizado a En Curso.';
       return actualizada;
-    } catch (err: any) {
-      error.value = err.message || 'Error al iniciar viaje.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al iniciar viaje.');
       throw err;
     } finally {
       loading.value = false;
@@ -171,8 +207,8 @@ export function useRutas(
       }
       success.value = 'Estado de ruta actualizado a Finalizada.';
       return actualizada;
-    } catch (err: any) {
-      error.value = err.message || 'Error al finalizar viaje.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al finalizar viaje.');
       throw err;
     } finally {
       loading.value = false;
@@ -192,8 +228,8 @@ export function useRutas(
       }
       success.value = 'Viaje cancelado correctamente.';
       return actualizada;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cancelar viaje.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cancelar viaje.');
       throw err;
     } finally {
       loading.value = false;
@@ -213,8 +249,8 @@ export function useRutas(
       }
       success.value = 'Chofer asignado correctamente.';
       return actualizada;
-    } catch (err: any) {
-      error.value = err.message || 'Error al asignar chofer a la ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al asignar chofer a la ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -229,8 +265,8 @@ export function useRutas(
       await viajeUseCase.eliminarRuta(rutaId);
       rutas.value = rutas.value.filter((r) => r.id !== rutaId);
       success.value = 'Ruta eliminada correctamente.';
-    } catch (err: any) {
-      error.value = err.message || 'Error al eliminar la ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al eliminar la ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -246,6 +282,20 @@ export function useRutas(
     success.value = null;
     filtroEstado.value = 'Todas';
     filtroFecha.value = '';
+    filtroTexto.value = '';
+    paginaActual.value = 1;
+  }
+
+  function obtenerRutaTrayecto(ruta: Ruta): string {
+    const frecuencia = frecuencias.value.find((item) => item.id === ruta.frecuenciaId);
+    return frecuencia
+      ? `${frecuencia.ciudadOrigen} → ${frecuencia.ciudadDestino}`
+      : `Frecuencia #${ruta.frecuenciaId}`;
+  }
+
+  function obtenerBusEtiqueta(busId: number): string {
+    const bus = buses.value.find((item) => item.id === busId);
+    return bus ? `Bus #${bus.numero} (${bus.placa})` : `Unidad #${busId}`;
   }
 
   return {
@@ -257,7 +307,13 @@ export function useRutas(
     success,
     filtroEstado,
     filtroFecha,
+    filtroTexto,
+    paginaActual,
+    itemsPorPagina,
+    totalFiltradas,
+    totalPaginas,
     rutasFiltradas,
+    rutasPaginadas,
     rutasProgramadas,
     rutasEnCurso,
     rutasFinalizadas,

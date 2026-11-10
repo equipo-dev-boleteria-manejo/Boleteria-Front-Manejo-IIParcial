@@ -13,6 +13,7 @@ import { ref, computed } from 'vue';
 import type { Usuario } from '../../Domain/Entities/Usuario';
 import type { CrearUsuarioDto, ActualizarUsuarioDto } from '../../Application/Dtos/UsuarioDto';
 import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin';
+import { RolUsuario } from '../../Domain/Constants/EstadosSistema';
 import {
   GetUsuarios,
   getUsuariosUseCase as defaultGetUsuarios,
@@ -37,6 +38,12 @@ export function useUsuarios(
   desactivarUsuarioService: DesactivarUsuario = defaultDesactivarUsuario,
 ) {
   const usuarios = ref<Usuario[]>([]);
+  const choferesActivos = computed(() =>
+    usuarios.value.filter(
+      (usuario): usuario is Usuario & { id: string } =>
+        Boolean(usuario.id) && usuario.activo && usuario.rol === RolUsuario.CHOFER,
+    ),
+  );
   const loading = ref<boolean>(false);
   const error = ref<string | null>(null);
   const mensajeExito = ref<string | null>(null);
@@ -207,6 +214,7 @@ export function useUsuarios(
 
   return {
     usuarios,
+    choferesActivos,
     loading,
     error,
     mensajeExito,

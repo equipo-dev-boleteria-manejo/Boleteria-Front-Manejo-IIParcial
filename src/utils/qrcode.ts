@@ -1,12 +1,3 @@
-import QRCode from 'qrcode'
-
-export const generateQrCode = async (
-  value: string,
-  filename: string
-): Promise<void> => {
-  await QRCode.toFile(filename, value)
-}
-
 export function extraerCodigoBoleto(valorLeido: string): string {
   const valor = String(valorLeido || '').trim()
 
@@ -29,4 +20,3 @@ export function extraerCodigoBoleto(valorLeido: string): string {
     return valor
   }
 }
-

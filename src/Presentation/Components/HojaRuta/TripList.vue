@@ -93,12 +93,12 @@
             <td class="px-4 py-3.5 whitespace-nowrap">
               <button
                 type="button"
-                :disabled="readonly"
+                :disabled="readonly || ruta.estado !== EstadoRuta.PROGRAMADA"
                 class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase transition-all duration-150 select-none cursor-pointer active:scale-95 disabled:cursor-default disabled:active:scale-100"
                 :class="ruta.esDirecta
                   ? 'bg-amber-100 text-amber-800 border border-amber-200 hover:bg-amber-200'
                   : 'bg-emerald-100 text-emerald-800 border border-emerald-200 hover:bg-emerald-200'"
-                :title="readonly ? '' : 'Clic para alternar modalidad directo / con paradas'"
+                :title="readonly || ruta.estado !== EstadoRuta.PROGRAMADA ? 'La modalidad solo puede cambiarse antes de iniciar el viaje' : 'Clic para alternar modalidad directo / con paradas'"
                 @click="emit('toggle-directo', ruta)"
               >
                 <span>{{ ruta.esDirecta ? '⚡' : '🛑' }}</span>
@@ -120,7 +120,7 @@
             <td v-if="!readonly" class="px-4 py-3.5 text-right whitespace-nowrap">
               <div class="flex items-center justify-end gap-1.5">
                 <ButtonBase
-                  v-if="ruta.estado === 'Programada'"
+                  v-if="ruta.estado === EstadoRuta.PROGRAMADA"
                   size="sm"
                   variant="primary"
                   @click="emit('iniciar-viaje', ruta)"
@@ -129,7 +129,7 @@
                 </ButtonBase>
 
                 <ButtonBase
-                  v-if="ruta.estado === 'EnCurso'"
+                  v-if="ruta.estado === EstadoRuta.EN_CURSO"
                   size="sm"
                   variant="success"
                   @click="emit('finalizar-viaje', ruta)"
@@ -138,7 +138,7 @@
                 </ButtonBase>
 
                 <ButtonBase
-                  v-if="ruta.estado === 'Programada'"
+                  v-if="ruta.estado === EstadoRuta.PROGRAMADA"
                   size="sm"
                   variant="danger"
                   @click="emit('cancelar-viaje', ruta)"
@@ -157,6 +157,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
+import { EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
 import ButtonBase from '../ButtonBase.vue'
 
 interface Props {
@@ -189,17 +190,16 @@ const ordenadasPorHora = computed(() => {
 
 function getEstadoClass(estado: string): string {
   switch (estado) {
-    case 'Programada':
+    case EstadoRuta.PROGRAMADA:
       return 'bg-blue-50 text-blue-700 border-blue-200'
-    case 'EnCurso':
+    case EstadoRuta.EN_CURSO:
       return 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-    case 'Finalizada':
+    case EstadoRuta.FINALIZADA:
       return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    case 'Cancelada':
+    case EstadoRuta.CANCELADA:
       return 'bg-rose-50 text-rose-700 border-rose-200'
     default:
       return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
 </script>
-

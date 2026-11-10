@@ -88,6 +88,20 @@ describe('useUsuarios Composable - Pruebas Unitarias y de Reactividad', () => {
     expect(composable.error.value).toBeNull();
   });
 
+  it('expone únicamente choferes activos con UUID para asignaciones de rutas', async () => {
+    const composable = useUsuarios(
+      mockGetUsuarios,
+      mockCrearUsuario,
+      mockActualizarUsuario,
+      mockDesactivarUsuario
+    );
+
+    await composable.cargarUsuarios();
+
+    expect(composable.choferesActivos.value).toHaveLength(1);
+    expect(composable.choferesActivos.value[0]?.id).toBe('usr-2');
+  });
+
   it('debe manejar errores al fallar la consulta de usuarios', async () => {
     vi.mocked(mockGetUsuarios.ejecutar).mockRejectedValueOnce(new Error('Fallo de red'));
     const composable = useUsuarios(

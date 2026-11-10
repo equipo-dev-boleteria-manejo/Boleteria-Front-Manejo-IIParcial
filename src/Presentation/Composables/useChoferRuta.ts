@@ -25,6 +25,7 @@ import {
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBoletosRepository } from '../../Infrastructure/Repositories/SupabaseBoletosRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
+import { mensajeErrorParaUsuario } from '../Utils/errorMessage';
 
 export interface ValidacionHistorialItem {
   codigo: string;
@@ -54,7 +55,7 @@ export function useChoferRuta(
   const error = ref<string | null>(null);
   const success = ref<string | null>(null);
   const resultado = ref<string | null>(null);
-  const pasajeros = ref<any[]>([]);
+  const pasajeros = ref<unknown[]>([]);
   const historial = ref<ValidacionHistorialItem[]>([]);
 
   const rutaProgramada = computed(
@@ -83,8 +84,8 @@ export function useChoferRuta(
   });
 
   const requiereObservacionPorTiempo = computed(() => {
-    const tiempoEsperado = rutaActual.value?.tiempoViajeMinutos || 180;
-    return minutosDesdeSalida.value > tiempoEsperado + 30;
+    const tiempoEsperado = rutaActual.value?.tiempoViajeMinutos;
+    return tiempoEsperado !== undefined && minutosDesdeSalida.value > tiempoEsperado + 30;
   });
 
   async function cargarRutaChofer(
@@ -106,8 +107,8 @@ export function useChoferRuta(
 
       rutaActual.value = activa;
       return activa;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar ruta asignada al chofer.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cargar ruta asignada al chofer.');
       throw err;
     } finally {
       loading.value = false;
@@ -130,8 +131,8 @@ export function useChoferRuta(
       resultado.value = success.value;
 
       return { ok: true, mensaje: success.value };
-    } catch (err: any) {
-      error.value = err.message || 'Error al iniciar viaje.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al iniciar viaje.');
       resultado.value = error.value;
       return { ok: false, mensaje: error.value };
     } finally {
@@ -160,8 +161,8 @@ export function useChoferRuta(
       resultado.value = success.value;
 
       return { ok: true, mensaje: success.value };
-    } catch (err: any) {
-      error.value = err.message || 'Error al finalizar viaje.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al finalizar viaje.');
       resultado.value = error.value;
       return { ok: false, mensaje: error.value };
     } finally {
@@ -190,8 +191,8 @@ export function useChoferRuta(
       resultado.value = success.value;
 
       return { ok: true, mensaje: success.value };
-    } catch (err: any) {
-      error.value = err.message || 'Error al registrar emergencia.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al registrar emergencia.');
       resultado.value = error.value;
       return { ok: false, mensaje: error.value };
     } finally {
@@ -225,8 +226,8 @@ export function useChoferRuta(
       resultado.value = success.value;
 
       return { ok: true, mensaje: success.value };
-    } catch (err: any) {
-      error.value = err.message || 'Error al validar boleto.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al validar boleto.');
       resultado.value = error.value;
 
       if (codigoLimpio) {

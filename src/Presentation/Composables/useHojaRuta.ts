@@ -10,8 +10,11 @@
 import { ref } from 'vue';
 import type { HojaRuta } from '../../Domain/Entities/HojaRuta';
 import type { Ruta } from '../../Domain/Entities/Ruta';
-import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
-import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
+import {
+  CambiarModalidadRuta,
+  cambiarModalidadRutaUseCase as defaultCambiarModalidadRuta,
+} from '../../Application/UseCases/CambiarModalidadRuta';
+import { mensajeErrorParaUsuario } from '../Utils/errorMessage';
 import {
   GestionarHojaRuta,
   gestionarHojaRutaUseCase as defaultGestionarHojaRuta,
@@ -24,7 +27,7 @@ import {
 export function useHojaRuta(
   gestionarUseCase: GestionarHojaRuta = defaultGestionarHojaRuta,
   asignarUseCase: AsignarRutaAHoja = defaultAsignarRutaAHoja,
-  rutaRepo: IRutaRepository = new SupabaseRutaRepository(),
+  cambiarModalidadUseCase: CambiarModalidadRuta = defaultCambiarModalidadRuta,
 ) {
   const hojasRuta = ref<HojaRuta[]>([]);
   const hojaActual = ref<HojaRuta | null>(null);
@@ -40,8 +43,8 @@ export function useHojaRuta(
       hojasRuta.value = lista;
       hojaActual.value = lista.length > 0 ? (lista[0] ?? null) : null;
       return lista;
-    } catch (err: any) {
-      error.value = err.message || 'Error al cargar hojas de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cargar hojas de ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -57,8 +60,8 @@ export function useHojaRuta(
       hojaActual.value = nueva;
       await cargarPorFecha(fecha);
       return nueva;
-    } catch (err: any) {
-      error.value = err.message || 'Error al crear hoja de ruta del día.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al crear hoja de ruta del día.');
       throw err;
     } finally {
       loading.value = false;
@@ -89,8 +92,8 @@ export function useHojaRuta(
 
       await cargarPorFecha(fecha);
       return true;
-    } catch (err: any) {
-      error.value = err.message || 'Error al asignar trayecto a la hoja de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al asignar trayecto a la hoja de ruta.');
       return false;
     } finally {
       loading.value = false;
@@ -106,8 +109,8 @@ export function useHojaRuta(
       if (fecha) {
         await cargarPorFecha(fecha);
       }
-    } catch (err: any) {
-      error.value = err.message || 'Error al iniciar la hoja de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al iniciar la hoja de ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -123,8 +126,8 @@ export function useHojaRuta(
       if (fecha) {
         await cargarPorFecha(fecha);
       }
-    } catch (err: any) {
-      error.value = err.message || 'Error al finalizar la hoja de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al finalizar la hoja de ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -140,8 +143,8 @@ export function useHojaRuta(
       if (fecha) {
         await cargarPorFecha(fecha);
       }
-    } catch (err: any) {
-      error.value = err.message || 'Error al cancelar la hoja de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al cancelar la hoja de ruta.');
       throw err;
     } finally {
       loading.value = false;
@@ -149,20 +152,21 @@ export function useHojaRuta(
   }
 
   async function toggleTipoRuta(ruta: Ruta, fecha?: string): Promise<boolean> {
-    if (!ruta.id) return false;
+    if (!ruta.id) {
+      error.value = 'No se puede cambiar la modalidad de una ruta sin identificador.';
+      return false;
+    }
     loading.value = true;
     error.value = null;
 
     try {
-      const nuevoEstadoDirecto = !ruta.esDirecta;
-      await rutaRepo.actualizar(ruta.id, { esDirecta: nuevoEstadoDirecto });
-      ruta.esDirecta = nuevoEstadoDirecto;
+      await cambiarModalidadUseCase.ejecutar(ruta.id, !ruta.esDirecta);
       if (fecha) {
         await cargarPorFecha(fecha);
       }
       return true;
-    } catch (err: any) {
-      error.value = err.message || 'Error al alternar tipo de ruta.';
+    } catch (err: unknown) {
+      error.value = mensajeErrorParaUsuario(err, 'Error al alternar tipo de ruta.');
       return false;
     } finally {
       loading.value = false;

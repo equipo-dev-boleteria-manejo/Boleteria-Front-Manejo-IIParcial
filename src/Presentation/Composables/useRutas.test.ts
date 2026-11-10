@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { nextTick } from 'vue';
 import { useRutas } from './useRutas';
 import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
@@ -118,6 +119,59 @@ describe('useRutas Composable', () => {
 
     expect(resultado).toHaveLength(1);
     expect(composable.frecuencias.value).toHaveLength(1);
+  });
+
+  it('prepara filas de presentación con filtros de texto y etiquetas', async () => {
+    const ruta = new Ruta(1, 10, '2026-06-01', EstadoRuta.PROGRAMADA);
+    ruta.id = 1;
+    const bus = new Bus(1, '25', 'PBA-1234', 40, EstadoBus.ACTIVO);
+    bus.id = 10;
+    const frecuencia = new Frecuencia(1, 'Quito', 'Guayaquil', '08:00', 'FREQ-01');
+    frecuencia.id = 1;
+
+    vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue([ruta]);
+    vi.mocked(mockBusRepo.obtenerTodos).mockResolvedValue([bus]);
+    vi.mocked(mockFrecuenciaRepo.obtenerTodas).mockResolvedValue([frecuencia]);
+
+    const composable = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+    await Promise.all([
+      composable.cargarRutas(),
+      composable.cargarBuses(),
+      composable.cargarFrecuencias(),
+    ]);
+
+    expect(composable.rutasPaginadas.value[0]).toMatchObject({
+      ruta,
+      trayectoEtiqueta: 'Quito → Guayaquil',
+      busEtiqueta: 'Bus #25 (PBA-1234)',
+    });
+
+    composable.filtroTexto.value = 'guayaquil';
+    expect(composable.rutasFiltradas.value).toHaveLength(1);
+    composable.filtroTexto.value = 'placa-no-existe';
+    expect(composable.rutasPaginadas.value).toHaveLength(0);
+  });
+
+  it('pagina los resultados y reinicia la página cuando cambian los filtros', async () => {
+    const rutas = Array.from({ length: 9 }, (_, index) => {
+      const ruta = new Ruta(1, index + 1, '2026-06-01', EstadoRuta.PROGRAMADA);
+      ruta.id = index + 1;
+      return ruta;
+    });
+    vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue(rutas);
+
+    const composable = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+    await composable.cargarRutas();
+
+    expect(composable.totalPaginas.value).toBe(2);
+    composable.paginaActual.value = 2;
+    expect(composable.rutasPaginadas.value).toHaveLength(1);
+
+    composable.filtroTexto.value = 'no existe';
+    await nextTick();
+
+    expect(composable.paginaActual.value).toBe(1);
+    expect(composable.rutasPaginadas.value).toHaveLength(0);
   });
 
   it('debe cambiar estado de una ruta e iniciar viaje', async () => {

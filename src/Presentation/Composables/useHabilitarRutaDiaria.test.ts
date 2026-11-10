@@ -4,6 +4,7 @@ import { HabilitarRutaDiaria } from '../../Application/UseCases/HabilitarRutaDia
 import { Ruta } from '../../Domain/Entities/Ruta';
 import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
+import { Frecuencia } from '../../Domain/Entities/Frecuencia';
 
 describe('useHabilitarRutaDiaria Composable', () => {
   let mockUseCase: HabilitarRutaDiaria;
@@ -21,6 +22,22 @@ describe('useHabilitarRutaDiaria Composable', () => {
     expect(composable.loading.value).toBe(false);
     expect(composable.error.value).toBeNull();
     expect(composable.rutaCreada.value).toBeNull();
+  });
+
+  it('determina días operativos a través de la entidad Frecuencia', () => {
+    const composable = useHabilitarRutaDiaria(mockUseCase);
+    const frecuencia = new Frecuencia(
+      1,
+      'Quito',
+      'Guayaquil',
+      '08:00',
+      'FR-01',
+      true,
+      ['Lunes'],
+    );
+
+    expect(composable.esDiaOperativo(frecuencia, '2026-06-15')).toBe(true);
+    expect(composable.esDiaOperativo(frecuencia, '2026-06-16')).toBe(false);
   });
 
   it('debe crear ruta exitosamente y actualizar el estado reactivo', async () => {
@@ -155,7 +172,7 @@ describe('useHabilitarRutaDiaria Composable', () => {
       // expected
     }
 
-    expect(composable.error.value).toBe('Fallo de red');
+    expect(composable.error.value).toBe('Error al habilitar la ruta diaria.');
     expect(composable.loading.value).toBe(false);
   });
 });

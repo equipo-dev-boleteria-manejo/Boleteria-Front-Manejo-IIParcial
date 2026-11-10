@@ -261,6 +261,7 @@ import { useUiStore } from '../../Store/uiStore'
 import { EstadoHojaRuta } from '../../../Domain/Constants/EstadosSistema'
 import type { HojaRuta } from '../../../Domain/Entities/HojaRuta'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
+import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
 
 const hoy = new Date().toISOString().slice(0, 10)
 const fechaFiltro = ref(hoy)
@@ -315,10 +316,10 @@ async function handleCrearHojaDia() {
       message: `Se ha generado la hoja de ruta para la fecha ${fechaFiltro.value}.`,
       type: 'success',
     })
-  } catch (err: any) {
+  } catch (err: unknown) {
     uiStore.showAlert({
       title: 'Error al Crear',
-      message: err.message || 'No se pudo crear la hoja de ruta.',
+      message: mensajeErrorParaUsuario(err, 'No se pudo crear la hoja de ruta.'),
       type: 'error',
     })
   }
@@ -373,10 +374,10 @@ async function handleIniciarHoja(hoja: HojaRuta) {
         message: 'La hoja de ruta ha sido emitida y se encuentra activa.',
         type: 'success',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error',
-        message: err.message || 'No se pudo iniciar la hoja de ruta.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo iniciar la hoja de ruta.'),
         type: 'error',
       })
     }
@@ -399,10 +400,10 @@ async function handleFinalizarHoja(hoja: HojaRuta) {
         message: 'La hoja de ruta ha sido cerrada y finalizada con éxito.',
         type: 'success',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error',
-        message: err.message || 'No se pudo cerrar la hoja de ruta.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo cerrar la hoja de ruta.'),
         type: 'error',
       })
     }
@@ -425,10 +426,10 @@ async function handleCancelarHoja(hoja: HojaRuta) {
         message: 'La hoja de ruta ha sido cancelada.',
         type: 'warning',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error',
-        message: err.message || 'No se pudo cancelar la hoja de ruta.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo cancelar la hoja de ruta.'),
         type: 'error',
       })
     }

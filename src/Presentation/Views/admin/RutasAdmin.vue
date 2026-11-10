@@ -47,7 +47,7 @@
           @click="filtroEstado = EstadoRuta.PROGRAMADA"
         >
           <p class="text-[10px] font-bold uppercase tracking-wider text-blue-600">Programadas</p>
-          <p class="text-2xl font-black text-blue-700 mt-1">{{ conteoProgramadas }}</p>
+          <p class="text-2xl font-black text-blue-700 mt-1">{{ rutasProgramadas.length }}</p>
         </button>
 
         <button
@@ -57,7 +57,7 @@
           @click="filtroEstado = EstadoRuta.EN_CURSO"
         >
           <p class="text-[10px] font-bold uppercase tracking-wider text-amber-600">En Curso</p>
-          <p class="text-2xl font-black text-amber-700 mt-1">{{ conteoEnCurso }}</p>
+          <p class="text-2xl font-black text-amber-700 mt-1">{{ rutasEnCurso.length }}</p>
         </button>
 
         <button
@@ -67,7 +67,7 @@
           @click="filtroEstado = EstadoRuta.FINALIZADA"
         >
           <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Finalizadas</p>
-          <p class="text-2xl font-black text-emerald-700 mt-1">{{ conteoFinalizadas }}</p>
+          <p class="text-2xl font-black text-emerald-700 mt-1">{{ rutasFinalizadas.length }}</p>
         </button>
       </div>
     </CardBase>
@@ -202,7 +202,7 @@
           <thead class="bg-slate-50/70 text-slate-500 text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
             <tr>
               <th class="px-4 py-3.5">Trayecto / Horario</th>
-              <th class="px-4 py-3.5">Unidad</th>
+              <th class="px-4 py-3.5">Unidad / Chofer</th>
               <th class="px-4 py-3.5">Fecha</th>
               <th class="px-4 py-3.5">Estado</th>
               <th class="px-4 py-3.5 text-right">Acciones</th>
@@ -210,27 +210,27 @@
           </thead>
           <tbody class="divide-y divide-slate-100">
             <tr
-              v-for="ruta in rutasPaginadas"
-              :key="ruta.id"
+              v-for="fila in rutasPaginadas"
+              :key="fila.ruta.id"
               class="hover:bg-slate-50/70 transition-colors"
             >
               <!-- Trayecto y Horario -->
               <td class="px-4 py-3.5">
                 <div class="font-bold text-slate-900">
-                  {{ obtenerRutaTrayecto(ruta) }}
+                  {{ fila.trayectoEtiqueta }}
                 </div>
                 <div class="flex items-center gap-2 mt-1">
                   <span class="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">
-                    ⏱️ {{ ruta.horaSalida || '--:--' }}
+                    ⏱️ {{ fila.ruta.horaSalida || '--:--' }}
                   </span>
                   <span
                     class="px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-tight"
-                    :class="ruta.esDirecta ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600'"
+                    :class="fila.ruta.esDirecta ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-slate-100 text-slate-600'"
                   >
-                    {{ ruta.esDirecta ? '⚡ Directo' : '🛑 Con Paradas' }}
+                    {{ fila.ruta.esDirecta ? '⚡ Directo' : '🛑 Con Paradas' }}
                   </span>
                   <span
-                    v-if="ruta.observacionChofer?.includes('INCIDENTE')"
+                    v-if="fila.ruta.observacionChofer?.includes('INCIDENTE')"
                     class="px-2 py-0.5 rounded-md bg-red-100 text-red-700 text-[10px] font-bold uppercase"
                   >
                     🚨 Incidente
@@ -241,17 +241,41 @@
               <!-- Unidad y Chofer -->
               <td class="px-4 py-3.5">
                 <div class="font-bold text-slate-800">
-                  {{ obtenerBusEtiqueta(ruta.busId) }}
+                  {{ fila.busEtiqueta }}
                 </div>
                 <div class="text-[11px] text-slate-400 font-medium">
-                  {{ ruta.choferId ? `Chofer: ${ruta.choferId}` : 'Sin chofer asignado' }}
+                  {{ fila.ruta.choferId ? `Chofer ID: ${fila.ruta.choferId}` : 'Sin chofer asignado' }}
+                </div>
+                <div
+                  v-if="fila.ruta.id && fila.ruta.estado === EstadoRuta.PROGRAMADA && choferes.length > 0"
+                  class="mt-2 flex flex-col gap-1.5 sm:flex-row"
+                >
+                  <select
+                    v-model="choferSeleccionadoPorRuta[fila.ruta.id]"
+                    :aria-label="`Chofer para ruta ${fila.ruta.id}`"
+                    :disabled="loading || choferesLoading"
+                    class="min-w-0 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50"
+                  >
+                    <option value="">Asignar o cambiar chofer</option>
+                    <option v-for="chofer in choferes" :key="chofer.id" :value="chofer.id">
+                      {{ chofer.nombreCompleto }}
+                    </option>
+                  </select>
+                  <ButtonBase
+                    size="sm"
+                    variant="outline"
+                    :disabled="loading || !choferSeleccionadoPorRuta[fila.ruta.id]"
+                    @click="handleAsignarChofer(fila.ruta)"
+                  >
+                    Asignar
+                  </ButtonBase>
                 </div>
               </td>
 
               <!-- Fecha -->
               <td class="px-4 py-3.5 whitespace-nowrap">
                 <span class="font-mono text-xs font-semibold text-slate-700">
-                  {{ ruta.fecha }}
+                  {{ fila.ruta.fecha }}
                 </span>
               </td>
 
@@ -259,9 +283,9 @@
               <td class="px-4 py-3.5 whitespace-nowrap">
                 <span
                   class="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border"
-                  :class="getEstadoBadgeClass(ruta.estado)"
+                  :class="getEstadoBadgeClass(fila.ruta.estado)"
                 >
-                  {{ ruta.estado }}
+                  {{ fila.ruta.estado }}
                 </span>
               </td>
 
@@ -269,31 +293,31 @@
               <td class="px-4 py-3.5 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1.5">
                   <ButtonBase
-                    v-if="ruta.estado === EstadoRuta.PROGRAMADA"
+                    v-if="fila.ruta.estado === EstadoRuta.PROGRAMADA"
                     size="sm"
                     variant="primary"
                     :disabled="loading"
-                    @click="handleIniciarViaje(ruta)"
+                    @click="handleIniciarViaje(fila.ruta)"
                   >
                     Iniciar Viaje
                   </ButtonBase>
 
                   <ButtonBase
-                    v-if="ruta.estado === EstadoRuta.EN_CURSO"
+                    v-if="fila.ruta.estado === EstadoRuta.EN_CURSO"
                     size="sm"
                     variant="success"
                     :disabled="loading"
-                    @click="handleFinalizarViaje(ruta)"
+                    @click="handleFinalizarViaje(fila.ruta)"
                   >
                     Finalizar
                   </ButtonBase>
 
                   <ButtonBase
-                    v-if="ruta.estado === EstadoRuta.PROGRAMADA"
+                    v-if="fila.ruta.estado === EstadoRuta.PROGRAMADA"
                     size="sm"
                     variant="danger"
                     :disabled="loading"
-                    @click="handleCancelarViaje(ruta)"
+                    @click="handleCancelarViaje(fila.ruta)"
                   >
                     Cancelar
                   </ButtonBase>
@@ -342,6 +366,10 @@
       v-model="modalHabilitarAbierto"
       :frecuencias="frecuencias"
       :buses="buses"
+      :choferes="choferes"
+      :choferes-loading="choferesLoading"
+      :choferes-error="choferesError"
+      :es-dia-operativo="esDiaOperativo"
       :loading="habilitarLoading"
       :error="habilitarError"
       @habilitar="onHabilitarRuta"
@@ -350,17 +378,19 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, onMounted } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ModalHabilitarRuta from '../../Components/ModalHabilitarRuta.vue'
 import { useRutas } from '../../Composables/useRutas'
 import { useHabilitarRutaDiaria } from '../../Composables/useHabilitarRutaDiaria'
+import { useUsuarios } from '../../Composables/useUsuarios'
 import { useUiStore } from '../../Store/uiStore'
 import { EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
 import type { HabilitarRutaInput } from '../../../Application/UseCases/HabilitarRutaDiaria'
+import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
 
 const uiStore = useUiStore()
 
@@ -368,80 +398,45 @@ const {
   rutas,
   buses,
   frecuencias,
+  filtroTexto,
   loading,
   error,
   filtroEstado,
   filtroFecha,
+  rutasProgramadas,
+  rutasEnCurso,
+  rutasFinalizadas,
+  rutasPaginadas,
+  totalFiltradas,
+  paginaActual,
+  totalPaginas,
+  itemsPorPagina,
   cargarRutas,
   cargarBuses,
   cargarFrecuencias,
   iniciarViaje,
   finalizarViaje,
   cancelarViaje,
+  asignarChofer,
 } = useRutas()
+
+const {
+  choferesActivos: choferes,
+  loading: choferesLoading,
+  error: choferesError,
+  cargarUsuarios,
+} = useUsuarios()
 
 const {
   loading: habilitarLoading,
   error: habilitarError,
   habilitar,
+  esDiaOperativo,
   limpiar: limpiarHabilitar,
 } = useHabilitarRutaDiaria()
 
 const modalHabilitarAbierto = ref(false)
-const filtroTexto = ref('')
-const paginaActual = ref(1)
-const itemsPorPagina = 8
-
-// Métricas de estados
-const conteoProgramadas = computed(
-  () => rutas.value.filter((r) => r.estado === EstadoRuta.PROGRAMADA).length
-)
-const conteoEnCurso = computed(
-  () => rutas.value.filter((r) => r.estado === EstadoRuta.EN_CURSO).length
-)
-const conteoFinalizadas = computed(
-  () => rutas.value.filter((r) => r.estado === EstadoRuta.FINALIZADA).length
-)
-
-// Filtrado combinado
-const listaFiltrada = computed(() => {
-  return rutas.value.filter((r) => {
-    // Filtro por estado
-    if (filtroEstado.value !== 'Todas' && r.estado !== filtroEstado.value) {
-      return false
-    }
-
-    // Filtro por fecha
-    if (filtroFecha.value && r.fecha !== filtroFecha.value) {
-      return false
-    }
-
-    // Filtro por texto libre
-    if (filtroTexto.value.trim()) {
-      const q = filtroTexto.value.toLowerCase().trim()
-      const trayecto = obtenerRutaTrayecto(r).toLowerCase()
-      const busInfo = obtenerBusEtiqueta(r.busId).toLowerCase()
-      const chofer = (r.choferId || '').toLowerCase()
-      const coincide =
-        trayecto.includes(q) || busInfo.includes(q) || chofer.includes(q)
-      if (!coincide) return false
-    }
-
-    return true
-  })
-})
-
-const totalFiltradas = computed(() => listaFiltrada.value.length)
-const totalPaginas = computed(() => Math.ceil(totalFiltradas.value / itemsPorPagina) || 1)
-
-const rutasPaginadas = computed(() => {
-  const inicio = (paginaActual.value - 1) * itemsPorPagina
-  return listaFiltrada.value.slice(inicio, inicio + itemsPorPagina)
-})
-
-watch([filtroEstado, filtroFecha, filtroTexto], () => {
-  paginaActual.value = 1
-})
+const choferSeleccionadoPorRuta = ref<Record<number, string>>({})
 
 onMounted(async () => {
   await recargarDatos()
@@ -449,7 +444,12 @@ onMounted(async () => {
 
 async function recargarDatos() {
   try {
-    await Promise.all([cargarRutas(), cargarBuses(), cargarFrecuencias()])
+    await Promise.all([
+      cargarRutas(),
+      cargarBuses(),
+      cargarFrecuencias(),
+      cargarUsuarios(),
+    ])
   } catch {
     // errores capturados por los composables
   }
@@ -482,6 +482,29 @@ async function onHabilitarRuta(payload: HabilitarRutaInput) {
   }
 }
 
+async function handleAsignarChofer(ruta: Ruta) {
+  if (!ruta.id) return
+
+  const choferId = choferSeleccionadoPorRuta.value[ruta.id]
+  if (!choferId) return
+
+  try {
+    await asignarChofer(ruta.id, choferId)
+    delete choferSeleccionadoPorRuta.value[ruta.id]
+    uiStore.showAlert({
+      title: 'Chofer Asignado',
+      message: 'El chofer quedó vinculado a la ruta programada.',
+      type: 'success',
+    })
+  } catch (err: unknown) {
+    uiStore.showAlert({
+      title: 'No se pudo asignar el chofer',
+      message: mensajeErrorParaUsuario(err, 'Ocurrió un error inesperado al asignar el chofer.'),
+      type: 'error',
+    })
+  }
+}
+
 async function handleIniciarViaje(ruta: Ruta) {
   if (!ruta.id) return
   const confirm = await uiStore.showConfirm({
@@ -498,10 +521,10 @@ async function handleIniciarViaje(ruta: Ruta) {
         message: 'La unidad ha salido y la ruta se encuentra En Curso.',
         type: 'success',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error Operativo',
-        message: err.message || 'No se pudo iniciar el viaje.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo iniciar el viaje.'),
         type: 'error',
       })
     }
@@ -524,10 +547,10 @@ async function handleFinalizarViaje(ruta: Ruta) {
         message: 'El viaje ha sido completado y registrado en la bitácora.',
         type: 'success',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error Operativo',
-        message: err.message || 'No se pudo finalizar el viaje.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo finalizar el viaje.'),
         type: 'error',
       })
     }
@@ -550,30 +573,14 @@ async function handleCancelarViaje(ruta: Ruta) {
         message: 'El viaje ha sido cancelado.',
         type: 'warning',
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       uiStore.showAlert({
         title: 'Error Operativo',
-        message: err.message || 'No se pudo cancelar el viaje.',
+        message: mensajeErrorParaUsuario(err, 'No se pudo cancelar el viaje.'),
         type: 'error',
       })
     }
   }
-}
-
-function obtenerRutaTrayecto(ruta: Ruta): string {
-  const f = frecuencias.value.find((item) => item.id === ruta.frecuenciaId)
-  if (f) {
-    return `${f.ciudadOrigen} → ${f.ciudadDestino}`
-  }
-  return `Frecuencia #${ruta.frecuenciaId}`
-}
-
-function obtenerBusEtiqueta(busId: number): string {
-  const b = buses.value.find((item) => item.id === busId)
-  if (b) {
-    return `Bus #${b.numero} (${b.placa})`
-  }
-  return `Unidad #${busId}`
 }
 
 function getEstadoBadgeClass(estado: string): string {
