@@ -6,12 +6,8 @@ import AsientosTarifasView from './AsientosTarifasView.vue';
 import * as useSeatTypesModule from '../Composables/useSeatTypes';
 import { ref } from 'vue';
 
-vi.mock('@stripe/stripe-js', () => ({
-  loadStripe: vi.fn().mockResolvedValue(null),
-}));
-
 describe('AsientosTarifasView.vue', () => {
-  it('renderiza las métricas y el selector interactivo de asientos', () => {
+  it('renderiza las métricas de la plantilla de flota y el selector interactivo para el administrador', () => {
     setActivePinia(createPinia());
 
     vi.spyOn(useSeatTypesModule, 'useSeatTypes').mockReturnValue({
@@ -29,14 +25,18 @@ describe('AsientosTarifasView.vue', () => {
 
     const wrapper = mount(AsientosTarifasView);
 
-    // MetricCards
-    expect(wrapper.text()).toContain('Total Asientos');
-    expect(wrapper.text()).toContain('Disponibles');
-    expect(wrapper.text()).toContain('Ocupados');
-    expect(wrapper.text()).toContain('Tarifas Activas');
+    // MetricCards del Administrador
+    expect(wrapper.text()).toContain('Capacidad Total');
+    expect(wrapper.text()).toContain('Piso 1 (VIP)');
+    expect(wrapper.text()).toContain('Piso 2 (Standard)');
+    expect(wrapper.text()).toContain('Tarifas Reguladas');
 
     // SelectorAsientosBus
     expect(wrapper.text()).toContain('Selección de Asiento');
     expect(wrapper.text()).toContain('Elija la ubicación dentro del mapa interactivo del bus');
+
+    // Especificación de Tarifas
+    expect(wrapper.text()).toContain('Especificación de Tarifas Base de la Cooperativa');
+    expect(wrapper.text()).toContain('Descuentos de Ley Obligatorios');
   });
 });

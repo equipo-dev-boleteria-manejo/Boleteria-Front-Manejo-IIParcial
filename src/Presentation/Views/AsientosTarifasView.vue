@@ -1,84 +1,32 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import MetricCard from '../Components/MetricCard.vue';
-import ButtonBase from '../Components/ButtonBase.vue';
+import CardBase from '../Components/CardBase.vue';
 import SelectorAsientosBus, {
   type AsientoVisual,
 } from '../Components/SelectorAsientosBus.vue';
-import ModalPagoBoleto from '../Components/ModalPagoBoleto.vue';
 import { useFeedback } from '../Composables/useFeedback';
 
-const { showSuccess, showInfo } = useFeedback();
+const { showInfo } = useFeedback();
 
 const asientoSeleccionado = ref<AsientoVisual | null>(null);
-const ocupadosSimulados = ref<(number | string)[]>([
+
+// Muestra de distribución estándar de la flota de dos pisos (36 asientos totales)
+const ocupadosDemostracion = ref<(number | string)[]>([
   'P1-2',
   'P1-5',
   'P2-14',
   'P2-18',
 ]);
 
-const mostrarModalPago = ref(false);
-const ultimaReserva = ref<{
-  asientoNumero: number | string;
-  asientoTipo: string;
-  pasajeroNombres: string;
-  metodoPago: string;
-  total: number;
-  referencia: string;
-  estado: string;
-} | null>(null);
-
 const totalAsientos = 36;
-const totalOcupados = computed(() => ocupadosSimulados.value.length);
-const totalLibres = computed(() => totalAsientos - totalOcupados.value);
+const capacidadPiso1Vip = 12;
+const capacidadPiso2Standard = 24;
 
 const handleSeleccionarAsiento = (asiento: AsientoVisual) => {
   asientoSeleccionado.value = asiento;
   showInfo(
-    `Asiento Seleccionado: Nº ${asiento.numero} - Piso ${asiento.piso} (${asiento.tipoNombre}) · $${asiento.precioBase.toFixed(2)}`,
-    3000
-  );
-  mostrarModalPago.value = true;
-};
-
-const handleCerrarModal = () => {
-  mostrarModalPago.value = false;
-  asientoSeleccionado.value = null;
-};
-
-const handlePagoConfirmado = (data: {
-  metodoPago: 'Transferencia' | 'Tarjeta';
-  referencia: string;
-  comprobanteNombre?: string;
-  estado: 'PAGADO' | 'EN_VALIDACION';
-  pasajero: any;
-  total: number;
-}) => {
-  if (!asientoSeleccionado.value) return;
-
-  const asientoId = asientoSeleccionado.value.id;
-  if (!ocupadosSimulados.value.includes(asientoId)) {
-    ocupadosSimulados.value = [...ocupadosSimulados.value, asientoId];
-  }
-
-  ultimaReserva.value = {
-    asientoNumero: asientoSeleccionado.value.numero,
-    asientoTipo: asientoSeleccionado.value.tipoNombre,
-    pasajeroNombres: data.pasajero.nombres || 'Pasajero General',
-    metodoPago: data.metodoPago,
-    total: data.total,
-    referencia: data.referencia,
-    estado: data.estado,
-  };
-
-  mostrarModalPago.value = false;
-  asientoSeleccionado.value = null;
-
-  showSuccess(
-    data.estado === 'PAGADO'
-      ? `¡Pago exitoso vía Tarjeta (Stripe)! Boleto emitido.`
-      : `Comprobante registrado. Boleto en estado EN VALIDACIÓN para aprobación.`,
+    `Asiento Nº ${asiento.numero} · Piso ${asiento.piso} (${asiento.tipoNombre}) · Tarifa Base: $${asiento.precioBase.toFixed(2)}`,
     3000
   );
 };
@@ -86,86 +34,91 @@ const handlePagoConfirmado = (data: {
 
 <template>
   <div class="space-y-6">
-    <!-- Tarjetas de Métricas del Sistema de Diseño -->
+    <!-- Tarjetas de Métricas de la Flota para el Administrador -->
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
       <MetricCard
-        title="Total Asientos"
+        title="Capacidad Total"
         :value="totalAsientos"
         icon="🪑"
-        description="Capacidad total configurada"
+        description="36 asientos en dos niveles"
       />
       <MetricCard
-        title="Disponibles"
-        :value="totalLibres"
-        icon="✅"
+        title="Piso 1 (VIP)"
+        :value="capacidadPiso1Vip"
+        icon="⭐"
+        variant="info"
+        description="12 asientos reclinables · $15.00"
+      />
+      <MetricCard
+        title="Piso 2 (Standard)"
+        :value="capacidadPiso2Standard"
+        icon="🚌"
         variant="success"
-        description="Listos para reserva"
+        description="24 asientos estándar · $10.00"
       />
       <MetricCard
-        title="Ocupados"
-        :value="totalOcupados"
-        icon="🚫"
-        variant="danger"
-        description="Boletos emitidos"
-      />
-      <MetricCard
-        title="Tarifas Activas"
+        title="Tarifas Reguladas"
         value="$10 - $15"
         icon="🏷️"
         variant="info"
-        description="Normal $10.00 · VIP $15.00"
+        description="Diferenciada según ANT"
       />
     </div>
 
-    <!-- Confirmación de Última Compra / Reserva Exitosa -->
-    <div
-      v-if="ultimaReserva"
-      class="rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm transition-all"
-    >
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div class="space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-600 text-white text-xs font-bold">✓</span>
-            <h4 class="font-bold text-emerald-950 text-sm">
-              {{ ultimaReserva.estado === 'PAGADO' ? 'Boleto Emitido y Pagado con Éxito' : 'Boleto en Proceso de Validación' }}
-            </h4>
-          </div>
-          <p class="text-xs text-emerald-800">
-            Asiento Nº <strong>{{ ultimaReserva.asientoNumero }}</strong> ({{ ultimaReserva.asientoTipo }}) para
-            <strong>{{ ultimaReserva.pasajeroNombres }}</strong> · Método: <strong>{{ ultimaReserva.metodoPago }}</strong> · Ref: <code class="font-mono bg-white/70 px-1 py-0.5 rounded">{{ ultimaReserva.referencia }}</code>
-          </p>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-base font-black text-emerald-900">${{ ultimaReserva.total.toFixed(2) }}</span>
-          <ButtonBase variant="outline" size="sm" @click="ultimaReserva = null">
-            Cerrar aviso
-          </ButtonBase>
-        </div>
-      </div>
-    </div>
-
-    <!-- Selector de Asientos Interactivo -->
+    <!-- Selector / Auditor Visual de la Estructura de Asientos -->
     <SelectorAsientosBus
       v-model="asientoSeleccionado"
-      :asientos-ocupados-ids="ocupadosSimulados"
+      :asientos-ocupados-ids="ocupadosDemostracion"
       @seleccionar-asiento="handleSeleccionarAsiento"
     />
 
-    <!-- Modal de Registro de Pasajero, Descuento y Pago -->
-    <ModalPagoBoleto
-      v-if="asientoSeleccionado"
-      :model-value="mostrarModalPago"
-      :asiento-numero="asientoSeleccionado.numero"
-      :asiento-tipo="asientoSeleccionado.tipoNombre"
-      :piso="asientoSeleccionado.piso"
-      :precio-base="asientoSeleccionado.precioBase"
-      @update:model-value="mostrarModalPago = $event"
-      @close="handleCerrarModal"
-      @confirmado="handlePagoConfirmado"
-    />
+    <!-- Especificación de Tarifas y Reglas para el Administrador -->
+    <CardBase
+      title="Especificación de Tarifas Base de la Cooperativa"
+      subtitle="Parámetros oficiales aplicados automáticamente en taquillas y venta en línea"
+      padding="md"
+    >
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800">Piso 1 · Servicio VIP</span>
+            <span class="font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+              $15.00
+            </span>
+          </div>
+          <p class="text-slate-600 leading-relaxed">
+            12 Asientos anchos semi-cama (reclinación 160°), climatización individual y tomas USB. Tarifa base sin recargo por reserva.
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800">Piso 2 · Servicio Estándar</span>
+            <span class="font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+              $10.00
+            </span>
+          </div>
+          <p class="text-slate-600 leading-relaxed">
+            24 Asientos anatómicos interprovinciales con cinturón de seguridad de tres puntos y visual panorámica.
+          </p>
+        </div>
+
+        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3.5 space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800">Descuentos de Ley Obligatorios</span>
+            <span class="font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+              -50%
+            </span>
+          </div>
+          <p class="text-slate-600 leading-relaxed">
+            Descuento del 50% aplicado en taquilla y venta web para Menores de 12 años, Tercera Edad (65+) y Personas con Discapacidad (CONADIS).
+          </p>
+        </div>
+      </div>
+    </CardBase>
 
     <p class="text-center text-xs text-slate-400">
-      Boletería Front · Sistema Oficial de Transporte Interprovincial del Ecuador
+      Boletería Front · Módulo de Administración de Plantilla de Flota y Tarifas Base
     </p>
   </div>
 </template>

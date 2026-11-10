@@ -393,10 +393,10 @@ const navItems: NavItem[] = [
   },
   {
     to: '/asientos-tarifas',
-    label: 'Asientos y Tarifas',
-    desc: 'Esquema interactivo de unidades y tarifas por piso.',
+    label: 'Plantilla de Asientos y Tarifas',
+    desc: 'Plantilla de distribución de flota y catálogo de tarifas por piso.',
     iconComponent: IconTickets,
-    roles: [...ADMIN, ...OFICINISTA, ...CLIENTE],
+    roles: ADMIN,
   },
   {
     to: '/admin/usuarios',
