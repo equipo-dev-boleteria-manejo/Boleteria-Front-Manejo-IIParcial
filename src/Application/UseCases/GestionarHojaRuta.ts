@@ -32,7 +32,20 @@ export class GestionarHojaRuta {
     this.validarFecha(fecha);
     const resultado = await this.hojaRutaRepository.obtenerPorFecha(fecha);
     if (!resultado) return [];
-    return Array.isArray(resultado) ? resultado : [resultado];
+    const hojas = Array.isArray(resultado) ? resultado : [resultado];
+
+    // El repositorio de hojas solo lee la tabla HojasRuta: los trayectos de cada hoja se cargan aparte.
+    // Sin esto la hoja siempre aparecía vacía, aunque sus trayectos estuvieran guardados.
+    if (this.rutaRepository) {
+      const rutaRepository = this.rutaRepository;
+      await Promise.all(
+        hojas.map(async (hoja) => {
+          if (hoja.id) hoja.rutas = (await rutaRepository.obtenerPorHojaRuta(hoja.id)) ?? [];
+        }),
+      );
+    }
+
+    return hojas;
   }
 
   /**

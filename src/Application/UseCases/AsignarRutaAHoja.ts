@@ -17,9 +17,12 @@ import { EstadoBus, EstadoHojaRuta, EstadoRuta } from '../../Domain/Constants/Es
 import {
   FrecuenciaNoDisponibleParaRutaException,
   BusNoActivoParaRutaException,
+  ChoferNoDisponibleParaRutaException,
   RutaSolapadaException,
 } from '../../Domain/Exceptions/RutaException';
 import { HojaRutaYaCerradaException } from '../../Domain/Exceptions/HojaRutaException';
+import { buscarConflictoHorario, crearIntervalo } from '../../Domain/Rules/solapamientoRutas';
+import { cargarRutasAdyacentes } from '../Services/ocupacionRutas';
 import { SupabaseHojaRutaRepository } from '../../Infrastructure/Repositories/SupabaseHojaRutaRepository';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
@@ -62,13 +65,19 @@ export class AsignarRutaAHoja {
       );
     }
 
-    // 2. Si se inyectó el repositorio de buses, validar que el bus exista y esté Activo
+    // 2. Si se inyectó el repositorio de buses, validar que el bus exista y esté Activo.
+    // Los mensajes nombran el bus como lo ve el usuario (número y placa) y no por su id interno.
+    let nombreBus = `bus ${busId}`;
     if (this.busRepo) {
       const bus = await this.busRepo.obtenerPorId(busId);
+      if (bus) nombreBus = `bus #${bus.numero} (${bus.placa})`;
+
       if (!bus || bus.estado !== EstadoBus.ACTIVO) {
         throw new BusNoActivoParaRutaException(
           busId,
-          `El bus con ID ${busId} no existe o no está en estado Activo.`
+          bus
+            ? `El ${nombreBus} no está en estado Activo.`
+            : `El bus con ID ${busId} no existe o no está en estado Activo.`
         );
       }
     }
@@ -88,42 +97,35 @@ export class AsignarRutaAHoja {
       throw new HojaRutaYaCerradaException(hojaRuta.id ?? 0);
     }
 
-    // 4. Validar solapamiento de horarios para este bus
-    const DURACION_ESTIMADA_MS = 3 * 60 * 60 * 1000;
+    // 4. Validar solapamiento de horarios (misma regla que "Programar ruta"): el bus no puede tener dos viajes a la
+    //    vez, ni el chofer, si se indicó. Se miran también el día anterior y el siguiente (viajes de medianoche).
     const horaSalidaFinal = horaSalida || frecuencia.horaSalida || '08:00';
-    const nuevaHoraInicio = this.parseHora(horaSalidaFinal);
-    const nuevaHoraFin = horaLlegada
-      ? this.parseHora(horaLlegada)
-      : nuevaHoraInicio + DURACION_ESTIMADA_MS;
+    const intervaloNuevo = crearIntervalo(horaSalidaFinal, horaLlegada);
 
-    // Obtener rutas del bus para verificar solapamientos
-    let rutasDelBus: Ruta[] = [];
-    if (hojaRuta.rutas && Array.isArray(hojaRuta.rutas)) {
-      rutasDelBus = hojaRuta.rutas.filter((r: Ruta) => r.busId === busId);
-    } else {
-      const rutasExistentes = await this.rutaRepo.obtenerPorBusYFecha(busId, fecha);
-      rutasDelBus = rutasExistentes || [];
+    // Si la hoja ya trae sus rutas se usan para el propio día; si no, se consultan al repositorio.
+    const rutasHojaDelBus =
+      hojaRuta.rutas && Array.isArray(hojaRuta.rutas)
+        ? hojaRuta.rutas.filter((r: Ruta) => r.busId === busId)
+        : undefined;
+    const rutasDelBus = await cargarRutasAdyacentes(
+      fecha,
+      (dia) => this.rutaRepo.obtenerPorBusYFecha(busId, dia),
+      rutasHojaDelBus,
+    );
+
+    if (buscarConflictoHorario(intervaloNuevo, rutasDelBus)) {
+      throw new RutaSolapadaException(
+        busId,
+        `El ${nombreBus} ya tiene un trayecto que se solapa con este horario.`
+      );
     }
 
-    for (const rutaExistente of rutasDelBus) {
-      if (rutaExistente.estado === EstadoRuta.CANCELADA) continue;
-      if (!rutaExistente.horaSalida) continue;
-
-      const existenteInicio = this.parseHora(rutaExistente.horaSalida);
-      const existenteFin = rutaExistente.horaLlegada
-        ? this.parseHora(rutaExistente.horaLlegada)
-        : existenteInicio + DURACION_ESTIMADA_MS;
-
-      const seSolapa =
-        (nuevaHoraInicio >= existenteInicio && nuevaHoraInicio < existenteFin) ||
-        (nuevaHoraFin > existenteInicio && nuevaHoraFin <= existenteFin) ||
-        (nuevaHoraInicio <= existenteInicio && nuevaHoraFin >= existenteFin);
-
-      if (seSolapa) {
-        throw new RutaSolapadaException(
-          busId,
-          `El bus ${busId} ya tiene un trayecto que se solapa con este horario.`
-        );
+    if (choferId) {
+      const rutasDelChofer = await cargarRutasAdyacentes(fecha, (dia) =>
+        this.rutaRepo.obtenerPorChoferYFecha(choferId, dia),
+      );
+      if (buscarConflictoHorario(intervaloNuevo, rutasDelChofer)) {
+        throw new ChoferNoDisponibleParaRutaException();
       }
     }
 
@@ -153,12 +155,6 @@ export class AsignarRutaAHoja {
     return this.ejecutar(input);
   }
 
-  private parseHora(horaStr: string): number {
-    const partes = horaStr.split(':').map(Number);
-    const horas = partes[0] || 0;
-    const minutos = partes[1] || 0;
-    return horas * 60 * 60 * 1000 + minutos * 60 * 1000;
-  }
 }
 
 export const asignarRutaAHojaUseCase = new AsignarRutaAHoja(

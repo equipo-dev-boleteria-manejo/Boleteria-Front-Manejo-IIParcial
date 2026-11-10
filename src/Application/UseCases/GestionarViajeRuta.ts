@@ -13,11 +13,20 @@ import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 import {
   RutaInvalidaException,
   RutaEstadoInvalidoException,
+  RutaFueraDeFechaException,
+  ChoferNoDisponibleParaRutaException,
 } from '../../Domain/Exceptions/RutaException';
+import { buscarConflictoHorario, describirHorario, intervaloDeRuta } from '../../Domain/Rules/solapamientoRutas';
+import { cargarRutasAdyacentes } from '../Services/ocupacionRutas';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
+import { fechaLocalISO } from '../../utils/fechaLocal';
 
 export class GestionarViajeRuta {
-  constructor(private readonly rutaRepo: IRutaRepository) {}
+  constructor(
+    private readonly rutaRepo: IRutaRepository,
+    /** Fecha de hoy (YYYY-MM-DD); se inyecta para poder probar la regla sin depender del reloj. */
+    private readonly hoy: () => string = () => fechaLocalISO(),
+  ) {}
 
   /**
    * Obtiene la lista de rutas aplicando filtros opcionales.
@@ -44,6 +53,11 @@ export class GestionarViajeRuta {
     const ruta = await this.rutaRepo.obtenerPorId(rutaId);
     if (ruta && ruta.estado !== EstadoRuta.PROGRAMADA) {
       throw new RutaEstadoInvalidoException('Solo se puede iniciar un viaje en estado Programada.');
+    }
+
+    // Un viaje solo puede iniciarse el día para el que fue programado (o después, si quedó pendiente).
+    if (ruta && ruta.fecha > this.hoy()) {
+      throw new RutaFueraDeFechaException(ruta.fecha);
     }
 
     return await this.rutaRepo.cambiarEstado(rutaId, EstadoRuta.EN_CURSO);
@@ -104,6 +118,23 @@ export class GestionarViajeRuta {
   async asignarChofer(rutaId: number, choferId: string): Promise<Ruta> {
     if (!rutaId || !choferId) {
       throw new RutaInvalidaException('Identificador de ruta y chofer requeridos.');
+    }
+
+    // Un chofer no puede manejar dos viajes a la vez: se compara con sus demás rutas (la propia no cuenta).
+    const ruta = await this.rutaRepo.obtenerPorId(rutaId);
+    const intervalo = ruta ? intervaloDeRuta(ruta) : null;
+    if (ruta && intervalo) {
+      const rutasDelChofer = await cargarRutasAdyacentes(ruta.fecha, (dia) =>
+        this.rutaRepo.obtenerPorChoferYFecha(choferId, dia),
+      );
+      const conflicto = buscarConflictoHorario(intervalo, rutasDelChofer, { ignorarRutaId: ruta.id });
+
+      if (conflicto) {
+        const horario = describirHorario(conflicto, ruta.fecha);
+        throw new ChoferNoDisponibleParaRutaException(
+          `El chofer ya tiene asignado otro viaje que se solapa con este horario${horario ? ` (${horario})` : ''}.`,
+        );
+      }
     }
 
     return await this.rutaRepo.actualizar(rutaId, { choferId });

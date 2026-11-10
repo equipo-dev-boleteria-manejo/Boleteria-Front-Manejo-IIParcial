@@ -88,6 +88,30 @@ export class RutaSolapadaException extends RutaException {
   }
 }
 
+export class ChoferNoDisponibleParaRutaException extends RutaException {
+  constructor(detalle?: string) {
+    super(
+      detalle || 'El chofer ya tiene asignado otro viaje que se solapa con este horario.',
+      'CHOFER_NO_DISPONIBLE',
+    );
+  }
+}
+
+export class RutaModalidadNoPermitidaException extends RutaException {
+  constructor(mensaje: string = 'La modalidad solicitada no está permitida para esta ruta.') {
+    super(mensaje, 'RUTA_MODALIDAD_NO_PERMITIDA');
+  }
+}
+
+export class RutaFueraDeFechaException extends RutaException {
+  constructor(fecha: string) {
+    super(
+      `La ruta del ${fecha} no puede iniciarse todavía: solo se puede iniciar el día del viaje.`,
+      'RUTA_FECHA_FUTURA',
+    );
+  }
+}
+
 export class BoletoNoValidoParaRutaException extends RutaException {
   constructor(mensaje: string = 'Boleto no encontrado o inválido para esta ruta.') {
     super(mensaje, 'BOLETO_INVALIDO_PARA_RUTA');

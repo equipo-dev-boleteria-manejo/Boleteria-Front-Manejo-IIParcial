@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { nextTick } from 'vue';
 import { useRutas } from './useRutas';
 import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
 import type { IBusRepository } from '../../Domain/Repositories/IBusRepository';
@@ -120,6 +121,56 @@ describe('useRutas Composable', () => {
     expect(composable.frecuencias.value).toHaveLength(1);
   });
 
+  it('prepara filas de presentación con filtros de texto y etiquetas', async () => {
+    const ruta = new Ruta(1, 10, '2026-06-01', EstadoRuta.PROGRAMADA);
+    ruta.id = 1;
+    const bus = new Bus(1, '25', 'PBA-1234', 40, EstadoBus.ACTIVO);
+    bus.id = 10;
+    const frecuencia = new Frecuencia(1, 'Quito', 'Guayaquil', '08:00', 'FREQ-01');
+    frecuencia.id = 1;
+
+    vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue([ruta]);
+    vi.mocked(mockBusRepo.obtenerTodos).mockResolvedValue([bus]);
+    vi.mocked(mockFrecuenciaRepo.obtenerTodas).mockResolvedValue([frecuencia]);
+
+    const composable = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+    await Promise.all([
+      composable.cargarRutas(),
+      composable.cargarBuses(),
+      composable.cargarFrecuencias(),
+    ]);
+
+    expect(composable.filasFiltradas.value[0]).toMatchObject({
+      ruta,
+      trayectoEtiqueta: 'Quito → Guayaquil',
+      busEtiqueta: 'Bus #25 (PBA-1234)',
+    });
+
+    composable.filtroTexto.value = 'guayaquil';
+    expect(composable.rutasFiltradas.value).toHaveLength(1);
+    composable.filtroTexto.value = 'placa-no-existe';
+    expect(composable.filasFiltradas.value).toHaveLength(0);
+  });
+
+  it('expone todas las filas filtradas sin paginar (la paginación la aplica la vista)', async () => {
+    const rutas = Array.from({ length: 25 }, (_, index) => {
+      const ruta = new Ruta(1, index + 1, '2026-06-01', EstadoRuta.PROGRAMADA);
+      ruta.id = index + 1;
+      return ruta;
+    });
+    vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue(rutas);
+
+    const composable = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+    await composable.cargarRutas();
+
+    expect(composable.filasFiltradas.value).toHaveLength(25);
+
+    composable.filtroTexto.value = 'no existe';
+    await nextTick();
+
+    expect(composable.filasFiltradas.value).toHaveLength(0);
+  });
+
   it('debe cambiar estado de una ruta e iniciar viaje', async () => {
     const r = new Ruta(1, 10, '2026-06-01', EstadoRuta.PROGRAMADA);
     r.id = 1;
@@ -214,5 +265,80 @@ describe('useRutas Composable', () => {
 
     expect(mockRutaRepo.eliminar).toHaveBeenCalledWith(1);
     expect(composable.rutas.value).toHaveLength(0);
+  });
+
+  describe('listas operativas, resumen y filtros', () => {
+    const crearBus = (id: number, estado: EstadoBus): Bus => {
+      const bus = new Bus(1, String(id), `PBA-100${id}`, 40, estado);
+      bus.id = id;
+      return bus;
+    };
+
+    it('solo ofrece frecuencias activas y buses en estado Activo para programar rutas', async () => {
+      const activa = new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FR-1');
+      activa.id = 1;
+      const inactiva = new Frecuencia(1, 'Quito', 'Loja', '09:00', 'FR-2');
+      inactiva.id = 2;
+      inactiva.desactivar();
+      vi.mocked(mockFrecuenciaRepo.obtenerTodas).mockResolvedValue([activa, inactiva]);
+      vi.mocked(mockBusRepo.obtenerTodos).mockResolvedValue([
+        crearBus(1, EstadoBus.ACTIVO),
+        crearBus(2, EstadoBus.MANTENIMIENTO),
+        crearBus(3, EstadoBus.INACTIVO),
+      ]);
+      const { frecuencias, buses, frecuenciasActivas, busesActivos, cargarFrecuencias, cargarBuses } = useRutas(
+        mockRutaRepo,
+        mockBusRepo,
+        mockFrecuenciaRepo,
+      );
+
+      await cargarFrecuencias();
+      await cargarBuses();
+
+      expect(frecuenciasActivas.value.map((f) => f.id)).toEqual([1]);
+      expect(busesActivos.value.map((b) => b.id)).toEqual([1]);
+      // Las listas completas se conservan para nombrar rutas ya existentes.
+      expect(frecuencias.value).toHaveLength(2);
+      expect(buses.value).toHaveLength(3);
+    });
+
+    it('resume las rutas por estado para las tarjetas de métricas', async () => {
+      const rutas = [
+        new Ruta(1, 1, '2026-06-01', EstadoRuta.PROGRAMADA),
+        new Ruta(1, 2, '2026-06-01', EstadoRuta.PROGRAMADA),
+        new Ruta(1, 3, '2026-06-01', EstadoRuta.EN_CURSO),
+        new Ruta(1, 4, '2026-06-01', EstadoRuta.FINALIZADA),
+        new Ruta(1, 5, '2026-06-01', EstadoRuta.CANCELADA),
+      ];
+      vi.mocked(mockRutaRepo.obtenerTodas).mockResolvedValue(rutas);
+      const { resumen, cargarRutas } = useRutas(mockRutaRepo, mockBusRepo, mockFrecuenciaRepo);
+      expect(resumen.value).toEqual({ total: 0, programadas: 0, enCurso: 0, finalizadas: 0 });
+
+      await cargarRutas();
+
+      expect(resumen.value).toEqual({ total: 5, programadas: 2, enCurso: 1, finalizadas: 1 });
+    });
+
+    it('detecta si hay filtros activos y permite reiniciarlos', () => {
+      const { hayFiltros, filtroTexto, filtroFecha, filtroEstado, reiniciarFiltros } = useRutas(
+        mockRutaRepo,
+        mockBusRepo,
+        mockFrecuenciaRepo,
+      );
+      expect(hayFiltros.value).toBe(false);
+
+      filtroTexto.value = '  ';
+      expect(hayFiltros.value).toBe(false);
+
+      filtroTexto.value = 'quito';
+      filtroFecha.value = '2026-06-01';
+      filtroEstado.value = EstadoRuta.EN_CURSO;
+      expect(hayFiltros.value).toBe(true);
+
+      reiniciarFiltros();
+
+      expect(hayFiltros.value).toBe(false);
+      expect([filtroTexto.value, filtroFecha.value, filtroEstado.value]).toEqual(['', '', 'Todas']);
+    });
   });
 });

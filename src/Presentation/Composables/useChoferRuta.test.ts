@@ -1,13 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useChoferRuta } from './useChoferRuta';
 import type { IRutaRepository } from '../../Domain/Repositories/IRutaRepository';
-import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
+import type { IAbordajeBoletosRepository } from '../../Domain/Repositories/IAbordajeBoletosRepository';
+import { Boleto } from '../../Domain/Entities/Boleto';
 import { Ruta } from '../../Domain/Entities/Ruta';
-import { EstadoRuta } from '../../Domain/Constants/EstadosSistema';
+import { EstadoBoleto, EstadoRuta } from '../../Domain/Constants/EstadosSistema';
 
 describe('useChoferRuta Composable', () => {
   let mockRutaRepo: IRutaRepository;
-  let mockBoletosRepo: IBoletosRepository;
+  let mockBoletosRepo: IAbordajeBoletosRepository;
 
   beforeEach(() => {
     mockRutaRepo = {
@@ -23,15 +24,8 @@ describe('useChoferRuta Composable', () => {
     };
 
     mockBoletosRepo = {
-      obtenerPorId: vi.fn(),
       obtenerPorCodigo: vi.fn(),
-      obtenerPorVentaId: vi.fn(),
-      obtenerPorRutaId: vi.fn(),
-      crear: vi.fn(),
-      actualizarEstado: vi.fn(),
       marcarAbordado: vi.fn(),
-      marcarNoAbordo: vi.fn(),
-      obtenerBoletosOcupados: vi.fn(),
     };
   });
 
@@ -124,10 +118,10 @@ describe('useChoferRuta Composable', () => {
     rEnCurso.id = 1;
 
     vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockResolvedValue([rEnCurso]);
-    vi.mocked(mockBoletosRepo.obtenerPorCodigo).mockResolvedValue({
-      id: 50,
-      codigoQr: 'QR-VALIDO-123',
-    } as any);
+    const boleto = new Boleto(5, 1, 12, '0926687856', 'Ana', 'Pérez', 10, undefined, EstadoBoleto.EMITIDO);
+    boleto.id = 50;
+    boleto.codigoQr = 'QR-VALIDO-123';
+    vi.mocked(mockBoletosRepo.obtenerPorCodigo).mockResolvedValue(boleto);
 
     const composable = useChoferRuta(mockRutaRepo, mockBoletosRepo);
     await composable.cargarRutaChofer('chofer-1', '2026-06-01');
@@ -157,6 +151,25 @@ describe('useChoferRuta Composable', () => {
     expect(composable.historial.value[0]?.resultado).toContain('no encontrado');
   });
 
+  it('registra en el historial el rechazo de un boleto de otra ruta', async () => {
+    const rEnCurso = new Ruta(1, 10, '2026-06-01', EstadoRuta.EN_CURSO);
+    rEnCurso.id = 1;
+
+    vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockResolvedValue([rEnCurso]);
+    const ajeno = new Boleto(5, 2, 12, '0926687856', 'Ana', 'Pérez', 10, undefined, EstadoBoleto.EMITIDO);
+    ajeno.id = 51;
+    vi.mocked(mockBoletosRepo.obtenerPorCodigo).mockResolvedValue(ajeno);
+
+    const composable = useChoferRuta(mockRutaRepo, mockBoletosRepo);
+    await composable.cargarRutaChofer('chofer-1', '2026-06-01');
+
+    const res = await composable.validarQrBoleto('QR-OTRA-RUTA');
+
+    expect(res.ok).toBe(false);
+    expect(res.mensaje).toBe('El boleto no corresponde a esta ruta.');
+    expect(mockBoletosRepo.marcarAbordado).not.toHaveBeenCalled();
+  });
+
   it('debe limpiar estado con limpiar()', () => {
     const composable = useChoferRuta(mockRutaRepo);
     composable.rutaActual.value = new Ruta(1, 10, '2026-06-01');
@@ -166,5 +179,30 @@ describe('useChoferRuta Composable', () => {
 
     expect(composable.rutaActual.value).toBeNull();
     expect(composable.error.value).toBeNull();
+  });
+
+  it('sin fecha consulta las rutas del día local, también a última hora de la noche', async () => {
+    vi.useFakeTimers();
+    // 23:30 hora local del 10/11: en UTC-5 ya sería el 11/11 en UTC.
+    vi.setSystemTime(new Date(2026, 10, 10, 23, 30));
+    try {
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockResolvedValue([]);
+      const composable = useChoferRuta(mockRutaRepo);
+
+      await composable.cargarRutaChofer('chofer-1');
+
+      expect(mockRutaRepo.obtenerPorChoferYFecha).toHaveBeenCalledWith('chofer-1', '2026-11-10');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('si se indica una fecha, usa esa y no la de hoy', async () => {
+    vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockResolvedValue([]);
+    const composable = useChoferRuta(mockRutaRepo);
+
+    await composable.cargarRutaChofer('chofer-1', '2026-12-01');
+
+    expect(mockRutaRepo.obtenerPorChoferYFecha).toHaveBeenCalledWith('chofer-1', '2026-12-01');
   });
 });

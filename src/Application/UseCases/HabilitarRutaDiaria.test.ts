@@ -14,6 +14,7 @@ import {
   FrecuenciaFueraDeDiaException,
   BusNoDisponibleParaRutaException,
   BusNoActivoParaRutaException,
+  ChoferNoDisponibleParaRutaException,
 } from '../../Domain/Exceptions/RutaException';
 
 describe('HabilitarRutaDiaria UseCase', () => {
@@ -259,5 +260,259 @@ describe('HabilitarRutaDiaria UseCase', () => {
     const resultado = await habilitarRutaDiaria.execute(input);
     expect(resultado).toBeDefined();
     expect(resultado.frecuenciaId).toBe(1);
+  });
+
+  describe('mensajes que nombran el bus como en la pantalla', () => {
+    const input: HabilitarRutaInput = { frecuenciaId: 1, busId: 10, fecha: '2026-06-01' };
+
+    it('el conflicto de horario indica el número y la placa del bus, no su id interno', async () => {
+      const bus = new Bus(1, '30', 'PNS-789', 50, EstadoBus.ACTIVO);
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(bus);
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([new Ruta(2, 10, '2026-06-01', EstadoRuta.PROGRAMADA)]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow(
+        'El bus #30 (PNS-789) ya se encuentra asignado a una ruta activa en el mismo horario para la fecha 2026-06-01.',
+      );
+    });
+
+    it('un bus que no está activo se nombra por número y placa', async () => {
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '26', 'PBA-254', 40, EstadoBus.MANTENIMIENTO));
+
+      await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow('El bus #26 (PBA-254) no está en estado Activo.');
+    });
+
+    it('un bus que no existe solo puede nombrarse por su id', async () => {
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(null);
+
+      await expect(habilitarRutaDiaria.ejecutar(input)).rejects.toThrow('El bus con ID 10 no existe o no está en estado Activo.');
+    });
+  });
+
+  describe('varios viajes del mismo bus el mismo día', () => {
+    const input = (extras: Partial<HabilitarRutaInput> = {}): HabilitarRutaInput => ({
+      frecuenciaId: 1,
+      busId: 10,
+      fecha: '2026-06-01',
+      ...extras,
+    });
+
+    const rutaExistente = (salida: string | undefined, llegada: string | undefined, estado: EstadoRuta) => {
+      const ruta = new Ruta(2, 10, '2026-06-01', estado);
+      ruta.horaSalida = salida;
+      ruta.horaLlegada = llegada;
+      return ruta;
+    };
+
+    beforeEach(() => {
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '14:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '30', 'PNS-789', 50, EstadoBus.ACTIVO));
+      vi.mocked(mockRutaRepo.crear).mockImplementation(async (ruta) => ruta);
+    });
+
+    it('permite un segundo viaje del mismo bus el mismo día si los horarios no se solapan', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('06:00:00', '09:00:00', EstadoRuta.FINALIZADA),
+      ]);
+
+      const ruta = await habilitarRutaDiaria.ejecutar(input());
+
+      expect(ruta.horaSalida).toBe('14:00');
+      expect(mockRutaRepo.crear).toHaveBeenCalled();
+    });
+
+    it('rechaza un viaje que se solapa e indica el horario ocupado', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('13:00', '16:00', EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).rejects.toThrow(BusNoDisponibleParaRutaException);
+      await expect(habilitarRutaDiaria.ejecutar(input())).rejects.toThrow('(13:00–16:00)');
+      expect(mockRutaRepo.crear).not.toHaveBeenCalled();
+    });
+
+    it('un viaje que sale justo cuando el otro llega no se solapa', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('11:00', '14:00', EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).resolves.toBeDefined();
+    });
+
+    it('usa el horario indicado en la solicitud en lugar del de la frecuencia', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('14:00', '17:00', EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input({ horaSalida: '20:00' }))).resolves.toMatchObject({
+        horaSalida: '20:00',
+      });
+    });
+
+    it('tiene en cuenta el tiempo de viaje indicado: un viaje largo puede chocar con uno posterior', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('20:00', '22:00', EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).resolves.toBeDefined();
+      await expect(habilitarRutaDiaria.ejecutar(input({ tiempoViajeMinutos: 600 }))).rejects.toThrow(
+        BusNoDisponibleParaRutaException,
+      );
+    });
+
+    it('los viajes cancelados no ocupan al bus', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('14:00', '17:00', EstadoRuta.CANCELADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).resolves.toBeDefined();
+    });
+
+    it('un viaje sin hora conocida se asume ocupado: no se puede demostrar que no se solape', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente(undefined, undefined, EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).rejects.toThrow(BusNoDisponibleParaRutaException);
+    });
+
+    it('un viaje nocturno ocupa al bus hasta la madrugada', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([
+        rutaExistente('22:00', '06:00', EstadoRuta.PROGRAMADA),
+      ]);
+
+      await expect(habilitarRutaDiaria.ejecutar(input({ horaSalida: '23:00' }))).rejects.toThrow(
+        BusNoDisponibleParaRutaException,
+      );
+      await expect(habilitarRutaDiaria.ejecutar(input({ horaSalida: '10:00' }))).resolves.toBeDefined();
+    });
+  });
+
+  describe('un chofer no puede manejar dos viajes a la vez', () => {
+    const input = (extras: Partial<HabilitarRutaInput> = {}): HabilitarRutaInput => ({
+      frecuenciaId: 1,
+      busId: 10,
+      fecha: '2026-06-01',
+      choferId: 'chofer-1',
+      ...extras,
+    });
+
+    const crearRuta = (
+      id: number,
+      fecha: string,
+      salida: string,
+      llegada: string,
+      estado: EstadoRuta = EstadoRuta.PROGRAMADA,
+    ) => {
+      const ruta = new Ruta(2, 99, fecha, estado);
+      ruta.id = id;
+      ruta.horaSalida = salida;
+      ruta.horaLlegada = llegada;
+      return ruta;
+    };
+
+    const rutasPorDia = (porFecha: Record<string, Ruta[]>) => async (_id: unknown, fecha: string) => porFecha[fecha] ?? [];
+
+    beforeEach(() => {
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '14:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '30', 'PNS-789', 50, EstadoBus.ACTIVO));
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockResolvedValue([]);
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockResolvedValue([]);
+      vi.mocked(mockRutaRepo.crear).mockImplementation(async (ruta) => ruta);
+    });
+
+    it('permite asignar al chofer si no tiene otro viaje en ese horario, consultando los tres días', async () => {
+      const ruta = await habilitarRutaDiaria.ejecutar(input());
+
+      expect(ruta.choferId).toBe('chofer-1');
+      expect(mockRutaRepo.obtenerPorChoferYFecha).toHaveBeenCalledWith('chofer-1', '2026-05-31');
+      expect(mockRutaRepo.obtenerPorChoferYFecha).toHaveBeenCalledWith('chofer-1', '2026-06-01');
+      expect(mockRutaRepo.obtenerPorChoferYFecha).toHaveBeenCalledWith('chofer-1', '2026-06-02');
+    });
+
+    it('rechaza si el chofer ya conduce otro bus que se solapa, e indica el horario', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockImplementation(
+        rutasPorDia({ '2026-06-01': [crearRuta(1, '2026-06-01', '13:00', '16:00')] }),
+      );
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).rejects.toBeInstanceOf(ChoferNoDisponibleParaRutaException);
+      await expect(habilitarRutaDiaria.ejecutar(input())).rejects.toThrow(
+        'El chofer seleccionado ya tiene asignado otro viaje que se solapa con este horario (13:00–16:00).',
+      );
+      expect(mockRutaRepo.crear).not.toHaveBeenCalled();
+    });
+
+    it('permite un viaje que empieza justo cuando termina el anterior del chofer', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockImplementation(
+        rutasPorDia({ '2026-06-01': [crearRuta(1, '2026-06-01', '11:00', '14:00')] }),
+      );
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).resolves.toBeDefined();
+    });
+
+    it('los viajes cancelados del chofer no cuentan', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockImplementation(
+        rutasPorDia({ '2026-06-01': [crearRuta(1, '2026-06-01', '14:00', '17:00', EstadoRuta.CANCELADA)] }),
+      );
+
+      await expect(habilitarRutaDiaria.ejecutar(input())).resolves.toBeDefined();
+    });
+
+    it('sin chofer indicado no consulta a ningún chofer', async () => {
+      await habilitarRutaDiaria.ejecutar(input({ choferId: undefined }));
+
+      expect(mockRutaRepo.obtenerPorChoferYFecha).not.toHaveBeenCalled();
+    });
+
+    it('un viaje nocturno del chofer que sale hoy choca con uno de mañana de madrugada', async () => {
+      vi.mocked(mockRutaRepo.obtenerPorChoferYFecha).mockImplementation(
+        rutasPorDia({ '2026-06-02': [crearRuta(1, '2026-06-02', '03:00', '06:00')] }),
+      );
+
+      await expect(habilitarRutaDiaria.ejecutar(input({ horaSalida: '22:00', horaLlegada: '04:00' }))).rejects.toThrow(
+        '(2026-06-02 03:00–06:00)',
+      );
+      await expect(habilitarRutaDiaria.ejecutar(input({ horaSalida: '22:00', horaLlegada: '02:00' }))).resolves.toBeDefined();
+    });
+  });
+
+  describe('viajes de medianoche del bus', () => {
+    beforeEach(() => {
+      vi.mocked(mockFrecuenciaRepo.obtenerPorId).mockResolvedValue(
+        new Frecuencia(1, 'Quito', 'Cuenca', '05:00', 'FREQ-001'),
+      );
+      vi.mocked(mockBusRepo.obtenerPorId).mockResolvedValue(new Bus(1, '30', 'PNS-789', 50, EstadoBus.ACTIVO));
+      vi.mocked(mockRutaRepo.crear).mockImplementation(async (ruta) => ruta);
+      const nocturnoDeAyer = new Ruta(2, 10, '2026-05-31', EstadoRuta.PROGRAMADA);
+      nocturnoDeAyer.horaSalida = '22:00';
+      nocturnoDeAyer.horaLlegada = '06:00';
+      vi.mocked(mockRutaRepo.obtenerPorBusYFecha).mockImplementation(async (_id, fecha) =>
+        fecha === '2026-05-31' ? [nocturnoDeAyer] : [],
+      );
+    });
+
+    it('el viaje nocturno de ayer sigue ocupando al bus en las primeras horas de hoy', async () => {
+      await expect(
+        habilitarRutaDiaria.ejecutar({ frecuenciaId: 1, busId: 10, fecha: '2026-06-01' }),
+      ).rejects.toThrow('(2026-05-31 22:00–06:00)');
+    });
+
+    it('cuando el bus ya llegó, el viaje de hoy puede salir', async () => {
+      await expect(
+        habilitarRutaDiaria.ejecutar({ frecuenciaId: 1, busId: 10, fecha: '2026-06-01', horaSalida: '06:00' }),
+      ).resolves.toBeDefined();
+    });
   });
 });

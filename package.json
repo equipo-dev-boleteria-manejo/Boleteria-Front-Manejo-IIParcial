@@ -17,7 +17,6 @@
     "html5-qrcode": "2.3.8",
     "jsbarcode": "3.12.3",
     "pinia": "3.0.4",
-    "qrcode": "1.5.4",
     "vue": "3.5.33",
     "vue-chartjs": "^5.3.4",
     "vue-router": "5.0.6"
