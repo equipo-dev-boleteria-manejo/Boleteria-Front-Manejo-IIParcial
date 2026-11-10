@@ -14,6 +14,8 @@ export interface VentaPayload {
   Estado?: EstadoVenta | string;
   MetodoPago: MetodoPago | string;
   ComprobanteUrl?: string | null;
+  /** Identificador del PaymentIntent de Stripe para compras con tarjeta. */
+  StripePaymentIntentId?: string | null;
   AprobadoPorId?: string | null;
   FechaVenta?: string;
 }
@@ -24,8 +26,21 @@ export interface IVentaRepository {
   obtenerVentaPorId(ventaId: number): Promise<Venta | null>;
   obtenerVentasPendientes(): Promise<Venta[]>;
   obtenerVentasPorRuta(rutaId: number): Promise<Venta[]>;
-  aprobarVenta(ventaId: number, aprobadoPorId: string): Promise<void>;
+  aprobarVenta(ventaId: number, aprobadoPorId: string | null): Promise<void>;
+  /**
+   * Confirma una reserva pagada con tarjeta: guarda el PaymentIntent, marca la
+   * venta como aprobada y deja constancia del usuario que la confirma.
+   */
+  confirmarVentaTarjeta(
+    ventaId: number,
+    stripePaymentIntentId: string,
+    aprobadoPorId?: string | null,
+  ): Promise<void>;
   rechazarVenta(ventaId: number, aprobadoPorId: string, observacion?: string): Promise<void>;
   migrarVentasARuta(oldRutaId: number, newRutaId: number): Promise<void>;
-  uploadComprobante?(path: string, file: Blob | ArrayBuffer | any, options?: any): Promise<{ publicUrl: string }>;
+  uploadComprobante?(
+    path: string,
+    file: Blob | ArrayBuffer | Uint8Array,
+    options?: { contentType?: string; upsert?: boolean },
+  ): Promise<{ publicUrl: string }>;
 }

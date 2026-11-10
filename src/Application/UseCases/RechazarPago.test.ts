@@ -18,6 +18,7 @@ describe('RechazarPago (Caso de Uso)', () => {
       obtenerVentasPendientes: vi.fn(),
       obtenerVentasPorRuta: vi.fn(),
       aprobarVenta: vi.fn(),
+      confirmarVentaTarjeta: vi.fn(),
       rechazarVenta: vi.fn().mockResolvedValue(undefined),
       migrarVentasARuta: vi.fn(),
     };

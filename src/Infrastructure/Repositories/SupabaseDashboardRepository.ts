@@ -32,12 +32,12 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
       .select('*', { count: 'exact', head: true })
       .eq('Estado', EstadoBus.ACTIVO);
 
-    // 3. Rutas en el rango (o hoy)
+    // 3. Rutas en el rango (o próximas)
     let rutasQuery = supabase.from('Rutas').select('*', { count: 'exact', head: true });
     if (filtro?.fechaInicio && filtro?.fechaFin) {
       rutasQuery = rutasQuery.gte('Fecha', filtro.fechaInicio).lte('Fecha', filtro.fechaFin);
     } else {
-      rutasQuery = rutasQuery.eq('Fecha', hoyStr);
+      rutasQuery = rutasQuery.gte('Fecha', hoyStr);
     }
     const { count: rutasCount } = await rutasQuery;
 
@@ -79,11 +79,17 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
       mantenimiento: 0,
       inactivos: 0,
     };
-    (buses || []).forEach((b: { Estado: string }) => {
-      const est = (b.Estado || '').toLowerCase();
-      if (est.includes('activo')) estadoFlota.activos++;
-      else if (est.includes('manten')) estadoFlota.mantenimiento++;
-      else estadoFlota.inactivos++;
+    (buses || []).forEach((b: { Estado?: string; estado?: string }) => {
+      const est = String(b.Estado ?? b.estado ?? '').trim().toLowerCase();
+      if (est === 'inactivo' || est.includes('inact') || est.includes('fuera')) {
+        estadoFlota.inactivos++;
+      } else if (est.includes('manten')) {
+        estadoFlota.mantenimiento++;
+      } else if (est === 'activo' || est.includes('act')) {
+        estadoFlota.activos++;
+      } else {
+        estadoFlota.activos++;
+      }
     });
 
     // Ventas agrupadas y Métodos de pago
@@ -139,14 +145,19 @@ export class SupabaseDashboardRepository implements IDashboardRepository {
     // Top Rutas
     const { data: rutas } = await supabase
       .from('Rutas')
-      .select('Id, Origen, DestinoFinal, Estado')
+      .select('Id, Estado, Frecuencias(CiudadOrigen, CiudadDestino)')
       .limit(10);
 
-    const topRutas: DesempenoRutaTop[] = (rutas || []).slice(0, 5).map((r: any) => ({
-      ruta: `${r.Origen} - ${r.DestinoFinal}`,
-      viajes: 1,
-      boletos: 10,
-    }));
+    const topRutas: DesempenoRutaTop[] = (rutas || []).slice(0, 5).map((r: any) => {
+      const freq = r.Frecuencias || r.frecuencias;
+      const origen = freq?.CiudadOrigen || freq?.ciudad_origen || 'Origen';
+      const destino = freq?.CiudadDestino || freq?.ciudad_destino || 'Destino';
+      return {
+        ruta: `${origen} - ${destino}`,
+        viajes: 1,
+        boletos: 10,
+      };
+    });
 
     return {
       metricas,

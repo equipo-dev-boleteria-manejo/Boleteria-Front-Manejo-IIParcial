@@ -17,6 +17,7 @@ import {
   ConfirmarCompra,
   confirmarCompraUseCase as defaultConfirmarCompraUseCase,
   type ConfirmInput,
+  type ResultadoConfirmacionCompra,
 } from '../../Application/UseCases/ConfirmarCompra';
 
 export function useVentaDescuento(
@@ -26,7 +27,7 @@ export function useVentaDescuento(
   const loading = ref<boolean>(false);
   const error = ref<string | null>(null);
   const descuento = ref<ResultadoDescuentoVentaDto | null>(null);
-  const ultimaVenta = ref<any | null>(null);
+  const ultimaVenta = ref<ResultadoConfirmacionCompra | null>(null);
 
   const tieneDescuento = computed<boolean>(() => {
     return Boolean(descuento.value && descuento.value.porcentajeDescuento > 0);
@@ -45,8 +46,11 @@ export function useVentaDescuento(
       const resultado = calcularUseCase.ejecutar(dto);
       descuento.value = resultado;
       return resultado;
-    } catch (err: any) {
-      error.value = err.message || 'Error al calcular el descuento de venta.';
+    } catch (err: unknown) {
+      error.value =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Error al calcular el descuento de venta.';
       throw err;
     }
   }
@@ -54,7 +58,7 @@ export function useVentaDescuento(
   /**
    * Confirma la compra de boletos aplicando validaciones, comprobante o cobro.
    */
-  async function confirmar(input: ConfirmInput): Promise<any> {
+  async function confirmar(input: ConfirmInput): Promise<ResultadoConfirmacionCompra> {
     loading.value = true;
     error.value = null;
 
@@ -62,8 +66,11 @@ export function useVentaDescuento(
       const resultado = await confirmarUseCase.ejecutar(input);
       ultimaVenta.value = resultado;
       return resultado;
-    } catch (err: any) {
-      error.value = err.message || 'Error al confirmar la compra.';
+    } catch (err: unknown) {
+      error.value =
+        err instanceof Error && err.message
+          ? err.message
+          : 'Error al confirmar la compra.';
       throw err;
     } finally {
       loading.value = false;

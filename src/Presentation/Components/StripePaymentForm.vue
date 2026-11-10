@@ -1,21 +1,27 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import { loadStripe, type Stripe, type StripeElements, type StripeCardElement } from '@stripe/stripe-js';
 import ButtonBase from './ButtonBase.vue';
 
-const props = withDefaults(
-  defineProps<{
-    clientSecret?: string;
-    amount: number;
-    allowSimulation?: boolean;
-  }>(),
-  {
-    clientSecret: '',
-    allowSimulation: true,
-  }
-);
+interface Props {
+  amount: number;
+  currency?: string;
+  disabled?: boolean;
+  clientSecret?: string;
+  allowSimulation?: boolean;
+  showSubmitButton?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  currency: 'usd',
+  disabled: false,
+  clientSecret: '',
+  allowSimulation: true,
+  showSubmitButton: true,
+});
 
 const emit = defineEmits<{
+  (e: 'ready'): void;
   (e: 'success', paymentResult: any): void;
   (e: 'error', error: any): void;
 }>();
@@ -29,19 +35,26 @@ const cardElementRef = ref<HTMLElement | null>(null);
 const isProcessing = ref(false);
 const errorMessage = ref('');
 const isStripeLoaded = ref(false);
+const configError = ref('');
 
 onMounted(async () => {
   if (!stripeKey) {
-    // Si no hay key configurada en el entorno, dejamos el modo simulación disponible
+    // Si no hay key configurada en el entorno, dejamos modo simulación disponible
+    isStripeLoaded.value = false;
+    emit('ready');
     return;
   }
 
   try {
     stripe = await loadStripe(stripeKey);
-    if (!stripe) return;
+    if (!stripe) {
+      emit('ready');
+      return;
+    }
 
-    elements = stripe.elements();
+    elements = stripe.elements({ locale: 'es' });
     cardElement = elements.create('card', {
+      hidePostalCode: true,
       style: {
         base: {
           fontSize: '15px',
@@ -59,12 +72,24 @@ onMounted(async () => {
     });
 
     if (cardElementRef.value) {
+      cardElementRef.value.innerHTML = '';
       cardElement.mount(cardElementRef.value);
       isStripeLoaded.value = true;
     }
+    emit('ready');
   } catch (err: any) {
     console.warn('No se pudo inicializar Stripe Elements:', err);
+    emit('ready');
   }
+});
+
+onBeforeUnmount(() => {
+  if (cardElement) {
+    cardElement.destroy();
+    cardElement = null;
+  }
+  elements = null;
+  stripe = null;
 });
 
 const handleSubmit = async () => {
@@ -99,11 +124,55 @@ const handleSubmit = async () => {
       id: `pi_sim_${Date.now()}`,
       status: 'succeeded',
       amount: Math.round(props.amount * 100),
-      currency: 'usd',
+      currency: props.currency,
       simulated: true,
     });
-  }, 800);
+  }, 600);
 };
+
+// Función para invocación imperativa desde componentes padres (como BuscarRutas.vue)
+async function pagar(monto?: number): Promise<string> {
+  const total = Number.isFinite(monto) && (monto ?? 0) > 0 ? monto! : props.amount;
+  isProcessing.value = true;
+  errorMessage.value = '';
+
+  if (stripe && cardElement && props.clientSecret) {
+    const { error, paymentIntent } = await stripe.confirmCardPayment(props.clientSecret, {
+      payment_method: { card: cardElement },
+    });
+
+    if (error) {
+      isProcessing.value = false;
+      const msg = error.message || 'Stripe rechazó el pago con la tarjeta.';
+      errorMessage.value = msg;
+      emit('error', msg);
+      throw new Error(msg);
+    }
+
+    if (paymentIntent?.id) {
+      isProcessing.value = false;
+      return paymentIntent.id;
+    }
+  }
+
+  // Simulación fallback
+  isProcessing.value = false;
+  return `pi_sim_${Math.round(total * 100)}_${Date.now()}`;
+}
+
+function reiniciar(): void {
+  errorMessage.value = '';
+  cardElement?.clear();
+}
+
+defineExpose({
+  pagar,
+  reiniciar,
+  listo: isStripeLoaded,
+  cargando: isProcessing,
+  configError,
+  error: errorMessage,
+});
 </script>
 
 <template>
@@ -125,11 +194,10 @@ const handleSubmit = async () => {
         <label class="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
           Datos de la Tarjeta
         </label>
-        <div ref="cardElementRef" class="min-h-[28px] text-sm text-slate-700">
-          <p v-if="!isStripeLoaded" class="text-xs text-slate-500 italic py-1">
-            💳 Ingreso seguro de tarjeta habilitado (Stripe Gateway)
-          </p>
-        </div>
+        <div ref="cardElementRef" class="min-h-[28px] text-sm text-slate-700"></div>
+        <p v-show="!isStripeLoaded" class="text-xs text-slate-500 italic py-1">
+          💳 Ingreso seguro de tarjeta habilitado (Stripe Gateway)
+        </p>
       </div>
 
       <div
@@ -141,10 +209,12 @@ const handleSubmit = async () => {
       </div>
 
       <ButtonBase
+        v-if="showSubmitButton"
         type="submit"
         variant="primary"
         class="w-full justify-center py-2.5 font-bold shadow-md shadow-blue-500/20"
         :loading="isProcessing"
+        :disabled="disabled"
       >
         {{ isProcessing ? 'Procesando pago seguro...' : `Pagar $${amount.toFixed(2)}` }}
       </ButtonBase>

@@ -7,7 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "test": "vitest",
-    "test:ui": "vitest --ui"
+    "test:ui": "vitest --ui",
+    "seed:test": "node scripts/seed-test-data.mjs"
   },
   "dependencies": {
     "@stripe/stripe-js": "9.7.0",

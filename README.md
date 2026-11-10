@@ -89,7 +89,14 @@ cp .env.example .env
 
 # 5. Iniciar servidor de desarrollo
 npm run dev
+
+# 6. (Opcional) Sembrar datos demo persistentes en Supabase
+#    Requiere SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en .env
+npm run seed:test
 ```
+
+> Las credenciales y el escenario de prueba están documentados en
+> [docs/pruebas-manuales-vistas.md](docs/pruebas-manuales-vistas.md).
 
 ---
 
@@ -100,3 +107,4 @@ npm run dev
 3. [LICENSE](LICENSE) - Licencia MIT del software.
 4. [SECURITY.md](SECURITY.md) - Política y protocolo de reporte de vulnerabilidades.
 5. [CITATION.cff](CITATION.cff) - Formato de citación académica del repositorio.
+6. [docs/pruebas-manuales-vistas.md](docs/pruebas-manuales-vistas.md) - Seed de datos demo y checklist de pruebas manuales de las vistas de venta.

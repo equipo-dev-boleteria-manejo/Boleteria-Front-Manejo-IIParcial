@@ -31,6 +31,11 @@ interface BoletoRow {
   CodigoQr: string | null;
   CodigoBarras: string | null;
   PrecioFinal: number;
+  FechaNacimiento: string | null;
+  EsMenor: boolean | null;
+  EsDiscapacitado: boolean | null;
+  EsTerceraEdad: boolean | null;
+  DescuentoAplicado: number | null;
   SubRutaOrigen: string | null;
   SubRutaDestino: string | null;
   CreatedAt: string | null;
@@ -75,6 +80,19 @@ export class SupabaseBoletosRepository
           ? (item.codigoBarras ?? null)
           : (item.CodigoBarras ?? null),
         PrecioFinal: esEntidad ? item.precioFinal : item.PrecioFinal,
+        FechaNacimiento: esEntidad
+          ? (item.fechaNacimiento ?? null)
+          : (item.FechaNacimiento ?? null),
+        EsMenor: esEntidad ? (item.esMenor ?? false) : (item.EsMenor ?? false),
+        EsDiscapacitado: esEntidad
+          ? (item.esDiscapacitado ?? false)
+          : (item.EsDiscapacitado ?? false),
+        EsTerceraEdad: esEntidad
+          ? (item.esTerceraEdad ?? false)
+          : (item.EsTerceraEdad ?? false),
+        DescuentoAplicado: esEntidad
+          ? (item.descuentoAplicado ?? 0)
+          : (item.DescuentoAplicado ?? 0),
         SubRutaOrigen: esEntidad
           ? (item.subRutaOrigen ?? null)
           : (item.SubRutaOrigen ?? null),
@@ -90,9 +108,13 @@ export class SupabaseBoletosRepository
       .select('*');
 
     if (error) {
-      throw new BoletoException(
-        `Error al insertar boletos en base de datos: ${error.message}`,
-      );
+      // 23505 = unique_violation. El índice parcial impide que dos boletos
+      // activos ocupen el mismo asiento en la misma ruta.
+      const mensaje =
+        error.code === '23505'
+          ? 'Uno de los asientos ya fue ocupado por otra compra. Vuelve a buscar la ruta.'
+          : `Error al insertar boletos en base de datos: ${error.message}`;
+      throw new BoletoException(mensaje);
     }
 
     return (data as BoletoRow[]).map((row) => this.mapRowToEntity(row));
@@ -282,6 +304,11 @@ export class SupabaseBoletosRepository
     boleto.id = row.Id;
     boleto.codigoQr = row.CodigoQr;
     boleto.codigoBarras = row.CodigoBarras;
+    boleto.fechaNacimiento = row.FechaNacimiento;
+    boleto.esMenor = row.EsMenor ?? false;
+    boleto.esDiscapacitado = row.EsDiscapacitado ?? false;
+    boleto.esTerceraEdad = row.EsTerceraEdad ?? false;
+    boleto.descuentoAplicado = Number(row.DescuentoAplicado ?? 0);
     boleto.subRutaOrigen = row.SubRutaOrigen;
     boleto.subRutaDestino = row.SubRutaDestino;
     if (row.CreatedAt) {

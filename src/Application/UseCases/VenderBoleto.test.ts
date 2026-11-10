@@ -4,10 +4,15 @@ import type { IVentaRepository } from '../../Domain/Repositories/IVentaRepositor
 import type { IBoletosRepository } from '../../Domain/Repositories/IBoletosRepository';
 import { EstadoVenta } from '../../Domain/Constants/EstadosSistema';
 import { DomainException } from '../../Domain/Exceptions/DomainException';
+import { ResolverPrecioAsiento } from './ResolverPrecioAsiento';
+import { CalcularDescuentoVenta } from './CalcularDescuentoVenta';
+import type { CalcularDescuentoVentaDto } from '../Dtos/CalcularDescuentoVentaDto';
 
 describe('VenderBoleto (Caso de Uso)', () => {
   let mockVentaRepo: IVentaRepository;
   let mockBoletosRepo: IBoletosRepository;
+  let mockResolverPrecios: ResolverPrecioAsiento;
+  let mockCalcularDescuento: CalcularDescuentoVenta;
   let useCase: VenderBoleto;
 
   beforeEach(() => {
@@ -18,6 +23,7 @@ describe('VenderBoleto (Caso de Uso)', () => {
       obtenerVentasPendientes: vi.fn(),
       obtenerVentasPorRuta: vi.fn(),
       aprobarVenta: vi.fn(),
+      confirmarVentaTarjeta: vi.fn(),
       rechazarVenta: vi.fn(),
       migrarVentasARuta: vi.fn(),
     };
@@ -34,7 +40,29 @@ describe('VenderBoleto (Caso de Uso)', () => {
       obtenerBoletoPorId: vi.fn(),
     };
 
-    useCase = new VenderBoleto(mockVentaRepo, mockBoletosRepo);
+    mockResolverPrecios = {
+      ejecutar: vi.fn().mockResolvedValue(new Map([[12, 15]])),
+    } as unknown as ResolverPrecioAsiento;
+
+    mockCalcularDescuento = {
+      ejecutar: vi.fn((datos: CalcularDescuentoVentaDto) => ({
+        numeroCedula: datos.numeroCedula,
+        edad: datos.edad,
+        tieneDiscapacidad: datos.tieneDiscapacidad,
+        precioBase: datos.precioBase,
+        categoria: 'SIN_DESCUENTO',
+        porcentajeDescuento: 0,
+        montoDescuento: 0,
+        precioFinal: datos.precioBase,
+      })),
+    } as unknown as CalcularDescuentoVenta;
+
+    useCase = new VenderBoleto(
+      mockVentaRepo,
+      mockBoletosRepo,
+      mockResolverPrecios,
+      mockCalcularDescuento,
+    );
   });
 
   it('debe registrar exitosamente la venta física en ventanilla en estado AprobadaPago', async () => {
@@ -60,7 +88,7 @@ describe('VenderBoleto (Caso de Uso)', () => {
           esDiscapacitado: false,
           esTerceraEdad: false,
           descuentoAplicado: 0,
-          precioFinal: 15.0,
+          precioFinal: 0.05,
         },
       ],
     };
@@ -68,6 +96,7 @@ describe('VenderBoleto (Caso de Uso)', () => {
     const resultado = await useCase.ejecutar(input);
 
     expect(mockBoletosRepo.verificarAsientoDisponible).toHaveBeenCalledWith(1, 12);
+    expect(mockResolverPrecios.ejecutar).toHaveBeenCalledWith([12]);
     expect(mockVentaRepo.crearVenta).toHaveBeenCalledWith(
       expect.objectContaining({
         UsuarioVendedorId: 'oficinista-001',

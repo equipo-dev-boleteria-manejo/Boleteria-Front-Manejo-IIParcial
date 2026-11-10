@@ -54,6 +54,7 @@ export const MetodoPago = {
   EFECTIVO: 'Efectivo',
   TRANSFERENCIA: 'Transferencia',
   DEPOSITO: 'Deposito',
+  TARJETA: 'Tarjeta',
 } as const
 export type MetodoPago = (typeof MetodoPago)[keyof typeof MetodoPago]
 

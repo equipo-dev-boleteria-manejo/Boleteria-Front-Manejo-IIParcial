@@ -25,10 +25,13 @@
         :disabled="disabled"
         :required="required"
         :autocomplete="autocomplete"
-        :maxlength="maxlength"
-        :min="min"
         :max="max"
+        :min="min"
         :step="step"
+        :maxlength="maxlength"
+        :minlength="minlength"
+        :inputmode="inputmode"
+        :pattern="pattern"
         class="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
         :class="[
           error
@@ -38,6 +41,7 @@
           $slots.suffix ? 'pr-10' : ''
         ]"
         @input="onInput"
+        @change="onInput"
         @blur="$emit('blur', $event)"
         @focus="$emit('focus', $event)"
       />
@@ -73,13 +77,16 @@ interface Props {
   required?: boolean
   autocomplete?: string
   containerClass?: string
-  maxlength?: number | string
-  min?: number | string
-  max?: number | string
-  step?: number | string
+  max?: string | number
+  min?: string | number
+  step?: string | number
+  maxlength?: string | number
+  minlength?: string | number
+  inputmode?: 'none' | 'text' | 'tel' | 'url' | 'email' | 'numeric' | 'decimal' | 'search'
+  pattern?: string
 }
 
-withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   label: '',
   id: () => `input-${Math.random().toString(36).slice(2, 9)}`,
@@ -91,20 +98,21 @@ withDefaults(defineProps<Props>(), {
   required: false,
   autocomplete: 'off',
   containerClass: '',
-  maxlength: undefined,
-  min: undefined,
-  max: undefined,
-  step: undefined,
 })
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: string): void
+  (e: 'change', event: Event): void
   (e: 'blur', event: FocusEvent): void
   (e: 'focus', event: FocusEvent): void
 }>()
 
 function onInput(event: Event) {
   const target = event.target as HTMLInputElement
+  if (event.type === 'change' && target.value === String(props.modelValue ?? '')) {
+    return
+  }
   emit('update:modelValue', target.value)
+  emit('change', event)
 }
 </script>

@@ -49,7 +49,7 @@ describe('ObtenerConteoCambios UseCase', () => {
         titulo: 'Cambio 4',
         descripcion: 'Desc',
         tipoCambio: TipoCambio.EMERGENCIA,
-        prioridad: PrioridadCambio.URGENTE,
+        prioridad: PrioridadCambio.CRITICA,
         estado: EstadoCambio.IMPLEMENTADO,
         solicitadoPor: 'dev4',
       },
@@ -58,7 +58,7 @@ describe('ObtenerConteoCambios UseCase', () => {
         titulo: 'Cambio 5',
         descripcion: 'Desc',
         tipoCambio: TipoCambio.EMERGENCIA,
-        prioridad: PrioridadCambio.URGENTE,
+        prioridad: PrioridadCambio.CRITICA,
         estado: EstadoCambio.SOLICITADO, // No implementado
         solicitadoPor: 'dev5',
       },
