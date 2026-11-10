@@ -1,59 +1,48 @@
 <template>
-  <div class="space-y-3 max-w-7xl mx-auto font-sans">
+  <div class="space-y-4 max-w-7xl mx-auto font-sans">
+    <!-- Tarjetas de Métricas / KPIs (MetricCard.vue) -->
+    <section class="grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Resumen de usuarios">
+      <MetricCard
+        v-for="tarjeta in tarjetasResumen"
+        :key="tarjeta.etiqueta"
+        :title="tarjeta.etiqueta"
+        :value="tarjeta.valor"
+        :icon="tarjeta.icono"
+        :description="tarjeta.detalle"
+        :variant="tarjeta.variant"
+      />
+    </section>
+
     <!-- Barra de Filtros, Búsqueda y Registro Rápido -->
     <div class="bg-white p-3 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row items-center justify-between gap-3">
       <div class="w-full md:w-80">
-        <InputBase
+        <SearchInput
           v-model="busqueda"
           placeholder="Buscar por nombre, email o cédula..."
-          container-class="w-full"
-        >
-          <template #prefix>
-            <svg class="h-4 w-4 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-          </template>
-        </InputBase>
+        />
       </div>
 
       <div class="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Rol:</label>
-          <select
-            v-model="filtroRol"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option value="Todos">Todos los roles</option>
-            <option :value="RolUsuario.ADMIN">Administrador</option>
-            <option :value="RolUsuario.ENCARGADO">Encargado</option>
-            <option :value="RolUsuario.OFICINISTA">Oficinista</option>
-            <option :value="RolUsuario.CHOFER">Chofer</option>
-            <option :value="RolUsuario.CLIENTE">Usuario Final / Cliente</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Rol:"
+          v-model="filtroRol"
+          :options="opcionesRol"
+        />
 
-        <div class="flex items-center gap-1.5">
-          <label class="text-[11px] font-bold text-slate-600 uppercase tracking-wider">Mostrar:</label>
-          <select
-            v-model="registrosPorPagina"
-            class="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 transition-all cursor-pointer"
-          >
-            <option :value="5">5 filas</option>
-            <option :value="10">10 filas</option>
-            <option :value="20">20 filas</option>
-          </select>
-        </div>
+        <SelectFilter
+          label="Mostrar:"
+          v-model="registrosPorPagina"
+          :options="[
+            { value: 5, label: '5 filas' },
+            { value: 10, label: '10 filas' },
+            { value: 20, label: '20 filas' },
+          ]"
+        />
 
-        <button
-          type="button"
+        <CreateButton
+          label="Registrar Nuevo Usuario"
           @click="abrirModalCrear"
-          class="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 active:scale-95 transition-all cursor-pointer ml-1"
-        >
-          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <span>Registrar Nuevo Usuario</span>
-        </button>
+        />
       </div>
     </div>
 
@@ -156,16 +145,11 @@
               </td>
               <td class="px-6 py-3 text-right">
                 <div class="flex items-center justify-end gap-2">
-                  <button
-                    type="button"
+                  <ActionButton
+                    action="edit"
+                    :aria-label="`Editar usuario ${u.nombres}`"
                     @click="abrirModalEditar(u)"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold shadow-2xs transition-all cursor-pointer"
-                  >
-                    <svg class="h-3.5 w-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                    <span>Editar</span>
-                  </button>
+                  />
 
                   <!-- Super Admin base protegido: botón de baja bloqueado -->
                   <span
@@ -175,17 +159,13 @@
                   >
                     Protegido
                   </span>
-                  <button
+                  <ActionButton
                     v-else-if="u.activo"
-                    type="button"
+                    action="danger"
+                    label="Dar de Baja"
+                    :aria-label="`Dar de baja a ${u.nombres}`"
                     @click="confirmarBaja(u)"
-                    class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition-all cursor-pointer"
-                  >
-                    <svg class="h-3.5 w-3.5 text-rose-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
-                    <span>Dar de Baja</span>
-                  </button>
+                  />
                 </div>
               </td>
             </tr>
@@ -425,7 +405,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useUiStore } from '../Store/uiStore'
 import { useUsuarios } from '../Composables/useUsuarios'
 import { usePasswordValidation } from '../Composables/usePasswordValidation'
@@ -435,9 +415,23 @@ import { RolUsuario } from '../../Domain/Constants/EstadosSistema'
 import { esSuperAdmin } from '../../Domain/Constants/SuperAdmin'
 import type { Usuario } from '../../Domain/Entities/Usuario'
 import ButtonBase from '../Components/ButtonBase.vue'
+import ActionButton from '../Components/ActionButton.vue'
+import MetricCard from '../Components/MetricCard.vue'
+import SearchInput from '../Components/SearchInput.vue'
+import SelectFilter from '../Components/SelectFilter.vue'
+import CreateButton from '../Components/CreateButton.vue'
 import InputBase from '../Components/InputBase.vue'
 import ModalBase from '../Components/ModalBase.vue'
 import PaginationControls from '../Components/PaginationControls.vue'
+
+const opcionesRol = [
+  { value: 'Todos', label: 'Todos los roles' },
+  { value: RolUsuario.ADMIN, label: 'Administrador' },
+  { value: RolUsuario.ENCARGADO, label: 'Encargado' },
+  { value: RolUsuario.OFICINISTA, label: 'Oficinista' },
+  { value: RolUsuario.CHOFER, label: 'Chofer' },
+  { value: RolUsuario.CLIENTE, label: 'Usuario Final / Cliente' },
+]
 
 const uiStore = useUiStore()
 
@@ -463,6 +457,51 @@ const {
   existeCedula,
   existeEmail,
 } = useUsuarios()
+
+const resumenUsuarios = computed(() => {
+  const total = usuarios.value.length
+  const activos = usuarios.value.filter((u) => u.activo).length
+  const inactivos = usuarios.value.filter((u) => !u.activo).length
+  const personal = usuarios.value.filter(
+    (u) =>
+      u.rol === RolUsuario.ADMIN ||
+      u.rol === RolUsuario.ENCARGADO ||
+      u.rol === RolUsuario.OFICINISTA ||
+      u.rol === RolUsuario.CHOFER,
+  ).length
+  return { total, activos, inactivos, personal }
+})
+
+const tarjetasResumen = computed(() => [
+  {
+    etiqueta: 'Total Usuarios',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.total,
+    detalle: 'Usuarios registrados en plataforma',
+    icono: '👥',
+    variant: 'default' as const,
+  },
+  {
+    etiqueta: 'Usuarios Activos',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.activos,
+    detalle: 'Cuentas con acceso habilitado',
+    icono: '✅',
+    variant: 'success' as const,
+  },
+  {
+    etiqueta: 'Usuarios Inactivos',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.inactivos,
+    detalle: 'Cuentas dadas de baja o suspendidas',
+    icono: '⛔',
+    variant: 'danger' as const,
+  },
+  {
+    etiqueta: 'Personal Operativo',
+    valor: loading.value && !usuarios.value.length ? '—' : resumenUsuarios.value.personal,
+    detalle: 'Admin, encargados, choferes y oficinistas',
+    icono: '🛡️',
+    variant: 'warning' as const,
+  },
+])
 
 const {
   password,

@@ -26,6 +26,9 @@
         :required="required"
         :autocomplete="autocomplete"
         :maxlength="maxlength"
+        :min="min"
+        :max="max"
+        :step="step"
         class="w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder-slate-400 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed"
         :class="[
           error
@@ -71,6 +74,9 @@ interface Props {
   autocomplete?: string
   containerClass?: string
   maxlength?: number | string
+  min?: number | string
+  max?: number | string
+  step?: number | string
 }
 
 withDefaults(defineProps<Props>(), {
@@ -86,6 +92,9 @@ withDefaults(defineProps<Props>(), {
   autocomplete: 'off',
   containerClass: '',
   maxlength: undefined,
+  min: undefined,
+  max: undefined,
+  step: undefined,
 })
 
 const emit = defineEmits<{
