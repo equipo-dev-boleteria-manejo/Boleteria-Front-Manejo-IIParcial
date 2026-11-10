@@ -18,7 +18,10 @@ import {
   FrecuenciaFueraDeDiaException,
   BusNoDisponibleParaRutaException,
   BusNoActivoParaRutaException,
+  ChoferNoDisponibleParaRutaException,
 } from '../../Domain/Exceptions/RutaException';
+import { buscarConflictoHorario, crearIntervalo, describirHorario } from '../../Domain/Rules/solapamientoRutas';
+import { cargarRutasAdyacentes } from '../Services/ocupacionRutas';
 import { SupabaseRutaRepository } from '../../Infrastructure/Repositories/SupabaseRutaRepository';
 import { SupabaseBusRepository } from '../../Infrastructure/Repositories/SupabaseBusRepository';
 import { SupabaseFrecuenciaRepository } from '../../Infrastructure/Repositories/SupabaseFrecuenciaRepository';
@@ -68,20 +71,44 @@ export class HabilitarRutaDiaria {
     if (!busExistente || busExistente.estado !== EstadoBus.ACTIVO) {
       throw new BusNoActivoParaRutaException(
         busId,
-        `El bus con ID ${busId} no existe o no está en estado Activo.`
+        busExistente
+          ? `El bus #${busExistente.numero} (${busExistente.placa}) no está en estado Activo.`
+          : `El bus con ID ${busId} no existe o no está en estado Activo.`
       );
     }
 
-    // 5. Validar disponibilidad del bus en la fecha indicada mediante el contrato oficial
-    const rutasExistentes = await this.rutaRepo.obtenerPorBusYFecha(busId, fecha);
-    const esBusDisponible = !rutasExistentes.some((r) => r.estado !== EstadoRuta.CANCELADA);
+    // 5. Validar disponibilidad del bus: puede hacer varios viajes el mismo día siempre que no se solapen
+    //    (misma regla que "Vincular al plan"). Se miran también el día anterior y el siguiente, por los viajes
+    //    que cruzan la medianoche. Un viaje del mismo día sin hora conocida se asume ocupado.
+    const horaSalida = input.horaSalida || frecuenciaExistente.horaSalida;
+    const intervaloNuevo = crearIntervalo(horaSalida, input.horaLlegada, input.tiempoViajeMinutos);
 
-    if (!esBusDisponible) {
+    const rutasDelBus = await cargarRutasAdyacentes(fecha, (dia) => this.rutaRepo.obtenerPorBusYFecha(busId, dia));
+    const conflictoBus = buscarConflictoHorario(intervaloNuevo, rutasDelBus, { sinHoraOcupa: true });
+
+    if (conflictoBus) {
+      const horario = describirHorario(conflictoBus, fecha);
       throw new BusNoDisponibleParaRutaException(
         busId,
         fecha,
-        `El bus con ID ${busId} ya se encuentra asignado a una ruta activa en el mismo horario para la fecha ${fecha}.`
+        `El bus #${busExistente.numero} (${busExistente.placa}) ya se encuentra asignado a una ruta activa en el mismo horario para la fecha ${fecha}${horario ? ` (${horario})` : ''}.`
       );
+    }
+
+    // 5b. Un chofer no puede manejar dos viajes a la vez (aunque sean de buses distintos).
+    if (input.choferId) {
+      const choferId = input.choferId;
+      const rutasDelChofer = await cargarRutasAdyacentes(fecha, (dia) =>
+        this.rutaRepo.obtenerPorChoferYFecha(choferId, dia),
+      );
+      const conflictoChofer = buscarConflictoHorario(intervaloNuevo, rutasDelChofer);
+
+      if (conflictoChofer) {
+        const horario = describirHorario(conflictoChofer, fecha);
+        throw new ChoferNoDisponibleParaRutaException(
+          `El chofer seleccionado ya tiene asignado otro viaje que se solapa con este horario${horario ? ` (${horario})` : ''}.`,
+        );
+      }
     }
 
     // 6. Instanciar la nueva Ruta con estado Programada por defecto
@@ -94,7 +121,7 @@ export class HabilitarRutaDiaria {
 
     nuevaRuta.choferId = input.choferId;
     nuevaRuta.hojaRutaId = input.hojaRutaId;
-    nuevaRuta.horaSalida = input.horaSalida || frecuenciaExistente.horaSalida;
+    nuevaRuta.horaSalida = horaSalida;
     nuevaRuta.horaLlegada = input.horaLlegada;
     nuevaRuta.esDirecta = input.esDirecta ?? frecuenciaExistente.esDirecto;
     nuevaRuta.observacionChofer = input.observacionChofer;

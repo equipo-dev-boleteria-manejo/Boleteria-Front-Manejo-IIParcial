@@ -67,6 +67,85 @@ describe('GestionarHojaRuta UseCase', () => {
     expect(mockHojaRutaRepo.obtenerPorFecha).toHaveBeenCalledWith('2026-06-15');
   });
 
+  describe('trayectos de la hoja al listarla', () => {
+    const crearRuta = (id: number) => {
+      const ruta = new Ruta(1, 10, '2026-06-15', EstadoRuta.PROGRAMADA);
+      ruta.id = id;
+      ruta.hojaRutaId = 1;
+      return ruta;
+    };
+
+    it('carga los trayectos de cada hoja, que el repositorio de hojas no trae', async () => {
+      const hoja = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      hoja.id = 1;
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue(hoja);
+      vi.mocked(mockRutaRepo.obtenerPorHojaRuta).mockResolvedValue([crearRuta(7), crearRuta(8)]);
+
+      const [resultado] = await useCase.listarPorFecha('2026-06-15');
+
+      expect(mockRutaRepo.obtenerPorHojaRuta).toHaveBeenCalledWith(1);
+      expect(resultado?.rutas?.map((ruta) => ruta.id)).toEqual([7, 8]);
+    });
+
+    it('una hoja sin trayectos queda con una lista vacía', async () => {
+      const hoja = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      hoja.id = 1;
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue(hoja);
+      vi.mocked(mockRutaRepo.obtenerPorHojaRuta).mockResolvedValue([]);
+
+      const [resultado] = await useCase.listarPorFecha('2026-06-15');
+
+      expect(resultado?.rutas).toEqual([]);
+    });
+
+    it('si el repositorio de rutas no devuelve nada, la hoja queda con lista vacía y no falla', async () => {
+      const hoja = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      hoja.id = 1;
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue(hoja);
+      vi.mocked(mockRutaRepo.obtenerPorHojaRuta).mockResolvedValue(undefined as never);
+
+      const [resultado] = await useCase.listarPorFecha('2026-06-15');
+
+      expect(resultado?.rutas).toEqual([]);
+    });
+
+    it('si el repositorio devuelve varias hojas, carga los trayectos de cada una', async () => {
+      const hojaA = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      hojaA.id = 1;
+      const hojaB = new HojaRuta('2026-06-15', EstadoHojaRuta.EMITIDA);
+      hojaB.id = 2;
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue([hojaA, hojaB] as never);
+      vi.mocked(mockRutaRepo.obtenerPorHojaRuta)
+        .mockResolvedValueOnce([crearRuta(7)])
+        .mockResolvedValueOnce([crearRuta(8), crearRuta(9)]);
+
+      const resultado = await useCase.listarPorFecha('2026-06-15');
+
+      expect(resultado.map((hoja) => hoja.rutas?.length)).toEqual([1, 2]);
+    });
+
+    it('una hoja aún sin identificador no consulta trayectos', async () => {
+      const hoja = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue(hoja);
+
+      const [resultado] = await useCase.listarPorFecha('2026-06-15');
+
+      expect(mockRutaRepo.obtenerPorHojaRuta).not.toHaveBeenCalled();
+      expect(resultado?.rutas).toBeUndefined();
+    });
+
+    it('sin repositorio de rutas inyectado conserva el comportamiento anterior', async () => {
+      const sinRutas = new GestionarHojaRuta(mockHojaRutaRepo, mockFrecuenciaRepo);
+      const hoja = new HojaRuta('2026-06-15', EstadoHojaRuta.BORRADOR);
+      hoja.id = 1;
+      vi.mocked(mockHojaRutaRepo.obtenerPorFecha).mockResolvedValue(hoja);
+
+      const [resultado] = await sinRutas.listarPorFecha('2026-06-15');
+
+      expect(resultado?.rutas).toBeUndefined();
+    });
+  });
+
   it('debe rechazar listar si la fecha no es válida', async () => {
     await expect(useCase.listarPorFecha('fecha-invalida')).rejects.toThrow(DomainException);
   });
