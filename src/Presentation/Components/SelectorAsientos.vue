@@ -1,8 +1,9 @@
 <template>
   <div class="space-y-5">
+    <!-- Header del selector con conteos y leyenda -->
     <div class="flex flex-wrap items-center justify-between gap-3">
       <div>
-        <h4 class="text-sm font-bold text-slate-900">Mapa de asientos</h4>
+        <h4 class="text-sm font-bold text-slate-900">Distribución de Asientos</h4>
         <p class="text-xs text-slate-500">
           {{ disponibles }} disponibles · {{ seleccionados.length }} seleccionados
         </p>
@@ -12,86 +13,148 @@
         <span
           v-for="tipo in tiposDisponibles"
           :key="tipo"
-          class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5"
+          class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-2xs"
         >
           <span class="h-2.5 w-2.5 rounded-full" :style="{ backgroundColor: colorTipo(tipo) }" />
           {{ tipo }} · ${{ formatearPrecio(preciosPorTipo[tipo] ?? 0) }}
         </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2.5 py-1 shadow-2xs">
           <span class="h-2.5 w-2.5 rounded-full bg-slate-300" />
           Ocupado
         </span>
-        <span class="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-2 py-1 sm:px-2.5">
+        <span class="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-700 shadow-2xs">
           <span class="h-2.5 w-2.5 rounded-full bg-blue-600" />
           Seleccionado
         </span>
       </div>
     </div>
 
+    <!-- Selector de Pisos (Tabs como la arquitectura de Daniela) -->
+    <div
+      v-if="pisos.length > 1"
+      class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-2"
+      role="group"
+      aria-label="Seleccionar piso del bus"
+    >
+      <div class="flex items-center gap-2 pl-2">
+        <span class="text-sm">🚌</span>
+        <span class="text-xs font-bold text-slate-700">Nivel a visualizar:</span>
+      </div>
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="piso in pisos"
+          :key="piso.numero"
+          type="button"
+          class="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold transition-all"
+          :class="
+            pisoActivoNumero === piso.numero
+              ? 'bg-blue-600 text-white shadow-md shadow-blue-500/25 ring-2 ring-blue-600 ring-offset-1'
+              : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          "
+          @click="pisoActivoNumero = piso.numero"
+        >
+          <span>{{ piso.numero === 1 ? '⭐ Piso 1 (VIP)' : '💺 Piso 2 (Estándar)' }}</span>
+          <span
+            class="rounded-full px-1.5 py-0.5 text-[10px] font-black"
+            :class="pisoActivoNumero === piso.numero ? 'bg-blue-700 text-white' : 'bg-slate-100 text-slate-500'"
+          >
+            {{ totalAsientosPiso(piso) }}
+          </span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Estado cargando -->
     <div v-if="loading" class="flex items-center justify-center gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-16 text-sm text-slate-500">
       <span class="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
       Cargando mapa de asientos…
     </div>
 
+    <!-- Estado vacío -->
     <div v-else-if="!asientos.length" class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 py-12 text-center text-sm text-slate-500">
       Este bus todavía no tiene asientos configurados.
     </div>
 
-    <div v-else class="space-y-6">
-      <div
-        v-for="piso in pisos"
-        :key="piso.numero"
-        class="rounded-2xl border border-slate-200 bg-slate-50/60 p-3 sm:p-4"
-      >
-        <div class="mb-3 flex items-center justify-between sm:mb-4">
-          <span class="text-xs font-bold uppercase tracking-wider text-slate-500">
-            {{ pisos.length > 1 ? `Piso ${piso.numero}` : 'Distribución del bus' }}
-          </span>
-          <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-            <span>🧭</span> Frente
-          </span>
-        </div>
-
-        <div class="mx-auto w-full max-w-md space-y-2">
-          <div
-            v-for="fila in piso.filas"
-            :key="`${piso.numero}-${fila.numero}`"
-            class="grid items-center gap-2"
-            :style="{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) 1.25rem repeat(2, minmax(0, 1fr))' }"
-          >
-            <button
-              v-for="asiento in fila.izquierda"
-              :key="asiento.id ?? asiento.numeroAsiento"
-              type="button"
-              class="relative flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-[11px] font-black transition-all duration-150 sm:h-11 sm:text-xs"
-              :class="claseAsiento(asiento)"
-              :style="estiloAsiento(asiento)"
-              :disabled="ocupado(asiento)"
-              :title="tituloAsiento(asiento)"
-              :aria-pressed="seleccionado(asiento)"
-              @click="emit('toggle', asiento)"
-            >
-              {{ asiento.numeroAsiento }}
-            </button>
-
-            <div aria-hidden="true" />
-
-            <button
-              v-for="asiento in fila.derecha"
-              :key="asiento.id ?? asiento.numeroAsiento"
-              type="button"
-              class="relative flex h-10 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-[11px] font-black transition-all duration-150 sm:h-11 sm:text-xs"
-              :class="claseAsiento(asiento)"
-              :style="estiloAsiento(asiento)"
-              :disabled="ocupado(asiento)"
-              :title="tituloAsiento(asiento)"
-              :aria-pressed="seleccionado(asiento)"
-              @click="emit('toggle', asiento)"
-            >
-              {{ asiento.numeroAsiento }}
-            </button>
+    <!-- Chasis visual del Bus -->
+    <div v-else-if="pisoActivo" class="rounded-3xl border-2 border-slate-200 bg-white p-4 shadow-sm sm:p-6">
+      <!-- Frente del bus / Cabina -->
+      <div class="mb-5 rounded-2xl border border-slate-200 bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 p-3 sm:p-4">
+        <div class="flex items-center justify-between text-xs font-bold text-slate-700">
+          <div class="flex items-center gap-2">
+            <span class="text-base">🚌</span>
+            <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-600">
+              {{ pisoActivo.numero === 1 ? 'Piso 1 · Frente del Bus' : 'Piso 2 · Nivel Panorámico' }}
+            </span>
+          </div>
+          <div class="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-600 shadow-2xs">
+            <span>{{ pisoActivo.numero === 1 ? '💺 Volante Conductor' : '🔭 Vista Frontal' }}</span>
           </div>
         </div>
+      </div>
+
+      <!-- Distribución de Asientos con Pasillo Central -->
+      <div class="mx-auto w-full max-w-sm space-y-2.5">
+        <div
+          v-for="fila in pisoActivo.filas"
+          :key="`${pisoActivo.numero}-${fila.numero}`"
+          class="grid items-center gap-2"
+          :style="{ gridTemplateColumns: 'repeat(2, minmax(0, 1fr)) 1.75rem repeat(2, minmax(0, 1fr))' }"
+        >
+          <button
+            v-for="asiento in fila.izquierda"
+            :key="asiento.id ?? asiento.numeroAsiento"
+            type="button"
+            class="relative flex h-11 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-xs font-black transition-all duration-150 sm:h-12"
+            :class="claseAsiento(asiento)"
+            :style="estiloAsiento(asiento)"
+            :disabled="ocupado(asiento)"
+            :title="tituloAsiento(asiento)"
+            :aria-pressed="seleccionado(asiento)"
+            @click="emit('toggle', asiento)"
+          >
+            <span>{{ asiento.numeroAsiento }}</span>
+            <span
+              v-if="esVip(asiento)"
+              class="absolute -top-1.5 -right-1 text-[9px] leading-none"
+              title="Asiento VIP"
+            >
+              ⭐
+            </span>
+          </button>
+
+          <!-- Pasillo Central -->
+          <div class="flex h-full items-center justify-center" aria-hidden="true">
+            <span class="h-3 w-0.5 rounded-full bg-slate-200"></span>
+          </div>
+
+          <button
+            v-for="asiento in fila.derecha"
+            :key="asiento.id ?? asiento.numeroAsiento"
+            type="button"
+            class="relative flex h-11 min-w-0 touch-manipulation items-center justify-center rounded-xl border text-xs font-black transition-all duration-150 sm:h-12"
+            :class="claseAsiento(asiento)"
+            :style="estiloAsiento(asiento)"
+            :disabled="ocupado(asiento)"
+            :title="tituloAsiento(asiento)"
+            :aria-pressed="seleccionado(asiento)"
+            @click="emit('toggle', asiento)"
+          >
+            <span>{{ asiento.numeroAsiento }}</span>
+            <span
+              v-if="esVip(asiento)"
+              class="absolute -top-1.5 -right-1 text-[9px] leading-none"
+              title="Asiento VIP"
+            >
+              ⭐
+            </span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Leyenda inferior de piso -->
+      <div class="mt-5 border-t border-slate-100 pt-3 text-center text-[11px] font-semibold text-slate-400">
+        {{ pisoActivo.numero === 1 ? 'Servicio VIP con asientos reclinables' : 'Servicio Estándar regular' }}
       </div>
     </div>
 
@@ -103,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import type { Asiento } from '../../Domain/Entities/Asiento'
 
 interface FilaAsientos {
@@ -142,6 +205,8 @@ const COLORES_TIPO: Record<string, string> = {
   ejecutivo: '#f39c12',
   executivo: '#f39c12',
 }
+
+const pisoActivoNumero = ref<number>(1)
 
 const disponibles = computed(
   () => props.asientos.filter((asiento) => !ocupado(asiento)).length,
@@ -188,6 +253,29 @@ const pisos = computed<PisoAsientos[]>(() => {
     }))
 })
 
+// Mantener el piso activo sincronizado cuando cargan o cambian los pisos
+watch(
+  pisos,
+  (nuevosPisos) => {
+    if (nuevosPisos.length > 0 && !nuevosPisos.some((p) => p.numero === pisoActivoNumero.value)) {
+      pisoActivoNumero.value = nuevosPisos[0].numero
+    }
+  },
+  { immediate: true }
+)
+
+const pisoActivo = computed<PisoAsientos | undefined>(() => {
+  return pisos.value.find((p) => p.numero === pisoActivoNumero.value) || pisos.value[0]
+})
+
+function totalAsientosPiso(piso: PisoAsientos): number {
+  return piso.filas.reduce((total, fila) => total + fila.izquierda.length + fila.derecha.length, 0)
+}
+
+function esVip(asiento: Asiento): boolean {
+  return asiento.tipo?.toLowerCase().includes('vip') || asiento.piso === 1
+}
+
 function compararFilas(a: string, b: string): number {
   const numeroA = Number(a)
   const numeroB = Number(b)
@@ -217,14 +305,17 @@ function claseAsiento(asiento: Asiento): string {
     return 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-400 line-through'
   }
   if (seleccionado(asiento)) {
-    return 'cursor-pointer border-blue-700 bg-blue-600 text-white shadow-md shadow-blue-200 scale-105'
+    return 'cursor-pointer border-blue-700 bg-blue-600 text-white shadow-md shadow-blue-500/25 scale-105 ring-2 ring-blue-400'
+  }
+  if (esVip(asiento)) {
+    return 'cursor-pointer border-amber-300 bg-amber-50/60 text-slate-800 hover:-translate-y-0.5 hover:border-amber-400 hover:shadow-sm'
   }
   return 'cursor-pointer border-slate-300 bg-white text-slate-700 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-sm'
 }
 
 function estiloAsiento(asiento: Asiento): Record<string, string> {
   if (ocupado(asiento) || seleccionado(asiento)) return {}
-  return { borderBottomColor: colorTipo(asiento.tipo) }
+  return { borderBottomColor: colorTipo(asiento.tipo), borderBottomWidth: '3px' }
 }
 
 function tituloAsiento(asiento: Asiento): string {

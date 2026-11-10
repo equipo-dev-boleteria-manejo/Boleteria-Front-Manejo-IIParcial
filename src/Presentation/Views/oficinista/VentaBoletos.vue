@@ -147,6 +147,9 @@
                 <td class="px-6 py-3">
                   <div class="font-bold text-slate-900">{{ ruta.bus?.numero || 'No asignado' }}</div>
                   <div v-if="ruta.bus?.placa" class="text-slate-400 text-xs">{{ ruta.bus.placa }}</div>
+                  <span class="inline-block mt-1 text-[10px] font-extrabold px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-100">
+                    {{ (ruta.bus?.pisos && ruta.bus.pisos > 1) || (ruta.totalAsientos && ruta.totalAsientos > 30) ? '2 Pisos (VIP/Estándar)' : '1 Piso' }}
+                  </span>
                 </td>
                 <td class="px-6 py-3 text-center">
                   <span class="inline-flex items-center justify-center rounded-full bg-blue-50 text-blue-700 px-2.5 py-1 text-[11px] font-bold">
@@ -209,6 +212,9 @@
                 {{ formatearFechaRuta(rutaSeleccionada.fecha) }} ·
                 {{ formatearHora(rutaSeleccionada.horaSalida) }} ·
                 Bus {{ rutaSeleccionada.bus?.numero || 'No asignado' }}
+                <span class="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-blue-700 ml-1.5 border border-blue-200">
+                  🚌 {{ (rutaSeleccionada.bus?.pisos && rutaSeleccionada.bus.pisos > 1) || (rutaSeleccionada.totalAsientos && rutaSeleccionada.totalAsientos > 30) ? 'Bus de 2 Pisos (VIP y Estándar)' : 'Bus de 1 Piso' }}
+                </span>
               </p>
             </div>
           </div>

@@ -1,14 +1,11 @@
 <template>
   <div class="space-y-4">
-    <div class="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <h4 class="text-sm font-bold text-slate-900">Datos de los pasajeros</h4>
-        <p class="text-xs text-slate-500">
-          Cada asiento debe tener un pasajero distinto. No se permite repetir la cédula.
-        </p>
-      </div>
+    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+      <span class="text-xs font-semibold text-slate-500">
+        Información requerida para la emisión de boletos
+      </span>
       <span class="rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-700">
-        {{ pasajeros.length }} {{ pasajeros.length === 1 ? 'pasajero' : 'pasajeros' }}
+        {{ pasajeros.length }} {{ pasajeros.length === 1 ? 'asiento a registrar' : 'asientos a registrar' }}
       </span>
     </div>
 
