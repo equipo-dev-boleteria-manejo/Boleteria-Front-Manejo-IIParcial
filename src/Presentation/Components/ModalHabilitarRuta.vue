@@ -1,211 +1,202 @@
 <template>
   <ModalBase
     :model-value="modelValue"
-    title="Habilitar y Programar Ruta Diaria"
+    title="Habilitar y programar ruta diaria"
     max-width="lg"
+    :close-on-click-outside="!loading"
     @update:model-value="emit('update:modelValue', $event)"
     @close="emit('close')"
   >
-    <form id="form-habilitar-ruta" class="space-y-4" @submit.prevent="onEnviar">
-      <!-- Estado de Error -->
+    <form id="form-habilitar-ruta" class="space-y-4" novalidate @submit.prevent="onEnviar">
+      <!-- Error devuelto por el servidor -->
       <div
         v-if="error"
         role="alert"
-        class="p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-bold flex items-center gap-2"
+        aria-live="assertive"
+        class="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs font-semibold text-red-700"
       >
-        <span class="text-base">⚠️</span>
+        <span aria-hidden="true">⚠️</span>
         <span class="flex-1">{{ error }}</span>
       </div>
 
       <div
         v-if="choferesError"
         role="alert"
-        class="p-3.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium"
+        class="rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-xs font-medium text-amber-800"
       >
         No se pudieron cargar los choferes: {{ choferesError }}
       </div>
 
-      <!-- Estado Vacío: Sin frecuencias -->
+      <!-- Sin frecuencias activas -->
       <div
         v-if="!loading && frecuencias.length === 0"
         role="status"
-        class="p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium text-center"
+        class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center text-xs font-medium text-amber-800"
       >
-        <span class="block text-2xl mb-1">⚠️</span>
-        No se encontraron frecuencias activas. Registre frecuencias antes de programar viajes.
+        <span class="mb-1 block text-2xl" aria-hidden="true">⚠️</span>
+        No se encontraron frecuencias activas. Registra o activa una frecuencia antes de programar viajes.
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <!-- Selector de Frecuencia -->
+      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <!-- Frecuencia -->
         <div class="space-y-1.5">
-          <label for="select-frecuencia" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Frecuencia / Horario <span class="text-red-500">*</span>
+          <label for="habilitar-frecuencia" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            Frecuencia / Horario <span class="text-red-500" aria-hidden="true">*</span>
           </label>
           <select
-            id="select-frecuencia"
+            id="habilitar-frecuencia"
             v-model="formulario.frecuenciaId"
-            required
             :disabled="loading || frecuencias.length === 0"
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
-            @change="onFrecuenciaChange"
+            :aria-invalid="Boolean(erroresVisibles.frecuenciaId)"
+            :class="[claseSelect, erroresVisibles.frecuenciaId ? 'border-red-400' : 'border-slate-300']"
           >
             <option value="" disabled>Seleccione una frecuencia</option>
-            <option v-for="f in frecuencias" :key="f.id || f.identificador" :value="f.id">
-              {{ f.ciudadOrigen }} → {{ f.ciudadDestino }} ({{ f.horaSalida }})
+            <option v-for="frecuencia in frecuencias" :key="frecuencia.id" :value="frecuencia.id">
+              {{ frecuencia.ciudadOrigen }} → {{ frecuencia.ciudadDestino }} ({{ frecuencia.horaSalida }})
             </option>
           </select>
+          <p v-if="erroresVisibles.frecuenciaId" role="alert" class="text-[11px] font-semibold text-red-600">
+            ⚠️ {{ erroresVisibles.frecuenciaId }}
+          </p>
         </div>
 
-        <!-- Fecha de Operación -->
-        <div class="space-y-1.5">
-          <label for="input-fecha-operacion" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Fecha de Viaje <span class="text-red-500">*</span>
-          </label>
-          <input
-            id="input-fecha-operacion"
-            v-model="formulario.fecha"
-            type="date"
-            required
-            :min="fechaMinima"
-            :disabled="loading"
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
-            :class="{ 'border-amber-400 bg-amber-50/50': diaNoOperativo }"
-            @change="onFechaChange"
-          />
-        </div>
+        <!-- Fecha -->
+        <InputBase
+          id="habilitar-fecha"
+          v-model="formulario.fecha"
+          label="Fecha de viaje"
+          type="date"
+          required
+          :min="fechaMinima()"
+          :disabled="loading"
+          :error="erroresVisibles.fecha"
+        />
       </div>
 
-      <!-- Alerta de Día No Operativo -->
-      <div
-        v-if="diaNoOperativo"
-        class="p-2.5 rounded-xl bg-amber-50 text-amber-700 text-xs font-semibold border border-amber-200 flex items-center gap-2"
-      >
-        <span>⚠️</span>
-        <span>La frecuencia seleccionada no opera en la fecha elegida.</span>
-      </div>
-
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-        <!-- Selector de Bus -->
+      <div class="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+        <!-- Unidad -->
         <div class="space-y-1.5">
-          <label for="select-bus" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Unidad / Bus <span class="text-red-500">*</span>
+          <label for="habilitar-bus" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            Unidad / Bus <span class="text-red-500" aria-hidden="true">*</span>
           </label>
           <select
-            id="select-bus"
+            id="habilitar-bus"
             v-model="formulario.busId"
-            required
             :disabled="loading || buses.length === 0"
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
+            :aria-invalid="Boolean(erroresVisibles.busId)"
+            :class="[claseSelect, erroresVisibles.busId ? 'border-red-400' : 'border-slate-300']"
           >
             <option value="" disabled>Seleccione una unidad</option>
-            <option v-for="b in buses" :key="b.id || b.numero" :value="b.id">
-              Bus #{{ b.numero }} ({{ b.placa }}) - Cap: {{ b.totalAsientos }}
+            <option v-for="bus in buses" :key="bus.id" :value="bus.id">
+              Bus #{{ bus.numero }} ({{ bus.placa }}) · {{ bus.totalAsientos }} asientos
             </option>
           </select>
-          <p v-if="buses.length === 0 && !loading" class="text-[11px] text-amber-600 font-medium">
+          <p v-if="erroresVisibles.busId" role="alert" class="text-[11px] font-semibold text-red-600">
+            ⚠️ {{ erroresVisibles.busId }}
+          </p>
+          <p v-else-if="buses.length === 0 && !loading" class="text-[11px] font-medium text-amber-600">
             No hay buses activos registrados.
           </p>
         </div>
 
-        <!-- Selector de Chofer (Opcional) -->
+        <!-- Chofer (opcional) -->
         <div class="space-y-1.5">
-          <label for="select-chofer" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
-            Chofer Asignado (Opcional)
+          <label for="habilitar-chofer" class="block text-xs font-bold uppercase tracking-wider text-slate-600">
+            Chofer asignado (opcional)
           </label>
           <select
-            id="select-chofer"
+            id="habilitar-chofer"
             v-model="formulario.choferId"
             :disabled="loading || choferesLoading"
-            class="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-400"
+            :class="[claseSelect, 'border-slate-300']"
           >
             <option value="">Sin chofer asignado</option>
-            <option
-              v-for="c in choferes"
-              :key="c.id"
-              :value="c.id"
-            >
-              {{ c.nombreCompleto }} (ID: {{ c.id }})
+            <option v-for="chofer in choferes" :key="chofer.id" :value="chofer.id">
+              {{ chofer.nombreCompleto }}
             </option>
           </select>
-          <p v-if="!choferes.length && !choferesLoading && !choferesError" class="text-[11px] text-amber-600 font-medium">
+          <p v-if="!choferes.length && !choferesLoading && !choferesError" class="text-[11px] font-medium text-amber-600">
             No hay choferes activos disponibles.
           </p>
         </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 items-center">
-        <!-- Tiempo Estimado de Viaje (Minutos) -->
+      <div class="grid grid-cols-1 items-start gap-3.5 sm:grid-cols-2">
         <InputBase
-          id="input-tiempo-viaje"
+          id="habilitar-tiempo"
           v-model="formulario.tiempoViajeMinutos"
-          label="Tiempo Estimado (Minutos)"
+          label="Tiempo estimado (minutos)"
           type="number"
+          min="1"
+          step="1"
           placeholder="Se calcula desde las paradas"
           :disabled="loading"
+          :error="erroresVisibles.tiempoViajeMinutos"
           helper-text="Si la frecuencia tiene paradas, se usa el tiempo de su última parada."
         />
 
-        <!-- Checkbox Servicio Directo -->
-        <div class="pt-5">
-          <label class="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+        <div class="space-y-1 pt-7">
+          <label class="inline-flex cursor-pointer select-none items-center gap-2 text-xs font-bold text-slate-700">
             <input
-              id="checkbox-directo"
+              id="habilitar-directo"
               v-model="formulario.esDirecta"
               type="checkbox"
-              :disabled="loading"
-              class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200"
+              :disabled="loading || frecuenciaSeleccionada?.esDirecto"
+              class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200 disabled:cursor-not-allowed"
             />
-            <span>Servicio Directo (Sin paradas intermedias)</span>
+            Servicio directo (sin paradas intermedias)
           </label>
+          <p v-if="frecuenciaSeleccionada?.esDirecto" class="text-[11px] text-slate-500">
+            Esta frecuencia es directa: no tiene paradas intermedias.
+          </p>
+          <p v-else-if="frecuenciaSeleccionada" class="text-[11px] text-slate-500">
+            Marca esta opción para que, ese día, la ruta salga sin detenerse en las paradas.
+          </p>
         </div>
       </div>
 
-      <!-- Observación Chofer / Despacho -->
       <InputBase
-        id="input-observacion"
+        id="habilitar-observacion"
         v-model="formulario.observacionChofer"
-        label="Observaciones de Despacho"
+        label="Observaciones de despacho"
         placeholder="Ej. Salida especial por feriado, conductor en relevo..."
         :disabled="loading"
+        :error="erroresVisibles.observacionChofer"
       />
     </form>
 
     <template #footer="{ close }">
-      <ButtonBase
-        variant="secondary"
-        size="md"
-        :disabled="loading"
-        @click="close"
-      >
-        Cancelar
-      </ButtonBase>
+      <ButtonBase variant="secondary" size="md" :disabled="loading" @click="close">Cancelar</ButtonBase>
       <ButtonBase
         type="submit"
         form="form-habilitar-ruta"
         variant="primary"
         size="md"
         :loading="loading"
-        :disabled="loading || frecuencias.length === 0 || buses.length === 0"
+        :disabled="hayErroresVisibles || frecuencias.length === 0 || buses.length === 0"
       >
-        Programar Ruta
+        Programar ruta
       </ButtonBase>
     </template>
   </ModalBase>
 </template>
 
 <script setup lang="ts">
-import { reactive, computed, watch } from 'vue'
+import { watch } from 'vue'
 import ModalBase from './ModalBase.vue'
 import InputBase from './InputBase.vue'
 import ButtonBase from './ButtonBase.vue'
 import type { Frecuencia } from '../../Domain/Entities/Frecuencia'
 import type { Bus } from '../../Domain/Entities/Bus'
 import type { HabilitarRutaInput } from '../../Application/UseCases/HabilitarRutaDiaria'
+import { useHabilitarRutaFormValidation } from '../Composables/useHabilitarRutaFormValidation'
 
 interface Props {
   modelValue: boolean
-  frecuencias?: Frecuencia[]
-  buses?: Bus[]
+  /** Solo frecuencias activas: son las únicas que se pueden programar. */
+  frecuencias?: readonly Frecuencia[]
+  /** Solo buses en estado Activo. */
+  buses?: readonly Bus[]
   choferes?: { id: string; nombreCompleto: string }[]
   choferesLoading?: boolean
   choferesError?: string | null
@@ -230,80 +221,29 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'habilitar', payload: HabilitarRutaInput): void
   (e: 'close'): void
-  (e: 'cambio-fecha', fecha: string): void
 }>()
 
-const fechaHoy = new Date().toISOString().slice(0, 10)
-const fechaMinima = fechaHoy
+// Mismo estilo que los selects de los formularios del equipo (EditarBusModal).
+const claseSelect =
+  'w-full rounded-xl border bg-white px-3.5 py-2.5 text-sm text-slate-900 transition-colors focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400'
 
-function getFormularioInicial() {
-  return {
-    frecuenciaId: '' as number | '',
-    busId: '' as number | '',
-    fecha: props.fechaDefecto || fechaHoy,
-    choferId: '',
-    esDirecta: true,
-    tiempoViajeMinutos: '' as number | '',
-    observacionChofer: '',
-  }
-}
+const { formulario, erroresVisibles, hayErroresVisibles, frecuenciaSeleccionada, fechaMinima, validarTodo, iniciar, aInput } =
+  useHabilitarRutaFormValidation({
+    frecuencias: () => props.frecuencias,
+    esDiaOperativo: (frecuencia, fecha) => props.esDiaOperativo(frecuencia, fecha),
+  })
 
-const formulario = reactive(getFormularioInicial())
-
-// Al abrir el modal, reiniciar con valores limpios
+// Cada vez que el modal se abre, el formulario arranca limpio.
 watch(
   () => props.modelValue,
   (abierto) => {
-    if (abierto) {
-      Object.assign(formulario, getFormularioInicial())
-    }
-  }
+    if (abierto) iniciar(props.fechaDefecto || undefined)
+  },
+  { immediate: true },
 )
 
-const selectedFrecuencia = computed(() => {
-  if (!formulario.frecuenciaId) return null
-  return props.frecuencias.find((f) => f.id === Number(formulario.frecuenciaId)) || null
-})
-
-const diaNoOperativo = computed(() => {
-  const frecuencia = selectedFrecuencia.value
-  return Boolean(
-    frecuencia &&
-      formulario.fecha &&
-      !props.esDiaOperativo(frecuencia, formulario.fecha),
-  )
-})
-
-function onFrecuenciaChange() {
-  const f = selectedFrecuencia.value
-  if (f) {
-    formulario.esDirecta = f.esDirecto
-    const paradas = f.obtenerParadasOrdenadas()
-    formulario.tiempoViajeMinutos =
-      paradas[paradas.length - 1]?.minutosDesdeOrigen || ''
-  }
-}
-
-function onFechaChange() {
-  emit('cambio-fecha', formulario.fecha)
-}
-
 function onEnviar() {
-  if (!formulario.frecuenciaId || !formulario.busId || !formulario.fecha) return
-
-  const payload: HabilitarRutaInput = {
-    frecuenciaId: Number(formulario.frecuenciaId),
-    busId: Number(formulario.busId),
-    fecha: formulario.fecha,
-    choferId: formulario.choferId || undefined,
-    esDirecta: formulario.esDirecta,
-    horaSalida: selectedFrecuencia.value?.horaSalida || undefined,
-    observacionChofer: formulario.observacionChofer || undefined,
-    tiempoViajeMinutos: formulario.tiempoViajeMinutos
-      ? Number(formulario.tiempoViajeMinutos)
-      : undefined,
-  }
-
-  emit('habilitar', payload)
+  if (!validarTodo()) return
+  emit('habilitar', aInput())
 }
 </script>

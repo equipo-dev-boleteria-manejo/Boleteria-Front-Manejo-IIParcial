@@ -1,245 +1,195 @@
 <template>
   <div class="space-y-6">
-    <!-- Encabezado con CardBase -->
-    <CardBase
-      title="Control de Abordaje y Validación de Boletos"
-      subtitle="Escaneo y verificación de códigos QR de boletos en tiempo real"
-      padding="lg"
+    <!-- Identidad del conductor, obtenida exclusivamente de la sesión autenticada -->
+    <div
+      class="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
     >
-      <template #header-action>
-        <div class="flex items-center gap-2">
-          <RefreshButton
-            :loading="loading"
-            @click="recargarRuta"
-          />
+      <div class="flex items-center gap-2.5">
+        <span
+          class="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-base"
+          aria-hidden="true"
+        >
+          👮
+        </span>
+        <div>
+          <p class="text-xs font-bold text-slate-800">Conductor: {{ nombreChofer }}</p>
+          <p v-if="authStore.user?.email" class="text-[11px] text-slate-400">{{ authStore.user.email }}</p>
         </div>
-      </template>
+      </div>
+      <RefreshButton :loading="loading" @click="recargarRuta" />
+    </div>
 
-      <!-- Identidad obtenida exclusivamente de la sesión autenticada -->
-      <div class="flex flex-wrap items-center justify-between gap-3 pt-1">
-        <div class="flex items-center gap-2.5">
-          <span class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold text-sm border border-emerald-100">
-            👮
-          </span>
-          <div>
-            <p class="text-xs font-bold text-slate-800">
-              Conductor: {{ nombreChofer }}
-            </p>
-            <p class="text-[11px] text-slate-400">
-              ID de usuario: {{ authStore.user?.id || 'No especificado' }}
-            </p>
-          </div>
+    <!-- Cargando -->
+    <CardBase v-if="loading && !rutaActual" padding="none">
+      <div class="space-y-3 p-5 sm:p-6" role="status" aria-live="polite" aria-label="Cargando ruta del chofer">
+        <span class="sr-only">Consultando el viaje asignado al conductor...</span>
+        <div class="h-6 w-1/3 animate-pulse rounded bg-slate-200"></div>
+        <div class="h-24 animate-pulse rounded-xl bg-slate-100"></div>
+      </div>
+    </CardBase>
+
+    <!-- Error al consultar la ruta -->
+    <CardBase v-else-if="error && !rutaActual" padding="none">
+      <div class="px-5 py-12 text-center sm:px-6" role="alert">
+        <div
+          class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-50 text-2xl"
+          aria-hidden="true"
+        >
+          ⚠️
+        </div>
+        <h3 class="mt-4 text-base font-bold text-slate-800">No pudimos consultar tu viaje</h3>
+        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">{{ error }}</p>
+        <div class="mt-4 flex justify-center">
+          <ButtonBase :loading="loading" @click="recargarRuta">Reintentar</ButtonBase>
         </div>
       </div>
     </CardBase>
 
-    <!-- 1. Estado de Error Principal -->
-    <div
-      v-if="error"
-      role="alert"
-      class="p-4 rounded-2xl bg-red-50 border border-red-200 text-red-700 text-sm font-medium flex items-center justify-between gap-3"
-    >
-      <div class="flex items-center gap-2">
-        <span class="text-xl">⚠️</span>
-        <span>{{ error }}</span>
+    <!-- Sin ruta asignada o acceso restringido -->
+    <CardBase v-else-if="!esChoferAutorizado" padding="none">
+      <div class="px-5 py-12 text-center sm:px-6">
+        <div
+          class="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-2xl"
+          aria-hidden="true"
+        >
+          🚌
+        </div>
+        <h3 class="mt-4 text-base font-bold text-slate-800">
+          {{ esChoferSesion ? 'No hay ruta activa asignada' : 'Acceso de operación restringido' }}
+        </h3>
+        <p class="mx-auto mt-1 max-w-md text-xs leading-relaxed text-slate-500">
+          {{
+            esChoferSesion
+              ? `No se encontró un viaje programado o en curso asignado a ${nombreChofer} para hoy.`
+              : 'Solo el chofer autenticado y asignado a la ruta puede operar viajes y validar boletos.'
+          }}
+        </p>
       </div>
-      <ButtonBase variant="secondary" size="sm" @click="recargarRuta">
-        Reintentar
-      </ButtonBase>
-    </div>
+    </CardBase>
 
-    <!-- 2. Estado de Carga (Loading) -->
-    <div
-      v-if="loading && !rutaActual"
-      role="status"
-      aria-label="Cargando ruta del chofer"
-      class="rounded-2xl bg-white p-8 border border-slate-200/80 shadow-sm space-y-4"
-    >
-      <div class="h-6 bg-slate-200 rounded w-1/3 animate-pulse"></div>
-      <div class="h-24 bg-slate-100 rounded-xl animate-pulse"></div>
-      <p class="text-center text-xs text-slate-400 font-medium pt-2">Consultando viaje asignado al conductor...</p>
-    </div>
-
-    <!-- 3. Estado Vacío (Empty State) -->
-    <div
-      v-else-if="!esChoferAutorizado"
-      class="rounded-2xl bg-white p-12 text-center border border-slate-200/80 shadow-sm space-y-3"
-    >
-      <div class="w-16 h-16 rounded-3xl bg-slate-100 text-slate-400 flex items-center justify-center text-3xl mx-auto">
-        🚌
-      </div>
-      <h3 class="text-base font-bold text-slate-800">
-        {{ esChoferSesion ? 'No hay ruta activa asignada' : 'Acceso de operación restringido' }}
-      </h3>
-      <p class="text-xs text-slate-500 max-w-sm mx-auto">
-        <template v-if="esChoferSesion">
-          No se encontró un viaje programado o en curso asignado a tu usuario
-          <strong class="text-slate-700">{{ authStore.user?.id }}</strong> para hoy.
-        </template>
-        <template v-else>
-          Solo el chofer autenticado y asignado a la ruta puede operar viajes y validar boletos.
-        </template>
-      </p>
-    </div>
-
-    <!-- 4. Estado con Datos: Ruta Activa + Validación QR (Success / Data) -->
+    <!-- Ruta activa y validación de boletos -->
     <div v-else class="space-y-6">
-      <!-- Tarjeta Resumen de la Ruta Activa -->
-      <div class="rounded-2xl bg-white p-6 border border-slate-200/80 shadow-sm space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-100 pb-4">
+      <div class="space-y-4 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
+        <div class="flex flex-col gap-3 border-b border-slate-100 pb-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div class="flex items-center gap-2">
-              <span class="text-lg">🛣️</span>
-              <h3 class="text-lg font-bold text-slate-900">
-                Viaje Operativo #{{ rutaActual?.id }}
-              </h3>
+              <h3 class="text-lg font-bold text-slate-900">Viaje operativo #{{ rutaActual?.id }}</h3>
               <span
-                class="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider border"
-                :class="getEstadoBadgeClass(rutaActual?.estado)"
+                class="rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                :class="claseBadgeEstadoRuta(rutaActual?.estado)"
               >
-                {{ rutaActual?.estado }}
+                {{ etiquetaEstadoRuta(rutaActual?.estado) }}
               </span>
             </div>
-            <p class="text-xs text-slate-500 mt-1">
-              Unidad #{{ rutaActual?.busId }} | Salida Programada: <strong class="font-mono text-slate-700">{{ rutaActual?.horaSalida || '--:--' }}</strong>
+            <p class="mt-1 text-xs text-slate-500">
+              Unidad #{{ rutaActual?.busId }} · Salida programada:
+              <strong class="font-mono text-slate-700">{{ rutaActual?.horaSalida || '--:--' }}</strong>
             </p>
           </div>
 
-          <!-- Botones de Operación del Chofer -->
+          <!-- Operación del chofer -->
           <div class="flex flex-wrap items-center gap-2">
-            <ButtonBase
-              v-if="rutaProgramada && esChoferAutorizado"
-              variant="primary"
-              size="md"
-              :loading="loading"
-              @click="handleIniciarViaje"
-            >
-              <span>🚀</span>
-              <span>Iniciar Viaje</span>
+            <ButtonBase v-if="rutaProgramada" variant="primary" size="md" :loading="loading" @click="handleIniciarViaje">
+              🚀 Iniciar viaje
             </ButtonBase>
-
-            <ButtonBase
-              v-if="rutaEnCurso && esChoferAutorizado"
-              variant="success"
-              size="md"
-              :loading="loading"
-              @click="handleFinalizarViaje"
-            >
-              <span>🏁</span>
-              <span>Finalizar Viaje</span>
+            <ButtonBase v-if="rutaEnCurso" variant="success" size="md" :loading="loading" @click="handleFinalizarViaje">
+              🏁 Finalizar viaje
             </ButtonBase>
-
-            <ButtonBase
-              v-if="rutaEnCurso && esChoferAutorizado"
-              variant="danger"
-              size="sm"
-              :disabled="loading"
-              @click="abrirModalEmergencia"
-            >
-              <span>🚨</span>
-              <span>Reportar Novedad</span>
+            <ButtonBase v-if="rutaEnCurso" variant="danger" size="sm" :disabled="loading" @click="abrirModalEmergencia">
+              🚨 Reportar novedad
             </ButtonBase>
           </div>
         </div>
 
-        <!-- Alerta de tiempo en viaje -->
         <div
           v-if="rutaEnCurso"
-          class="p-3 rounded-xl bg-blue-50 text-blue-800 text-xs font-semibold flex items-center justify-between gap-2"
+          class="flex items-center justify-between gap-2 rounded-xl bg-blue-50 p-3 text-xs font-semibold text-blue-800"
         >
-          <div class="flex items-center gap-2">
-            <span>⏱️</span>
-            <span>Tiempo transcurrido en ruta: <strong>{{ minutosDesdeSalida }} minutos</strong></span>
-          </div>
+          <span>⏱️ Tiempo transcurrido en ruta: <strong>{{ minutosDesdeSalida }} minutos</strong></span>
           <span
             v-if="requiereObservacionPorTiempo"
-            class="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[10px] font-bold uppercase"
+            class="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800"
           >
-            ⚠️ Supera tiempo estimado
+            ⚠️ Supera el tiempo estimado
           </span>
         </div>
       </div>
 
-      <!-- Zona de Validación: Escáner QR y Entrada Manual -->
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <!-- Panel Izquierdo: Escáner Cámara -->
+      <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <!-- Escáner con cámara -->
         <CardBase
-          title="Escáner QR con Cámara"
+          title="Escáner QR con cámara"
           subtitle="Enfoca el código QR impreso o digital del boleto del pasajero"
           padding="md"
         >
           <div class="space-y-4">
-            <!-- Botones de Control de Cámara -->
             <div class="flex items-center justify-between">
               <ButtonBase
                 :variant="camaraActiva ? 'danger' : 'primary'"
                 size="sm"
-                :disabled="!esChoferAutorizado || !rutaEnCurso || loading"
-                @click="toggleCamara"
+                :disabled="!rutaEnCurso || loading"
+                @click="alternar"
               >
-                <span>📷</span>
-                <span>{{ camaraActiva ? 'Detener Cámara' : 'Activar Cámara' }}</span>
+                📷 {{ camaraActiva ? 'Detener cámara' : 'Activar cámara' }}
               </ButtonBase>
-
-              <span
-                class="text-xs font-medium"
-                :class="camaraActiva ? 'text-emerald-600' : 'text-slate-400'"
-              >
+              <span class="text-xs font-medium" :class="camaraActiva ? 'text-emerald-600' : 'text-slate-400'">
                 {{ camaraActiva ? '● Cámara en vivo' : '○ Cámara inactiva' }}
               </span>
             </div>
 
-            <!-- Contenedor del video del escáner -->
-            <div class="relative bg-slate-900 rounded-2xl overflow-hidden min-h-[260px] flex items-center justify-center border border-slate-800">
-              <div id="chofer-qr-reader" class="w-full"></div>
+            <div
+              class="relative flex min-h-[260px] items-center justify-center overflow-hidden rounded-2xl border border-slate-800 bg-slate-900"
+            >
+              <div :id="ID_CONTENEDOR_QR" class="w-full"></div>
 
               <div
                 v-if="!camaraActiva"
-                class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center text-slate-400 space-y-2 pointer-events-none"
+                class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center space-y-2 p-6 text-center text-slate-400"
               >
-                <span class="text-4xl opacity-40">📸</span>
+                <span class="text-4xl opacity-40" aria-hidden="true">📸</span>
                 <p class="text-xs font-bold text-slate-300">
-                  {{ rutaEnCurso
-                    ? 'Presiona "Activar Cámara" para iniciar la lectura continua de boletos'
-                    : 'Debes iniciar el viaje antes de validar boletos' }}
+                  {{
+                    rutaEnCurso
+                      ? 'Presiona "Activar cámara" para iniciar la lectura continua de boletos'
+                      : 'Debes iniciar el viaje antes de validar boletos'
+                  }}
                 </p>
               </div>
 
-              <!-- Spinner de procesando escaneo -->
               <div
                 v-if="procesandoEscaneo"
-                class="absolute inset-0 bg-slate-900/70 backdrop-blur-xs flex flex-col items-center justify-center text-white space-y-2 z-10"
+                class="absolute inset-0 z-10 flex flex-col items-center justify-center space-y-2 bg-slate-900/70 text-white"
               >
-                <div class="w-8 h-8 border-4 border-white/20 border-t-white rounded-full animate-spin"></div>
+                <div class="h-8 w-8 animate-spin rounded-full border-4 border-white/20 border-t-white"></div>
                 <p class="text-xs font-bold">Validando código...</p>
               </div>
             </div>
 
-            <!-- Mensajes de cámara -->
-            <p v-if="mensajeCamara" class="text-xs text-amber-600 font-medium text-center">
+            <p v-if="mensajeCamara" role="status" class="text-center text-xs font-medium text-amber-600">
               {{ mensajeCamara }}
             </p>
           </div>
         </CardBase>
 
-        <!-- Panel Derecho: Entrada Manual de Código y Resultado -->
         <div class="space-y-6">
+          <!-- Validación manual -->
           <CardBase
-            title="Validación Manual de Boleto"
-            subtitle="Ingresa el código numérico o alfanumérico si el QR no es legible"
+            title="Validación manual de boleto"
+            subtitle="Ingresa el código del boleto si el QR no es legible"
             padding="md"
           >
-            <form class="space-y-3" @submit.prevent="handleValidarManual">
+            <form class="space-y-3" novalidate @submit.prevent="handleValidarManual">
               <InputBase
                 id="input-codigo-boleto"
-                v-model="codigoManual"
-                label="Código del Boleto"
+                v-model="codigoManual.formulario.valor"
+                label="Código del boleto"
                 placeholder="Ej. BOL-2026-000123"
                 required
-                :disabled="!esChoferAutorizado || !rutaEnCurso || loading"
+                :disabled="!rutaEnCurso || loading"
+                :error="codigoManual.error.value"
               >
                 <template #prefix>
-                  <span>🎟️</span>
+                  <span aria-hidden="true">🎟️</span>
                 </template>
               </InputBase>
 
@@ -249,51 +199,32 @@
                 size="md"
                 full-width
                 :loading="loading"
-                :disabled="!esChoferAutorizado || !rutaEnCurso || !codigoManual.trim() || loading"
+                :disabled="!rutaEnCurso || codigoManual.hayErroresVisibles.value"
               >
-                Validar Boleto
+                Validar boleto
               </ButtonBase>
             </form>
-
-            <!-- Banner de Éxito / Resultado Positivo -->
-            <div
-              v-if="success"
-              role="status"
-              class="mt-4 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold flex items-start gap-2.5"
-            >
-              <span class="text-lg">✅</span>
-              <div>
-                <p class="font-black text-sm text-emerald-900">¡Boleto Validado Exitosamente!</p>
-                <p class="mt-0.5 text-emerald-700">{{ success }}</p>
-              </div>
-            </div>
           </CardBase>
 
-          <!-- Historial de Validaciones de la Sesión -->
-          <CardBase
-            title="Historial de Abordaje"
-            subtitle="Últimos boletos procesados durante este viaje"
-            padding="md"
-          >
+          <!-- Historial de la sesión -->
+          <CardBase title="Historial de abordaje" subtitle="Últimos boletos procesados durante este viaje" padding="md">
             <div v-if="historial.length === 0" class="py-6 text-center text-xs text-slate-400">
               Aún no se han escaneado boletos en esta sesión.
             </div>
 
-            <div v-else class="space-y-2 max-h-56 overflow-y-auto">
+            <div v-else class="max-h-56 space-y-2 overflow-y-auto">
               <div
-                v-for="(item, idx) in historial"
-                :key="idx"
-                class="p-2.5 rounded-xl border flex items-center justify-between text-xs"
-                :class="item.resultado === 'Validado'
-                  ? 'border-emerald-100 bg-emerald-50/50'
-                  : 'border-red-100 bg-red-50/50'"
+                v-for="(item, indice) in historial"
+                :key="indice"
+                class="flex items-center justify-between rounded-xl border p-2.5 text-xs"
+                :class="item.resultado === 'Validado' ? 'border-emerald-100 bg-emerald-50/50' : 'border-red-100 bg-red-50/50'"
               >
                 <div class="flex items-center gap-2">
                   <span class="font-mono font-bold text-slate-700">{{ item.codigo }}</span>
                   <span class="text-[10px] text-slate-400">({{ item.hora }})</span>
                 </div>
                 <span
-                  class="px-2 py-0.5 rounded-md font-bold text-[10px] uppercase"
+                  class="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
                   :class="item.resultado === 'Validado' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'"
                 >
                   {{ item.resultado }}
@@ -305,24 +236,19 @@
       </div>
     </div>
 
-    <!-- Modal: Confirmar Finalización con Observación -->
-    <ModalBase
-      v-if="esChoferAutorizado"
-      v-model="mostrarModalObservacion"
-      title="Finalizar Viaje Operativo"
-      max-width="md"
-    >
-      <form id="form-finalizar-observacion" class="space-y-3" @submit.prevent="confirmarFinalizacion">
+    <!-- Modal: finalizar el viaje con observación -->
+    <ModalBase v-if="esChoferAutorizado" v-model="mostrarModalObservacion" title="Finalizar viaje operativo" max-width="md">
+      <form id="form-finalizar-observacion" class="space-y-3" novalidate @submit.prevent="confirmarFinalizacion">
         <p class="text-xs text-slate-600">
-          El viaje ha superado el tiempo estimado o requiere un cierre documentado. Por favor, ingresa una observación final.
+          El viaje superó el tiempo estimado o requiere un cierre documentado. Ingresa una observación final.
         </p>
-
         <InputBase
           id="obs-finalizar"
-          v-model="observacion"
-          label="Observación del Conductor"
+          v-model="obsFinalizar.formulario.valor"
+          label="Observación del conductor"
           placeholder="Ej. Llegada a terminal sin novedades, retraso por tráfico..."
           required
+          :error="obsFinalizar.error.value"
         />
       </form>
 
@@ -334,31 +260,32 @@
           variant="success"
           size="md"
           :loading="loading"
+          :disabled="obsFinalizar.hayErroresVisibles.value"
         >
-          Confirmar y Finalizar
+          Confirmar y finalizar
         </ButtonBase>
       </template>
     </ModalBase>
 
-    <!-- Modal: Reportar Emergencia / Novedad -->
+    <!-- Modal: reportar emergencia o novedad -->
     <ModalBase
       v-if="esChoferAutorizado"
       v-model="mostrarModalEmergencia"
-      title="Reportar Incidente / Emergencia Operativa"
+      title="Reportar incidente / emergencia operativa"
       max-width="md"
     >
-      <form id="form-emergencia" class="space-y-3" @submit.prevent="confirmarEmergencia">
-        <div class="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs font-semibold flex items-center gap-2">
-          <span>🚨</span>
+      <form id="form-emergencia" class="space-y-3" novalidate @submit.prevent="confirmarEmergencia">
+        <div class="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-700">
+          <span aria-hidden="true">🚨</span>
           <span>Este reporte quedará registrado en la bitácora de auditoría y notificará al centro de control.</span>
         </div>
-
         <InputBase
           id="obs-emergencia"
-          v-model="observacion"
-          label="Detalle de la Emergencia o Incidente"
+          v-model="obsEmergencia.formulario.valor"
+          label="Detalle de la emergencia o incidente"
           placeholder="Ej. Falla mecánica en km 45, transbordo solicitado..."
           required
+          :error="obsEmergencia.error.value"
         />
       </form>
 
@@ -370,9 +297,9 @@
           variant="danger"
           size="md"
           :loading="loading"
-          :disabled="!observacion.trim()"
+          :disabled="obsEmergencia.hayErroresVisibles.value"
         >
-          Registrar Emergencia
+          Registrar emergencia
         </ButtonBase>
       </template>
     </ModalBase>
@@ -380,21 +307,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
-import CardBase from '../../Components/CardBase.vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
-import RefreshButton from '../../Components/RefreshButton.vue'
+import CardBase from '../../Components/CardBase.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ModalBase from '../../Components/ModalBase.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
+import { useCampoValidado } from '../../Composables/useCampoValidado'
 import { useChoferRuta } from '../../Composables/useChoferRuta'
-import { useAuthStore } from '../../Store/authStore'
+import { useEscanerQr } from '../../Composables/useEscanerQr'
 import { useFeedback } from '../../Composables/useFeedback'
+import { claseBadgeEstadoRuta, etiquetaEstadoRuta } from '../../Composables/presentacionRutas'
+import { validarCodigoBoleto, validarObservacionObligatoria } from '../../Composables/validacionRutas'
+import { useAuthStore } from '../../Store/authStore'
 import { extraerCodigoBoleto } from '../../../utils/qrcode'
-import { RolUsuario, EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
-import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
+import { RolUsuario } from '../../../Domain/Constants/EstadosSistema'
 
-const QR_READER_ID = 'chofer-qr-reader'
+const ID_CONTENEDOR_QR = 'chofer-qr-reader'
 
 const authStore = useAuthStore()
 const { showSuccess, showWarning, showError, confirm } = useFeedback()
@@ -404,7 +333,6 @@ const {
   historial,
   loading,
   error,
-  success,
   rutaProgramada,
   rutaEnCurso,
   minutosDesdeSalida,
@@ -417,41 +345,42 @@ const {
   limpiar,
 } = useChoferRuta()
 
-const codigoManual = ref('')
-const mensajeCamara = ref('')
-const camaraActiva = ref(false)
+// Estado exclusivamente de interfaz.
 const procesandoEscaneo = ref(false)
-
 const mostrarModalObservacion = ref(false)
 const mostrarModalEmergencia = ref(false)
-const observacion = ref('')
 
-let html5QrCode: Html5Qrcode | null = null
-let ultimoCodigoEscaneado = ''
-let ultimoScanTimestamp = 0
+const codigoManual = useCampoValidado(validarCodigoBoleto)
+const obsFinalizar = useCampoValidado(validarObservacionObligatoria)
+const obsEmergencia = useCampoValidado(validarObservacionObligatoria)
 
 const choferIdSesion = computed(() => authStore.user?.id || '')
-const esChoferSesion = computed(
-  () => authStore.role === RolUsuario.CHOFER && Boolean(choferIdSesion.value),
-)
+const esChoferSesion = computed(() => authStore.role === RolUsuario.CHOFER && Boolean(choferIdSesion.value))
 const esChoferAutorizado = computed(
   () => esChoferSesion.value && rutaActual.value?.choferId === choferIdSesion.value,
 )
+const nombreChofer = computed(() => authStore.user?.nombre || authStore.user?.nombres || 'Conductor autorizado')
 
-const nombreChofer = computed(() => {
-  return authStore.user?.nombre || authStore.user?.nombres || 'Conductor Autorizado'
+const { camaraActiva, mensajeCamara, alternar, detener } = useEscanerQr({
+  idContenedor: ID_CONTENEDOR_QR,
+  motivoBloqueo: () => {
+    if (!esChoferAutorizado.value) return 'Solo el chofer asignado puede validar boletos.'
+    if (!rutaEnCurso.value) return 'Primero debes iniciar el viaje para activar el escáner.'
+    return ''
+  },
+  alLeer: (codigo) => procesarCodigo(codigo),
 })
 
-onMounted(async () => {
-  await recargarRuta()
+onMounted(() => {
+  void recargarRuta()
 })
 
 onBeforeUnmount(() => {
-  void detenerCamara()
+  void detener()
 })
 
 watch(esChoferAutorizado, (autorizado) => {
-  if (!autorizado) void detenerCamara()
+  if (!autorizado) void detener()
 })
 
 async function recargarRuta() {
@@ -463,7 +392,7 @@ async function recargarRuta() {
   try {
     await cargarRutaChofer(choferIdSesion.value)
   } catch {
-    // error capturado por useChoferRuta
+    // El mensaje queda en `error` y se muestra en el estado de error.
   }
 }
 
@@ -471,76 +400,76 @@ async function handleIniciarViaje() {
   if (!esChoferAutorizado.value) return
 
   const confirmado = await confirm({
-    title: 'Iniciar Salida',
-    message: '¿Confirmas el inicio del viaje? El bus pasará a estado En Curso.',
+    title: 'Iniciar salida',
+    message: '¿Confirmas el inicio del viaje? El bus pasará a estado En curso.',
     type: 'info',
   })
+  if (!confirmado) return
 
-  if (confirmado) {
-    const res = await iniciarViaje()
-    if (res.ok) {
-      showSuccess('El viaje ha comenzado. Ya puedes escanear boletos.')
-    }
-  }
+  const resultado = await iniciarViaje()
+  if (resultado.ok) showSuccess('El viaje comenzó. Ya puedes escanear boletos.')
+  else showError(resultado.mensaje)
 }
 
 async function handleFinalizarViaje() {
   if (!esChoferAutorizado.value) return
 
   if (requiereObservacionPorTiempo.value) {
-    observacion.value = ''
+    obsFinalizar.iniciar()
     mostrarModalObservacion.value = true
     return
   }
 
   const confirmado = await confirm({
-    title: 'Finalizar Viaje',
-    message: '¿Confirmas que el viaje ha finalizado con éxito?',
+    title: 'Finalizar viaje',
+    message: '¿Confirmas que el viaje finalizó con éxito?',
     type: 'info',
   })
+  if (!confirmado) return
 
-  if (confirmado) {
-    await detenerCamara()
-    const res = await finalizarViaje()
-    if (res.ok) {
-      showSuccess('El viaje ha finalizado correctamente.')
-    }
-  }
+  await detener()
+  const resultado = await finalizarViaje()
+  if (resultado.ok) showSuccess('El viaje finalizó correctamente.')
+  else showError(resultado.mensaje)
 }
 
 async function confirmarFinalizacion() {
-  if (!esChoferAutorizado.value) return
+  if (!esChoferAutorizado.value || !obsFinalizar.validarTodo()) return
 
-  await detenerCamara()
-  const res = await finalizarViaje(observacion.value)
-  if (res.ok) {
+  await detener()
+  const resultado = await finalizarViaje(obsFinalizar.texto.value)
+  if (resultado.ok) {
     mostrarModalObservacion.value = false
-    observacion.value = ''
-    showSuccess('El viaje ha finalizado con observación registrada.')
+    showSuccess('El viaje finalizó con la observación registrada.')
+  } else {
+    showError(resultado.mensaje)
   }
 }
 
 function abrirModalEmergencia() {
   if (!esChoferAutorizado.value) return
 
-  observacion.value = ''
+  obsEmergencia.iniciar()
   mostrarModalEmergencia.value = true
 }
 
 async function confirmarEmergencia() {
-  if (!esChoferAutorizado.value || !observacion.value.trim()) return
-  const res = await marcarEmergencia(observacion.value)
-  if (res.ok) {
+  if (!esChoferAutorizado.value || !obsEmergencia.validarTodo()) return
+
+  const resultado = await marcarEmergencia(obsEmergencia.texto.value)
+  if (resultado.ok) {
     mostrarModalEmergencia.value = false
-    observacion.value = ''
-    showWarning('Se ha registrado la novedad y notificado a la administración.')
+    showWarning('Se registró la novedad y se notificó a la administración.')
+  } else {
+    showError(resultado.mensaje)
   }
 }
 
 async function handleValidarManual() {
-  if (!esChoferAutorizado.value || !codigoManual.value.trim()) return
-  const codigo = codigoManual.value.trim()
-  codigoManual.value = ''
+  if (!esChoferAutorizado.value || !codigoManual.validarTodo()) return
+
+  const codigo = codigoManual.texto.value
+  codigoManual.iniciar()
   await procesarCodigo(codigo)
 }
 
@@ -548,111 +477,18 @@ async function procesarCodigo(codigoCrudo: string) {
   if (!esChoferAutorizado.value) return
 
   const codigo = extraerCodigoBoleto(codigoCrudo)
-  if (!codigo) return
+  if (!codigo) {
+    showWarning('No se pudo leer un código válido. Inténtalo de nuevo.')
+    return
+  }
 
   procesandoEscaneo.value = true
   try {
-    await validarQrBoleto(codigo)
+    const resultado = await validarQrBoleto(codigo)
+    if (resultado.ok) showSuccess(resultado.mensaje)
+    else showError(resultado.mensaje)
   } finally {
     procesandoEscaneo.value = false
-  }
-}
-
-async function toggleCamara() {
-  if (camaraActiva.value) {
-    await detenerCamara()
-  } else {
-    await iniciarCamara()
-  }
-}
-
-async function iniciarCamara() {
-  mensajeCamara.value = ''
-
-  if (!esChoferAutorizado.value) {
-    mensajeCamara.value = 'Solo el chofer asignado puede validar boletos.'
-    return
-  }
-
-  if (!rutaEnCurso.value) {
-    mensajeCamara.value = 'Primero debes iniciar el viaje para activar el escáner.'
-    return
-  }
-
-  if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
-    mensajeCamara.value = 'El navegador no permite el acceso a la cámara. Usa la validación manual.'
-    return
-  }
-
-  try {
-    await nextTick()
-    if (!html5QrCode) {
-      html5QrCode = new Html5Qrcode(QR_READER_ID)
-    }
-
-    const config = {
-      fps: 10,
-      qrbox: { width: 240, height: 240 },
-      aspectRatio: 1.0,
-      formatsToSupport: [
-        Html5QrcodeSupportedFormats.QR_CODE,
-        Html5QrcodeSupportedFormats.CODE_128,
-        Html5QrcodeSupportedFormats.CODE_39,
-        Html5QrcodeSupportedFormats.EAN_13,
-      ],
-    }
-
-    await html5QrCode.start(
-      { facingMode: 'environment' },
-      config,
-      async (decodedText) => {
-        const ahora = Date.now()
-        if (decodedText === ultimoCodigoEscaneado && ahora - ultimoScanTimestamp < 2500) {
-          return // Evitar lecturas duplicadas continuas del mismo código
-        }
-        ultimoCodigoEscaneado = decodedText
-        ultimoScanTimestamp = ahora
-        await procesarCodigo(decodedText)
-      },
-      () => {
-        // Callback vacío de frame no detectado para no saturar consola
-      }
-    )
-
-    camaraActiva.value = true
-  } catch (err: unknown) {
-    camaraActiva.value = false
-    mensajeCamara.value = mensajeErrorParaUsuario(
-      err,
-      'No se pudo iniciar la cámara. Verifica los permisos.',
-    )
-  }
-}
-
-async function detenerCamara() {
-  if (html5QrCode && camaraActiva.value) {
-    try {
-      await html5QrCode.stop()
-      await html5QrCode.clear()
-    } catch {
-      // Ignorar errores al detener la cámara
-    }
-  }
-  camaraActiva.value = false
-}
-
-function getEstadoBadgeClass(estado?: string): string {
-  switch (estado) {
-    case EstadoRuta.PROGRAMADA:
-      return 'bg-blue-50 text-blue-700 border-blue-200'
-    case EstadoRuta.EN_CURSO:
-      return 'bg-amber-50 text-amber-700 border-amber-200 animate-pulse'
-    case EstadoRuta.FINALIZADA:
-      return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    case EstadoRuta.CANCELADA:
-      return 'bg-rose-50 text-rose-700 border-rose-200'
-    default:
-      return 'bg-slate-100 text-slate-700 border-slate-200'
   }
 }
 </script>
