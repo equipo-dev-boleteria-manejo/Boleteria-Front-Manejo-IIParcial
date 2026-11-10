@@ -8,84 +8,99 @@
     >
       <template #header-action>
         <div class="flex items-center gap-2">
-          <ButtonBase
-            variant="secondary"
-            size="sm"
-            :disabled="loading"
+          <RefreshButton
+            :loading="loading"
             @click="recargarDatos"
-          >
-            <span>🔄</span>
-            <span>Actualizar</span>
-          </ButtonBase>
-          <ButtonBase
-            variant="primary"
-            size="sm"
+          />
+          <CreateButton
+            label="Programar Ruta"
             @click="abrirModalHabilitar"
-          >
-            <span>➕</span>
-            <span>Programar Ruta</span>
-          </ButtonBase>
+          />
         </div>
       </template>
 
-      <!-- KPI / Resumen de Estados Clicables -->
+      <!-- KPI / Resumen de Estados Clicables (MetricCard) -->
       <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
-        <button
-          type="button"
-          class="rounded-xl border p-4 text-left transition-all active:scale-95 cursor-pointer"
-          :class="filtroEstado === 'Todas' ? 'border-blue-500 bg-blue-50/70 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+        <div
+          role="button"
+          tabindex="0"
+          class="text-left transition-all active:scale-95 cursor-pointer rounded-2xl focus:outline-none"
+          :class="filtroEstado === 'Todas' ? 'ring-2 ring-blue-500' : ''"
           @click="filtroEstado = 'Todas'"
+          @keydown.enter="filtroEstado = 'Todas'"
+          @keydown.space.prevent="filtroEstado = 'Todas'"
         >
-          <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500">Todas las Rutas</p>
-          <p class="text-2xl font-black text-slate-900 mt-1">{{ rutas.length }}</p>
-        </button>
+          <MetricCard
+            title="Todas las Rutas"
+            :value="rutas.length"
+            icon="🛣️"
+            variant="default"
+          />
+        </div>
 
-        <button
-          type="button"
-          class="rounded-xl border p-4 text-left transition-all active:scale-95 cursor-pointer"
-          :class="filtroEstado === EstadoRuta.PROGRAMADA ? 'border-blue-500 bg-blue-50/70 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+        <div
+          role="button"
+          tabindex="0"
+          class="text-left transition-all active:scale-95 cursor-pointer rounded-2xl focus:outline-none"
+          :class="filtroEstado === EstadoRuta.PROGRAMADA ? 'ring-2 ring-blue-500' : ''"
           @click="filtroEstado = EstadoRuta.PROGRAMADA"
+          @keydown.enter="filtroEstado = EstadoRuta.PROGRAMADA"
+          @keydown.space.prevent="filtroEstado = EstadoRuta.PROGRAMADA"
         >
-          <p class="text-[10px] font-bold uppercase tracking-wider text-blue-600">Programadas</p>
-          <p class="text-2xl font-black text-blue-700 mt-1">{{ rutasProgramadas.length }}</p>
-        </button>
+          <MetricCard
+            title="Programadas"
+            :value="rutasProgramadas.length"
+            icon="⏱️"
+            variant="info"
+          />
+        </div>
 
-        <button
-          type="button"
-          class="rounded-xl border p-4 text-left transition-all active:scale-95 cursor-pointer"
-          :class="filtroEstado === EstadoRuta.EN_CURSO ? 'border-amber-500 bg-amber-50/70 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+        <div
+          role="button"
+          tabindex="0"
+          class="text-left transition-all active:scale-95 cursor-pointer rounded-2xl focus:outline-none"
+          :class="filtroEstado === EstadoRuta.EN_CURSO ? 'ring-2 ring-amber-500' : ''"
           @click="filtroEstado = EstadoRuta.EN_CURSO"
+          @keydown.enter="filtroEstado = EstadoRuta.EN_CURSO"
+          @keydown.space.prevent="filtroEstado = EstadoRuta.EN_CURSO"
         >
-          <p class="text-[10px] font-bold uppercase tracking-wider text-amber-600">En Curso</p>
-          <p class="text-2xl font-black text-amber-700 mt-1">{{ rutasEnCurso.length }}</p>
-        </button>
+          <MetricCard
+            title="En Curso"
+            :value="rutasEnCurso.length"
+            icon="🚌"
+            variant="warning"
+          />
+        </div>
 
-        <button
-          type="button"
-          class="rounded-xl border p-4 text-left transition-all active:scale-95 cursor-pointer"
-          :class="filtroEstado === EstadoRuta.FINALIZADA ? 'border-emerald-500 bg-emerald-50/70 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+        <div
+          role="button"
+          tabindex="0"
+          class="text-left transition-all active:scale-95 cursor-pointer rounded-2xl focus:outline-none"
+          :class="filtroEstado === EstadoRuta.FINALIZADA ? 'ring-2 ring-emerald-500' : ''"
           @click="filtroEstado = EstadoRuta.FINALIZADA"
+          @keydown.enter="filtroEstado = EstadoRuta.FINALIZADA"
+          @keydown.space.prevent="filtroEstado = EstadoRuta.FINALIZADA"
         >
-          <p class="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Finalizadas</p>
-          <p class="text-2xl font-black text-emerald-700 mt-1">{{ rutasFinalizadas.length }}</p>
-        </button>
+          <MetricCard
+            title="Finalizadas"
+            :value="rutasFinalizadas.length"
+            icon="✅"
+            variant="success"
+          />
+        </div>
       </div>
     </CardBase>
 
     <!-- Barra de Filtros -->
     <div class="rounded-2xl bg-white p-4 border border-slate-200/80 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
       <div class="flex flex-1 flex-col sm:flex-row gap-3">
-        <!-- Búsqueda por texto -->
+        <!-- Búsqueda por texto (SearchInput) -->
         <div class="flex-1">
-          <InputBase
+          <SearchInput
             id="filtro-texto"
             v-model="filtroTexto"
             placeholder="Buscar por origen, destino o bus..."
-          >
-            <template #prefix>
-              <span>🔍</span>
-            </template>
-          </InputBase>
+          />
         </div>
 
         <!-- Filtro por fecha -->
@@ -198,24 +213,24 @@
       </div>
 
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse text-xs sm:text-sm">
-          <thead class="bg-slate-50/70 text-slate-500 text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
+        <table class="w-full text-left border-collapse text-xs">
+          <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
             <tr>
-              <th class="px-4 py-3.5">Trayecto / Horario</th>
-              <th class="px-4 py-3.5">Unidad / Chofer</th>
-              <th class="px-4 py-3.5">Fecha</th>
-              <th class="px-4 py-3.5">Estado</th>
-              <th class="px-4 py-3.5 text-right">Acciones</th>
+              <th class="px-6 py-3.5">Trayecto / Horario</th>
+              <th class="px-6 py-3.5">Unidad / Chofer</th>
+              <th class="px-6 py-3.5">Fecha</th>
+              <th class="px-6 py-3.5">Estado</th>
+              <th class="px-6 py-3.5 text-right">Acciones</th>
             </tr>
           </thead>
-          <tbody class="divide-y divide-slate-100">
+          <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
             <tr
               v-for="fila in rutasPaginadas"
               :key="fila.ruta.id"
-              class="hover:bg-slate-50/70 transition-colors"
+              class="hover:bg-slate-50/80 transition-colors"
             >
               <!-- Trayecto y Horario -->
-              <td class="px-4 py-3.5">
+              <td class="px-6 py-3">
                 <div class="font-bold text-slate-900">
                   {{ fila.trayectoEtiqueta }}
                 </div>
@@ -239,7 +254,7 @@
               </td>
 
               <!-- Unidad y Chofer -->
-              <td class="px-4 py-3.5">
+              <td class="px-6 py-3">
                 <div class="font-bold text-slate-800">
                   {{ fila.busEtiqueta }}
                 </div>
@@ -273,14 +288,14 @@
               </td>
 
               <!-- Fecha -->
-              <td class="px-4 py-3.5 whitespace-nowrap">
+              <td class="px-6 py-3 whitespace-nowrap">
                 <span class="font-mono text-xs font-semibold text-slate-700">
                   {{ fila.ruta.fecha }}
                 </span>
               </td>
 
               <!-- Estado Badge -->
-              <td class="px-4 py-3.5 whitespace-nowrap">
+              <td class="px-6 py-3 whitespace-nowrap">
                 <span
                   class="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border"
                   :class="getEstadoBadgeClass(fila.ruta.estado)"
@@ -290,37 +305,31 @@
               </td>
 
               <!-- Acciones -->
-              <td class="px-4 py-3.5 text-right whitespace-nowrap">
+              <td class="px-6 py-3 text-right whitespace-nowrap">
                 <div class="flex items-center justify-end gap-1.5">
-                  <ButtonBase
+                  <ActionButton
                     v-if="fila.ruta.estado === EstadoRuta.PROGRAMADA"
-                    size="sm"
-                    variant="primary"
+                    action="primary"
+                    label="Iniciar Viaje"
                     :disabled="loading"
                     @click="handleIniciarViaje(fila.ruta)"
-                  >
-                    Iniciar Viaje
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
+                  <ActionButton
                     v-if="fila.ruta.estado === EstadoRuta.EN_CURSO"
-                    size="sm"
-                    variant="success"
+                    action="success"
+                    label="Finalizar"
                     :disabled="loading"
                     @click="handleFinalizarViaje(fila.ruta)"
-                  >
-                    Finalizar
-                  </ButtonBase>
+                  />
 
-                  <ButtonBase
+                  <ActionButton
                     v-if="fila.ruta.estado === EstadoRuta.PROGRAMADA"
-                    size="sm"
-                    variant="danger"
+                    action="danger"
+                    label="Cancelar"
                     :disabled="loading"
                     @click="handleCancelarViaje(fila.ruta)"
-                  >
-                    Cancelar
-                  </ButtonBase>
+                  />
                 </div>
               </td>
             </tr>
@@ -381,18 +390,22 @@
 import { ref, onMounted } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
-import InputBase from '../../Components/InputBase.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
+import CreateButton from '../../Components/CreateButton.vue'
+import SearchInput from '../../Components/SearchInput.vue'
+import MetricCard from '../../Components/MetricCard.vue'
+import ActionButton from '../../Components/ActionButton.vue'
 import ModalHabilitarRuta from '../../Components/ModalHabilitarRuta.vue'
 import { useRutas } from '../../Composables/useRutas'
 import { useHabilitarRutaDiaria } from '../../Composables/useHabilitarRutaDiaria'
 import { useUsuarios } from '../../Composables/useUsuarios'
-import { useUiStore } from '../../Store/uiStore'
+import { useFeedback } from '../../Composables/useFeedback'
 import { EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
 import type { HabilitarRutaInput } from '../../../Application/UseCases/HabilitarRutaDiaria'
 import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
 
-const uiStore = useUiStore()
+const { showSuccess, showError, showWarning, confirm } = useFeedback()
 
 const {
   rutas,
@@ -472,11 +485,7 @@ async function onHabilitarRuta(payload: HabilitarRutaInput) {
     await habilitar(payload)
     await cargarRutas()
     modalHabilitarAbierto.value = false
-    uiStore.showAlert({
-      title: 'Ruta Habilitada',
-      message: 'La ruta ha sido programada y habilitada exitosamente en el sistema.',
-      type: 'success',
-    })
+    showSuccess('La ruta ha sido programada y habilitada exitosamente.')
   } catch {
     // el error se refleja reactivamente en habilitarError y en el modal
   }
@@ -491,94 +500,62 @@ async function handleAsignarChofer(ruta: Ruta) {
   try {
     await asignarChofer(ruta.id, choferId)
     delete choferSeleccionadoPorRuta.value[ruta.id]
-    uiStore.showAlert({
-      title: 'Chofer Asignado',
-      message: 'El chofer quedó vinculado a la ruta programada.',
-      type: 'success',
-    })
+    showSuccess('El chofer quedó vinculado a la ruta programada.')
   } catch (err: unknown) {
-    uiStore.showAlert({
-      title: 'No se pudo asignar el chofer',
-      message: mensajeErrorParaUsuario(err, 'Ocurrió un error inesperado al asignar el chofer.'),
-      type: 'error',
-    })
+    showError(mensajeErrorParaUsuario(err, 'Ocurrió un error inesperado al asignar el chofer.'))
   }
 }
 
 async function handleIniciarViaje(ruta: Ruta) {
   if (!ruta.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Iniciar Operación de Viaje',
     message: `¿Confirmas el inicio del viaje para la Unidad #${ruta.busId}?`,
     type: 'info',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await iniciarViaje(ruta.id)
-      uiStore.showAlert({
-        title: 'Viaje Iniciado',
-        message: 'La unidad ha salido y la ruta se encuentra En Curso.',
-        type: 'success',
-      })
+      showSuccess('La unidad ha salido y la ruta se encuentra En Curso.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error Operativo',
-        message: mensajeErrorParaUsuario(err, 'No se pudo iniciar el viaje.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo iniciar el viaje.'))
     }
   }
 }
 
 async function handleFinalizarViaje(ruta: Ruta) {
   if (!ruta.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Finalizar Viaje',
     message: `¿Confirmas que el viaje de la Unidad #${ruta.busId} ha concluido satisfactoriamente?`,
     type: 'info',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await finalizarViaje(ruta.id)
-      uiStore.showAlert({
-        title: 'Viaje Finalizado',
-        message: 'El viaje ha sido completado y registrado en la bitácora.',
-        type: 'success',
-      })
+      showSuccess('El viaje ha sido completado y registrado en la bitácora.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error Operativo',
-        message: mensajeErrorParaUsuario(err, 'No se pudo finalizar el viaje.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo finalizar el viaje.'))
     }
   }
 }
 
 async function handleCancelarViaje(ruta: Ruta) {
   if (!ruta.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Cancelar Viaje',
-    message: `¿Estás seguro de cancelar este viaje programado? Esta acción no se puede deshacer.`,
+    message: '¿Estás seguro de cancelar este viaje programado? Esta acción no se puede deshacer.',
     type: 'warning',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await cancelarViaje(ruta.id, 'Cancelado por el despachador')
-      uiStore.showAlert({
-        title: 'Viaje Cancelado',
-        message: 'El viaje ha sido cancelado.',
-        type: 'warning',
-      })
+      showWarning('El viaje ha sido cancelado.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error Operativo',
-        message: mensajeErrorParaUsuario(err, 'No se pudo cancelar el viaje.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo cancelar el viaje.'))
     }
   }
 }

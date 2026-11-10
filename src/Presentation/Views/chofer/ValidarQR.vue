@@ -8,15 +8,10 @@
     >
       <template #header-action>
         <div class="flex items-center gap-2">
-          <ButtonBase
-            variant="secondary"
-            size="sm"
-            :disabled="loading"
+          <RefreshButton
+            :loading="loading"
             @click="recargarRuta"
-          >
-            <span>🔄</span>
-            <span>Actualizar</span>
-          </ButtonBase>
+          />
         </div>
       </template>
 
@@ -389,11 +384,12 @@ import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch } from 'vue'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
 import InputBase from '../../Components/InputBase.vue'
 import ModalBase from '../../Components/ModalBase.vue'
 import { useChoferRuta } from '../../Composables/useChoferRuta'
 import { useAuthStore } from '../../Store/authStore'
-import { useUiStore } from '../../Store/uiStore'
+import { useFeedback } from '../../Composables/useFeedback'
 import { extraerCodigoBoleto } from '../../../utils/qrcode'
 import { RolUsuario, EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
 import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
@@ -401,7 +397,7 @@ import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
 const QR_READER_ID = 'chofer-qr-reader'
 
 const authStore = useAuthStore()
-const uiStore = useUiStore()
+const { showSuccess, showWarning, showError, confirm } = useFeedback()
 
 const {
   rutaActual,
@@ -474,20 +470,16 @@ async function recargarRuta() {
 async function handleIniciarViaje() {
   if (!esChoferAutorizado.value) return
 
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Iniciar Salida',
     message: '¿Confirmas el inicio del viaje? El bus pasará a estado En Curso.',
     type: 'info',
   })
 
-  if (confirm) {
+  if (confirmado) {
     const res = await iniciarViaje()
     if (res.ok) {
-      uiStore.showAlert({
-        title: 'Viaje Iniciado',
-        message: 'El viaje ha comenzado. Ya puedes escanear boletos.',
-        type: 'success',
-      })
+      showSuccess('El viaje ha comenzado. Ya puedes escanear boletos.')
     }
   }
 }
@@ -501,21 +493,17 @@ async function handleFinalizarViaje() {
     return
   }
 
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Finalizar Viaje',
     message: '¿Confirmas que el viaje ha finalizado con éxito?',
     type: 'info',
   })
 
-  if (confirm) {
+  if (confirmado) {
     await detenerCamara()
     const res = await finalizarViaje()
     if (res.ok) {
-      uiStore.showAlert({
-        title: 'Viaje Concluido',
-        message: 'El viaje ha finalizado correctamente.',
-        type: 'success',
-      })
+      showSuccess('El viaje ha finalizado correctamente.')
     }
   }
 }
@@ -528,11 +516,7 @@ async function confirmarFinalizacion() {
   if (res.ok) {
     mostrarModalObservacion.value = false
     observacion.value = ''
-    uiStore.showAlert({
-      title: 'Viaje Concluido',
-      message: 'El viaje ha finalizado con observación registrada.',
-      type: 'success',
-    })
+    showSuccess('El viaje ha finalizado con observación registrada.')
   }
 }
 
@@ -549,11 +533,7 @@ async function confirmarEmergencia() {
   if (res.ok) {
     mostrarModalEmergencia.value = false
     observacion.value = ''
-    uiStore.showAlert({
-      title: 'Emergencia Registrada',
-      message: 'Se ha registrado la novedad y notificado a la administración.',
-      type: 'warning',
-    })
+    showWarning('Se ha registrado la novedad y notificado a la administración.')
   }
 }
 

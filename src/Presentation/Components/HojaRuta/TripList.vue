@@ -52,24 +52,24 @@
 
     <!-- 4. Estado con Datos (Success / Data) -->
     <div v-else class="overflow-x-auto">
-      <table class="w-full text-left border-collapse text-xs sm:text-sm">
-        <thead class="bg-slate-50/60 text-slate-500 text-[11px] uppercase font-bold tracking-wider border-b border-slate-100">
+      <table class="w-full text-left border-collapse text-xs">
+        <thead class="bg-slate-50 border-b border-slate-200 text-xs font-bold uppercase text-slate-600 tracking-wider">
           <tr>
-            <th class="px-4 py-3">Salida</th>
-            <th class="px-4 py-3">Unidad / Bus</th>
-            <th class="px-4 py-3">Modalidad</th>
-            <th class="px-4 py-3">Estado</th>
-            <th v-if="!readonly" class="px-4 py-3 text-right">Acciones</th>
+            <th class="px-6 py-3.5">Salida</th>
+            <th class="px-6 py-3.5">Unidad / Bus</th>
+            <th class="px-6 py-3.5">Modalidad</th>
+            <th class="px-6 py-3.5">Estado</th>
+            <th v-if="!readonly" class="px-6 py-3.5 text-right">Acciones</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-slate-100">
+        <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
           <tr
             v-for="ruta in ordenadasPorHora"
             :key="ruta.id || `${ruta.busId}-${ruta.frecuenciaId}-${ruta.horaSalida}`"
-            class="hover:bg-slate-50/70 transition-colors"
+            class="hover:bg-slate-50/80 transition-colors"
           >
             <!-- Hora -->
-            <td class="px-4 py-3.5 font-bold text-slate-900 whitespace-nowrap">
+            <td class="px-6 py-3 font-bold text-slate-900 whitespace-nowrap">
               <span class="inline-flex items-center gap-1.5 font-mono text-sm text-slate-800">
                 <span>⏱️</span>
                 <span>{{ ruta.horaSalida || '--:--' }}</span>
@@ -80,7 +80,7 @@
             </td>
 
             <!-- Bus -->
-            <td class="px-4 py-3.5 whitespace-nowrap">
+            <td class="px-6 py-3 whitespace-nowrap">
               <div class="flex items-center gap-2">
                 <span class="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center border border-blue-100">
                   {{ ruta.busId }}
@@ -90,7 +90,7 @@
             </td>
 
             <!-- Modalidad Directo / Con Paradas (Interactivo) -->
-            <td class="px-4 py-3.5 whitespace-nowrap">
+            <td class="px-6 py-3 whitespace-nowrap">
               <button
                 type="button"
                 :disabled="readonly || ruta.estado !== EstadoRuta.PROGRAMADA"
@@ -107,7 +107,7 @@
             </td>
 
             <!-- Estado -->
-            <td class="px-4 py-3.5 whitespace-nowrap">
+            <td class="px-6 py-3 whitespace-nowrap">
               <span
                 class="inline-block px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider border"
                 :class="getEstadoClass(ruta.estado)"
@@ -117,34 +117,28 @@
             </td>
 
             <!-- Acciones -->
-            <td v-if="!readonly" class="px-4 py-3.5 text-right whitespace-nowrap">
+            <td v-if="!readonly" class="px-6 py-3 text-right whitespace-nowrap">
               <div class="flex items-center justify-end gap-1.5">
-                <ButtonBase
+                <ActionButton
                   v-if="ruta.estado === EstadoRuta.PROGRAMADA"
-                  size="sm"
-                  variant="primary"
+                  action="primary"
+                  label="Iniciar"
                   @click="emit('iniciar-viaje', ruta)"
-                >
-                  Iniciar
-                </ButtonBase>
+                />
 
-                <ButtonBase
+                <ActionButton
                   v-if="ruta.estado === EstadoRuta.EN_CURSO"
-                  size="sm"
-                  variant="success"
+                  action="success"
+                  label="Finalizar"
                   @click="emit('finalizar-viaje', ruta)"
-                >
-                  Finalizar
-                </ButtonBase>
+                />
 
-                <ButtonBase
+                <ActionButton
                   v-if="ruta.estado === EstadoRuta.PROGRAMADA"
-                  size="sm"
-                  variant="danger"
+                  action="danger"
+                  label="Cancelar"
                   @click="emit('cancelar-viaje', ruta)"
-                >
-                  Cancelar
-                </ButtonBase>
+                />
               </div>
             </td>
           </tr>
@@ -158,7 +152,7 @@
 import { computed } from 'vue'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
 import { EstadoRuta } from '../../../Domain/Constants/EstadosSistema'
-import ButtonBase from '../ButtonBase.vue'
+import ActionButton from '../ActionButton.vue'
 
 interface Props {
   rutas: Ruta[]

@@ -8,25 +8,17 @@
     >
       <template #header-action>
         <div class="flex items-center gap-2">
-          <ButtonBase
-            variant="secondary"
-            size="sm"
-            :disabled="loading"
+          <RefreshButton
+            label="Consultar Plan"
+            :loading="loading"
             @click="consultarPlan"
-          >
-            <span>🔄</span>
-            <span>Consultar Plan</span>
-          </ButtonBase>
-          <ButtonBase
+          />
+          <CreateButton
             v-if="hojasRuta.length === 0"
-            variant="primary"
-            size="sm"
-            :disabled="loading"
+            label="Crear Hoja del Día"
+            :loading="loading"
             @click="handleCrearHojaDia"
-          >
-            <span>📋</span>
-            <span>Crear Hoja del Día</span>
-          </ButtonBase>
+          />
         </div>
       </template>
 
@@ -254,10 +246,12 @@
 import { ref, reactive, onMounted } from 'vue'
 import CardBase from '../../Components/CardBase.vue'
 import ButtonBase from '../../Components/ButtonBase.vue'
+import RefreshButton from '../../Components/RefreshButton.vue'
+import CreateButton from '../../Components/CreateButton.vue'
 import TripList from '../../Components/HojaRuta/TripList.vue'
 import { useHojaRuta } from '../../Composables/useHojaRuta'
 import { useRutas } from '../../Composables/useRutas'
-import { useUiStore } from '../../Store/uiStore'
+import { useFeedback } from '../../Composables/useFeedback'
 import { EstadoHojaRuta } from '../../../Domain/Constants/EstadosSistema'
 import type { HojaRuta } from '../../../Domain/Entities/HojaRuta'
 import type { Ruta } from '../../../Domain/Entities/Ruta'
@@ -265,7 +259,7 @@ import { mensajeErrorParaUsuario } from '../../Utils/errorMessage'
 
 const hoy = new Date().toISOString().slice(0, 10)
 const fechaFiltro = ref(hoy)
-const uiStore = useUiStore()
+const { showSuccess, showError, showWarning, confirm } = useFeedback()
 
 const form = reactive({
   frecuenciaId: '' as number | '',
@@ -311,27 +305,15 @@ async function consultarPlan() {
 async function handleCrearHojaDia() {
   try {
     await crearHojaDia(fechaFiltro.value)
-    uiStore.showAlert({
-      title: 'Hoja Creada',
-      message: `Se ha generado la hoja de ruta para la fecha ${fechaFiltro.value}.`,
-      type: 'success',
-    })
+    showSuccess(`Se ha generado la hoja de ruta para la fecha ${fechaFiltro.value}.`)
   } catch (err: unknown) {
-    uiStore.showAlert({
-      title: 'Error al Crear',
-      message: mensajeErrorParaUsuario(err, 'No se pudo crear la hoja de ruta.'),
-      type: 'error',
-    })
+    showError(mensajeErrorParaUsuario(err, 'No se pudo crear la hoja de ruta.'))
   }
 }
 
 async function handleAsignarTrayecto() {
   if (!form.frecuenciaId || !form.busId) {
-    uiStore.showAlert({
-      title: 'Validación Requerida',
-      message: 'Debes seleccionar una frecuencia y un bus para vincular el trayecto.',
-      type: 'warning',
-    })
+    showWarning('Debes seleccionar una frecuencia y un bus para vincular el trayecto.')
     return
   }
 
@@ -342,96 +324,64 @@ async function handleAsignarTrayecto() {
   )
 
   if (ok) {
-    uiStore.showAlert({
-      title: 'Trayecto Asignado',
-      message: 'El bus ha sido vinculado con éxito a la frecuencia en la hoja operativa.',
-      type: 'success',
-    })
+    showSuccess('El bus ha sido vinculado con éxito a la frecuencia en la hoja operativa.')
     form.frecuenciaId = ''
     form.busId = ''
   } else {
-    uiStore.showAlert({
-      title: 'Conflicto Operativo',
-      message: error.value || 'No se pudo asignar el trayecto a la hoja.',
-      type: 'error',
-    })
+    showError(error.value || 'No se pudo asignar el trayecto a la hoja.')
   }
 }
 
 async function handleIniciarHoja(hoja: HojaRuta) {
   if (!hoja.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Iniciar Operación',
     message: `¿Confirmas el inicio de operación para la Hoja de Ruta #${hoja.id}?`,
     type: 'info',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await iniciarHoja(hoja.id, fechaFiltro.value)
-      uiStore.showAlert({
-        title: 'Operación Iniciada',
-        message: 'La hoja de ruta ha sido emitida y se encuentra activa.',
-        type: 'success',
-      })
+      showSuccess('La hoja de ruta ha sido emitida y se encuentra activa.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error',
-        message: mensajeErrorParaUsuario(err, 'No se pudo iniciar la hoja de ruta.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo iniciar la hoja de ruta.'))
     }
   }
 }
 
 async function handleFinalizarHoja(hoja: HojaRuta) {
   if (!hoja.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Cerrar Hoja de Ruta',
     message: `¿Confirmas el cierre de la Hoja #${hoja.id}? Esta acción completará todos los trayectos pendientes.`,
     type: 'warning',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await finalizarHoja(hoja.id, fechaFiltro.value)
-      uiStore.showAlert({
-        title: 'Hoja Cerrada',
-        message: 'La hoja de ruta ha sido cerrada y finalizada con éxito.',
-        type: 'success',
-      })
+      showSuccess('La hoja de ruta ha sido cerrada y finalizada con éxito.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error',
-        message: mensajeErrorParaUsuario(err, 'No se pudo cerrar la hoja de ruta.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo cerrar la hoja de ruta.'))
     }
   }
 }
 
 async function handleCancelarHoja(hoja: HojaRuta) {
   if (!hoja.id) return
-  const confirm = await uiStore.showConfirm({
+  const confirmado = await confirm({
     title: 'Cancelar Hoja de Ruta',
     message: `¿Estás seguro de cancelar la Hoja #${hoja.id} y todos sus viajes asociados?`,
     type: 'danger',
   })
 
-  if (confirm) {
+  if (confirmado) {
     try {
       await cancelarHoja(hoja.id, 'Cancelada por el supervisor', fechaFiltro.value)
-      uiStore.showAlert({
-        title: 'Hoja Cancelada',
-        message: 'La hoja de ruta ha sido cancelada.',
-        type: 'warning',
-      })
+      showWarning('La hoja de ruta ha sido cancelada.')
     } catch (err: unknown) {
-      uiStore.showAlert({
-        title: 'Error',
-        message: mensajeErrorParaUsuario(err, 'No se pudo cancelar la hoja de ruta.'),
-        type: 'error',
-      })
+      showError(mensajeErrorParaUsuario(err, 'No se pudo cancelar la hoja de ruta.'))
     }
   }
 }
