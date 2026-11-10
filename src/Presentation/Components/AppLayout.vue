@@ -84,7 +84,7 @@
       </div>
 
       <!-- Menú de Navegación -->
-      <nav class="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">
+      <nav class="flex-1 space-y-1.5 overflow-y-auto px-3 py-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
         <router-link
           v-for="item in visibleItems"
           :key="item.to"

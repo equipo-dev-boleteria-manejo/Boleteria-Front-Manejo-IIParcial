@@ -15,6 +15,7 @@ import MisBoletos from '../Views/cliente/MisBoletos.vue'
 import VentaBoletos from '../Views/oficinista/VentaBoletos.vue'
 import AprobarPago from '../Views/oficinista/AprobarPago.vue'
 import Reportes from '../Views/reportes/Reportes.vue'
+import AsientosTarifasView from '../Views/AsientosTarifasView.vue'
 
 const ADMIN = ['admin', 'administrador']
 const OFICINISTA = ['oficinista']
@@ -35,6 +36,12 @@ export const routes: RouteRecordRaw[] = [
     name: 'Dashboard',
     component: Dashboard,
     meta: { roles: TODOS },
+  },
+  {
+    path: '/asientos-tarifas',
+    name: 'AsientosTarifas',
+    component: AsientosTarifasView,
+    meta: { roles: [...ADMIN, ...OFICINISTA, ...CLIENTE] },
   },
   {
     path: '/admin/usuarios',
@@ -145,24 +152,20 @@ router.beforeEach(async (to) => {
     await authStore.initializeAuth()
   }
 
-  // Si va al login estando ya autenticado, redirigir al inicio
   if (to.path === '/login' && authStore.isAuthenticated) {
     return { path: '/' }
   }
 
-  // Rutas públicas accesibles sin autenticación
   if (to.meta.public) {
     return true
   }
 
-  // Rutas privadas sin autenticación -> al login
   if (!authStore.isAuthenticated) {
     return { path: '/login' }
   }
 
   const allowedRoles = (to.meta.roles as string[] | undefined) || []
 
-  // Si no especifica roles, permitir acceso a usuarios autenticados
   if (allowedRoles.length === 0) {
     return true
   }
@@ -174,7 +177,6 @@ router.beforeEach(async (to) => {
     return true
   }
 
-  // Si no tiene el rol permitido, redirigir al dashboard
   return { path: '/' }
 })
 

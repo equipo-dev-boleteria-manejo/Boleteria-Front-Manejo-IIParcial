@@ -59,6 +59,10 @@
           :options="opcionesEstructura"
         />
 
+        <PageSizeFilter
+          v-model="pageSize"
+        />
+
         <RefreshButton
           :loading="cargandoCatalogo"
           @click="recargarCatalogo"
@@ -157,7 +161,7 @@
           </thead>
           <tbody class="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
             <tr
-              v-for="bus in busesFiltrados"
+              v-for="bus in busesPaginados"
               :key="bus.id ?? bus.placa"
               class="hover:bg-blue-50/50 transition-colors"
             >
@@ -297,11 +301,24 @@
 
       <template #footer>
         <div
-          class="flex w-full flex-col gap-2 px-5 pb-5 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6"
+          class="flex w-full flex-col gap-2 px-5 pb-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-6"
         >
           <p>Los cambios de estado se reflejan automáticamente en el catálogo.</p>
           <p class="font-semibold text-slate-600">{{ buses.length }} buses listados</p>
         </div>
+
+        <PaginationControls
+          v-if="totalPages > 1"
+          :current-page="currentPage"
+          :total-pages="totalPages"
+          :total-items="totalItems"
+          :items-per-page="pageSize"
+          :has-prev-page="hasPrevPage"
+          :has-next-page="hasNextPage"
+          @prev="prevPage"
+          @next="nextPage"
+          @set-page="setPage"
+        />
       </template>
     </CardBase>
 
@@ -455,6 +472,8 @@ import ActionButton from '../../Components/ActionButton.vue'
 import MetricCard from '../../Components/MetricCard.vue'
 import SearchInput from '../../Components/SearchInput.vue'
 import SelectFilter from '../../Components/SelectFilter.vue'
+import PageSizeFilter from '../../Components/PageSizeFilter.vue'
+import PaginationControls from '../../Components/PaginationControls.vue'
 import CreateButton from '../../Components/CreateButton.vue'
 import RefreshButton from '../../Components/RefreshButton.vue'
 import InputBase from '../../Components/InputBase.vue'
@@ -464,6 +483,7 @@ import ReportarIncidenteModal from '../../Components/ReportarIncidenteModal.vue'
 import { usePlacaValidation } from '../../Composables/usePlacaValidation'
 import { useBusFormValidation } from '../../Composables/useBusFormValidation'
 import { useFeedback } from '../../Composables/useFeedback'
+import { usePagination } from '../../Composables/usePagination'
 import { useBuses, type GuardarBusInput } from '../../Composables/useBuses'
 import { useControlBuses } from '../../Composables/useControlBuses'
 import {
@@ -559,6 +579,19 @@ const busesFiltrados = computed(() => {
     return coincideBusqueda && coincideEstado && coincideEstructura
   })
 })
+
+const {
+  currentPage,
+  pageSize,
+  totalItems,
+  totalPages,
+  paginatedItems: busesPaginados,
+  hasPrevPage,
+  hasNextPage,
+  prevPage,
+  nextPage,
+  setPage,
+} = usePagination(busesFiltrados, { initialPageSize: 10 })
 
 function resetFiltros() {
   busqueda.value = ''

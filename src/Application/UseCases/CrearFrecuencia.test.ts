@@ -101,4 +101,26 @@ describe('CrearFrecuenciaUseCase', () => {
 
     await expect(useCase.execute(dto)).rejects.toThrow(IdentificadorFrecuenciaDuplicadoException);
   });
+
+  it('una frecuencia con paradas registrada sin ninguna parada nace inactiva', async () => {
+    const creada = await useCase.execute({ ...dto, esDirecto: false, paradas: [] });
+
+    expect(creada.activa).toBe(false);
+  });
+
+  it('una frecuencia con paradas que ya trae al menos una nace activa', async () => {
+    const creada = await useCase.execute({
+      ...dto,
+      esDirecto: false,
+      paradas: [{ ciudad: 'Latacunga', orden: 1, minutosDesdeOrigen: 120 }],
+    });
+
+    expect(creada.activa).toBe(true);
+  });
+
+  it('una frecuencia directa sin paradas nace activa', async () => {
+    const creada = await useCase.execute({ ...dto, esDirecto: true, paradas: [] });
+
+    expect(creada.activa).toBe(true);
+  });
 });

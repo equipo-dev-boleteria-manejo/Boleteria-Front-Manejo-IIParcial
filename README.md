@@ -32,10 +32,9 @@ En el contexto del transporte terrestre ecuatoriano, las cooperativas manejan ru
 
 ---
 
-## 3. Arquitectura del Software
+## 3. Organización de carpetas
 
-El proyecto implementa una **Arquitectura Limpia / Hexagonal (Clean Architecture)** orientada al desacoplamiento de capas y mantenibilidad:
-
+El proyecto organiza su código siguiendo los principios de Clean Architecture (Arquitectura Limpia) para mantener una separación clara de responsabilidades entre las distintas capas de la aplicación.
 ```
 src/
 ├── Application/        # Casos de uso y reglas de aplicación
