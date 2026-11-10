@@ -46,6 +46,8 @@ export interface FilaFrecuencia {
   tiempoUltimaParada: string;
   codigoAnt: string;
   activa: boolean;
+  /** Frecuencia con paradas que aún no tiene ninguna: debe completarse antes de operar. */
+  faltanParadas: boolean;
 }
 
 export interface FilaParada {
@@ -56,6 +58,13 @@ export interface FilaParada {
   minutosDesdeOrigen: number;
   permiteVenta: boolean;
   costo: string;
+  /** Valor numérico del costo, para precargar el formulario de edición. */
+  costoProporcional: number;
+}
+
+/** Quita el prefijo técnico de las excepciones de dominio: "[FrecuenciaException] Texto" -> "Texto". */
+export function mensajeLegible(mensaje: string): string {
+    return mensaje.replace(/^\[[A-Za-z]+Exception\]\s*/, '').trim();
 }
 
 /** 0 -> '0 min', 90 -> '1 h 30 min', 120 -> '2 h'. */
@@ -90,6 +99,7 @@ export function aFilaParada(parada: ParadaIntermedia): FilaParada {
     minutosDesdeOrigen: parada.minutosDesdeOrigen,
     permiteVenta: parada.permiteVenta,
     costo: formatearCosto(parada.costoProporcional),
+    costoProporcional: parada.costoProporcional,
   };
 }
 
@@ -108,8 +118,48 @@ export function aFilaFrecuencia(frecuencia: Frecuencia): FilaFrecuencia {
     dias: resumirDias(frecuencia.diasOperacion),
     totalParadas: paradas.length,
     tiempoUltimaParada: ultima ? formatearMinutos(ultima.minutosDesdeOrigen) : 'Sin estimar',
-    codigoAnt: frecuencia.codigoAnt ?? '—',
+    codigoAnt: frecuencia.codigoAnt?.trim() || '—',
     activa: frecuencia.activa,
+    faltanParadas: frecuencia.estaIncompleta(),
+  };
+}
+
+/** Datos que el formulario de edición precarga a partir de una frecuencia existente. */
+export interface DatosEdicionFrecuencia {
+  cooperativaId: number;
+  identificadorFrecuencia: string;
+  ciudadOrigen: string;
+  ciudadDestino: string;
+  horaSalida: string;
+  esDirecto: boolean;
+  diasOperacion: DiaOperacion[];
+  codigoAnt: string;
+  resolucionAnt: string;
+  /** Paradas que ya tiene: una frecuencia con paradas no puede pasar a directa. */
+  totalParadas: number;
+}
+
+/** Guardar como directa una frecuencia que tiene paradas obliga a eliminarlas (una directa no las lleva). */
+export function eliminaParadasAlGuardar(
+  datos: DatosEdicionFrecuencia | null,
+  cambios: { esDirecto?: boolean },
+): boolean {
+  return datos !== null && datos.totalParadas > 0 && cambios.esDirecto === true;
+}
+
+export function aDatosEdicion(frecuencia: Frecuencia): DatosEdicionFrecuencia {
+  return {
+    cooperativaId: frecuencia.cooperativaId,
+    identificadorFrecuencia: frecuencia.identificadorFrecuencia,
+    ciudadOrigen: frecuencia.ciudadOrigen,
+    ciudadDestino: frecuencia.ciudadDestino,
+    // La base puede devolver HH:mm:ss; el campo de hora trabaja con HH:mm.
+    horaSalida: frecuencia.horaSalida.slice(0, 5),
+    esDirecto: frecuencia.esDirecto,
+    diasOperacion: [...frecuencia.diasOperacion],
+    codigoAnt: frecuencia.codigoAnt ?? '',
+    resolucionAnt: frecuencia.resolucionAnt ?? '',
+    totalParadas: frecuencia.paradas.length,
   };
 }
 
@@ -117,4 +167,61 @@ export function aFilaFrecuencia(frecuencia: Frecuencia): FilaFrecuencia {
 export function siguienteOrdenParada(frecuencia: Frecuencia | null): number {
   if (!frecuencia) return 1;
   return frecuencia.paradas.reduce((maximo, parada) => Math.max(maximo, parada.orden), 0) + 1;
+}
+
+/** Opciones del filtro de estado de la barra de búsqueda. */
+export const OPCIONES_FILTRO_ESTADO: Array<{ value: FiltroEstado; label: string }> = [
+  { value: 'Todas', label: 'Todas' },
+  { value: 'Activas', label: 'Activas' },
+  { value: 'Inactivas', label: 'Inactivas' },
+];
+
+export type FiltroEstado = 'Todas' | 'Activas' | 'Inactivas';
+
+export interface ResumenFrecuencias {
+  total: number;
+  activas: number;
+  inactivas: number;
+  conParadas: number;
+}
+
+/** Cifras para las tarjetas de métricas de la vista. */
+export function resumirFrecuencias(frecuencias: readonly Frecuencia[]): ResumenFrecuencias {
+  const activas = frecuencias.filter((frecuencia) => frecuencia.activa).length;
+
+  return {
+    total: frecuencias.length,
+    activas,
+    inactivas: frecuencias.length - activas,
+    conParadas: frecuencias.filter((frecuencia) => frecuencia.paradas.length > 0).length,
+  };
+}
+
+const normalizarTexto = (texto: string): string =>
+  texto
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+/**
+ * Filtra las filas por texto (identificador, código ANT, origen o destino, sin distinguir
+ * mayúsculas ni tildes) y por estado.
+ */
+export function filtrarFilas(
+  filas: readonly FilaFrecuencia[],
+  busqueda: string,
+  estado: FiltroEstado,
+): FilaFrecuencia[] {
+  const termino = normalizarTexto(busqueda);
+
+  return filas.filter((fila) => {
+    if (estado === 'Activas' && !fila.activa) return false;
+    if (estado === 'Inactivas' && fila.activa) return false;
+    if (!termino) return true;
+
+    return [fila.identificador, fila.codigoAnt, fila.origen, fila.destino, fila.ruta].some((campo) =>
+      normalizarTexto(campo).includes(termino),
+    );
+  });
 }

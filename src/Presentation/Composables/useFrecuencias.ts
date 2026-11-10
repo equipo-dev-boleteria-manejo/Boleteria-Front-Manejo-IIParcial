@@ -25,14 +25,21 @@ import {
   gestionarFrecuenciasUseCase as defaultGestionarUseCase,
 } from '../../Application/UseCases/GestionarFrecuencias';
 import {
+  aDatosEdicion,
   aFilaFrecuencia,
   aFilaParada,
+  filtrarFilas,
+  mensajeLegible,
+  resumirFrecuencias,
   siguienteOrdenParada,
+  type DatosEdicionFrecuencia,
   type FilaFrecuencia,
   type FilaParada,
+  type FiltroEstado,
+  type ResumenFrecuencias,
 } from './presentacionFrecuencias';
 
-export type { FilaFrecuencia, FilaParada };
+export type { FilaFrecuencia, FilaParada, FiltroEstado, ResumenFrecuencias };
 
 export function useFrecuencias(
   crearUseCase: CrearFrecuenciaUseCase = defaultCrearUseCase,
@@ -58,6 +65,19 @@ export function useFrecuencias(
   );
   const ordenSugeridoParada = computed(() => siguienteOrdenParada(frecuenciaSeleccionada.value));
 
+  // Cifras para las tarjetas de métricas y filtros de la barra de búsqueda.
+  const resumen = computed<ResumenFrecuencias>(() => resumirFrecuencias(frecuencias.value));
+  const busqueda = ref('');
+  const filtroEstado = ref<FiltroEstado>('Todas');
+  const filasFiltradas = computed<FilaFrecuencia[]>(() =>
+    filtrarFilas(filasFrecuencias.value, busqueda.value, filtroEstado.value),
+  );
+
+  function reiniciarFiltros(): void {
+    busqueda.value = '';
+    filtroEstado.value = 'Todas';
+  }
+
   /**
    * Ejecuta una acción del caso de uso gestionando loading y error de forma uniforme.
    */
@@ -68,7 +88,7 @@ export function useFrecuencias(
     try {
       return await accion();
     } catch (err: unknown) {
-      error.value = err instanceof Error ? err.message : mensajePorDefecto;
+      error.value = err instanceof Error ? mensajeLegible(err.message) || mensajePorDefecto : mensajePorDefecto;
       throw err;
     } finally {
       loading.value = false;
@@ -148,6 +168,33 @@ export function useFrecuencias(
     }, 'Error al actualizar la frecuencia');
   }
 
+  /**
+   * Guarda los cambios de una frecuencia aplicando sus reglas:
+   * - Si pasa a directa, se eliminan sus paradas (una directa no las lleva). Primero se guarda el cambio y
+   *   después se eliminan las paradas: si el guardado falla, la frecuencia conserva sus paradas intactas.
+   * - Si queda incompleta (con paradas, pero sin ninguna) y estaba activa, se desactiva.
+   */
+  async function guardarFrecuencia(id: number, cambios: ActualizarFrecuenciaDto): Promise<Frecuencia> {
+    return ejecutar(async () => {
+      const actual = frecuencias.value.find((frecuencia) => frecuencia.id === id);
+      let guardada = await gestionarUseCase.actualizar(id, cambios);
+
+      if (cambios.esDirecto === true && actual && actual.paradas.length > 0) {
+        for (const parada of actual.paradas) {
+          if (parada.id !== undefined) await gestionarUseCase.eliminarParada(parada.id);
+        }
+        guardada = await gestionarUseCase.obtenerPorId(id);
+      }
+
+      if (guardada.estaIncompleta() && guardada.activa) {
+        await gestionarUseCase.desactivar(id);
+        guardada = await gestionarUseCase.obtenerPorId(id);
+      }
+      reemplazar(guardada);
+      return guardada;
+    }, 'Error al actualizar la frecuencia');
+  }
+
   async function activarFrecuencia(id: number): Promise<Frecuencia> {
     return ejecutar(async () => {
       const actualizada = await gestionarUseCase.activar(id);
@@ -170,6 +217,17 @@ export function useFrecuencias(
     }, 'Error al agregar la parada');
   }
 
+  /** Modifica una parada y refresca su frecuencia para reflejar el cambio. */
+  async function actualizarParada(paradaId: number, cambios: Partial<ParadaIntermediaDto>): Promise<void> {
+    await ejecutar(async () => {
+      const frecuenciaId = frecuenciaIdDeParada(paradaId);
+      await gestionarUseCase.actualizarParada(paradaId, cambios);
+      if (frecuenciaId !== undefined) {
+        await recargar(frecuenciaId);
+      }
+    }, 'Error al actualizar la parada');
+  }
+
   /**
    * Elimina una parada. Si la parada pertenece a una frecuencia ya cargada,
    * refresca esa frecuencia para reflejar el cambio.
@@ -179,9 +237,20 @@ export function useFrecuencias(
       const frecuenciaId = frecuenciaIdDeParada(paradaId);
       await gestionarUseCase.eliminarParada(paradaId);
       if (frecuenciaId !== undefined) {
-        await recargar(frecuenciaId);
+        const restante = await recargar(frecuenciaId);
+        // Al quedarse sin paradas, una frecuencia con paradas deja de operar hasta completarse.
+        if (restante.estaIncompleta() && restante.activa) {
+          await gestionarUseCase.desactivar(frecuenciaId);
+          await recargar(frecuenciaId);
+        }
       }
     }, 'Error al eliminar la parada');
+  }
+
+  /** Datos de una frecuencia ya cargada, listos para precargar el formulario de edición. */
+  function obtenerDatosEdicion(id: number): DatosEdicionFrecuencia | null {
+    const frecuencia = frecuencias.value.find((item) => item.id === id);
+    return frecuencia ? aDatosEdicion(frecuencia) : null;
   }
 
   function limpiarError(): void {
@@ -189,6 +258,7 @@ export function useFrecuencias(
   }
 
   return {
+    obtenerDatosEdicion,
     loading,
     error,
     frecuencias,
@@ -199,6 +269,11 @@ export function useFrecuencias(
     filaSeleccionada,
     paradasSeleccionadas,
     ordenSugeridoParada,
+    resumen,
+    busqueda,
+    filtroEstado,
+    filasFiltradas,
+    reiniciarFiltros,
     cargarFrecuencias,
     cargarPorCooperativa,
     buscarPorTramo,
@@ -206,9 +281,11 @@ export function useFrecuencias(
     limpiarSeleccion,
     registrarFrecuencia,
     actualizarFrecuencia,
+    guardarFrecuencia,
     activarFrecuencia,
     desactivarFrecuencia,
     agregarParadaAFrecuencia,
+    actualizarParada,
     eliminarParada,
     limpiarError,
   };

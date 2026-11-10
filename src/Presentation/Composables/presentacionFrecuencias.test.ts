@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import { Frecuencia, ParadaIntermedia } from '../../Domain/Entities/Frecuencia';
 import {
+  OPCIONES_FILTRO_ESTADO,
+  aDatosEdicion,
   aFilaFrecuencia,
   aFilaParada,
+  filtrarFilas,
   formatearCosto,
   formatearMinutos,
+  mensajeLegible,
   resumirDias,
+  resumirFrecuencias,
   siguienteOrdenParada,
 } from './presentacionFrecuencias';
 
@@ -97,6 +102,7 @@ describe('modelos de presentación', () => {
       minutosDesdeOrigen: 90,
       permiteVenta: false,
       costo: '$3.50',
+      costoProporcional: 3.5,
     });
   });
 
@@ -107,5 +113,114 @@ describe('modelos de presentación', () => {
 
     frecuencia.establecerParadas([new ParadaIntermedia('A', 1, 10), new ParadaIntermedia('B', 4, 20)]);
     expect(siguienteOrdenParada(frecuencia)).toBe(5);
+  });
+});
+
+describe('aDatosEdicion y código ANT', () => {
+  it('prepara los datos para precargar el formulario de edición', () => {
+    const frecuencia = new Frecuencia(2, 'Quito', 'Cuenca', '08:30:00', 'FR-001', false, ['Lunes', 'Viernes']);
+    frecuencia.codigoAnt = 'ANT-1';
+
+    const datos = aDatosEdicion(frecuencia);
+
+    expect(datos).toEqual({
+      cooperativaId: 2,
+      identificadorFrecuencia: 'FR-001',
+      ciudadOrigen: 'Quito',
+      ciudadDestino: 'Cuenca',
+      horaSalida: '08:30',
+      esDirecto: false,
+      diasOperacion: ['Lunes', 'Viernes'],
+      codigoAnt: 'ANT-1',
+      resolucionAnt: '',
+      totalParadas: 0,
+    });
+    expect(datos.diasOperacion).not.toBe(frecuencia.diasOperacion);
+  });
+
+  it('un código ANT vacío o en blanco se muestra como "—" en la tabla', () => {
+    const frecuencia = new Frecuencia(1, 'Quito', 'Cuenca', '08:30', 'FR-001');
+    frecuencia.codigoAnt = '   ';
+
+    expect(aFilaFrecuencia(frecuencia).codigoAnt).toBe('—');
+    frecuencia.codigoAnt = '';
+    expect(aFilaFrecuencia(frecuencia).codigoAnt).toBe('—');
+  });
+});
+
+describe('mensajeLegible', () => {
+  it('quita el prefijo técnico de las excepciones de dominio', () => {
+    expect(mensajeLegible('[FrecuenciaException] El identificador FR-001 ya existe para la cooperativa 1')).toBe(
+      'El identificador FR-001 ya existe para la cooperativa 1',
+    );
+    expect(mensajeLegible('Sin conexión con el servidor')).toBe('Sin conexión con el servidor');
+    expect(mensajeLegible('[ParadaException]   Orden inválido')).toBe('Orden inválido');
+  });
+});
+
+describe('resumirFrecuencias', () => {
+  it('cuenta total, activas, inactivas y las que tienen paradas', () => {
+    const conParadas = new Frecuencia(1, 'Quito', 'Cuenca', '08:00', 'FR-1');
+    conParadas.establecerParadas([new ParadaIntermedia('Latacunga', 1, 120)]);
+    const inactiva = new Frecuencia(1, 'Quito', 'Ambato', '09:00', 'FR-2');
+    inactiva.desactivar();
+    const directa = new Frecuencia(1, 'Quito', 'Loja', '10:00', 'FR-3');
+
+    expect(resumirFrecuencias([conParadas, inactiva, directa])).toEqual({
+      total: 3,
+      activas: 2,
+      inactivas: 1,
+      conParadas: 1,
+    });
+  });
+
+  it('devuelve ceros cuando no hay frecuencias', () => {
+    expect(resumirFrecuencias([])).toEqual({ total: 0, activas: 0, inactivas: 0, conParadas: 0 });
+  });
+});
+
+describe('filtrarFilas', () => {
+  const fila = (extras: Partial<ReturnType<typeof aFilaFrecuencia>>) => ({
+    id: 1,
+    identificador: 'FR-001',
+    origen: 'Quito',
+    destino: 'Cuenca',
+    ruta: 'Quito → Cuenca',
+    horaSalida: '08:00',
+    tipo: 'Directo' as const,
+    dias: 'Todos los días',
+    totalParadas: 0,
+    tiempoUltimaParada: 'Sin estimar',
+    codigoAnt: 'ANT-9',
+    activa: true,
+    faltanParadas: false,
+    ...extras,
+  });
+
+  const filas = [
+    fila({ id: 1 }),
+    fila({ id: 2, identificador: 'FR-002', origen: 'Guayaquil', destino: 'Machala', ruta: 'Guayaquil → Machala', codigoAnt: '—', activa: false }),
+    fila({ id: 3, identificador: 'FR-003', origen: 'Cuenca', destino: 'Loja', ruta: 'Cuenca → Loja', codigoAnt: '—' }),
+  ];
+
+  it('sin texto ni estado devuelve todas', () => {
+    expect(filtrarFilas(filas, '', 'Todas')).toHaveLength(3);
+  });
+
+  it('busca por origen, destino, identificador y código sin distinguir mayúsculas ni tildes', () => {
+    expect(filtrarFilas(filas, 'cuenca', 'Todas').map((f) => f.id)).toEqual([1, 3]);
+    expect(filtrarFilas(filas, 'FR-002', 'Todas').map((f) => f.id)).toEqual([2]);
+    expect(filtrarFilas(filas, 'ant-9', 'Todas').map((f) => f.id)).toEqual([1]);
+    expect(filtrarFilas([fila({ origen: 'Alausí', ruta: 'Alausí → Cuenca' })], 'alausi', 'Todas')).toHaveLength(1);
+  });
+
+  it('filtra por estado y combina con el texto', () => {
+    expect(filtrarFilas(filas, '', 'Activas').map((f) => f.id)).toEqual([1, 3]);
+    expect(filtrarFilas(filas, '', 'Inactivas').map((f) => f.id)).toEqual([2]);
+    expect(filtrarFilas(filas, 'cuenca', 'Inactivas')).toEqual([]);
+  });
+
+  it('expone las opciones del filtro de estado', () => {
+    expect(OPCIONES_FILTRO_ESTADO.map((o) => o.value)).toEqual(['Todas', 'Activas', 'Inactivas']);
   });
 });
