@@ -62,7 +62,10 @@
             </div>
 
             <!-- Body -->
-            <div class="px-6 py-5 overflow-y-auto flex-1 text-sm text-slate-700">
+            <div
+              class="px-6 py-5 flex-1 text-sm text-slate-700"
+              :class="[scrollable ? 'overflow-y-auto' : 'overflow-hidden', bodyClass]"
+            >
               <slot />
             </div>
 
@@ -90,6 +93,8 @@ interface Props {
   closeOnClickOutside?: boolean
   closeOnEsc?: boolean
   variant?: 'primary' | 'neutral'
+  scrollable?: boolean
+  bodyClass?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -98,6 +103,8 @@ const props = withDefaults(defineProps<Props>(), {
   closeOnClickOutside: true,
   closeOnEsc: true,
   variant: 'primary',
+  scrollable: true,
+  bodyClass: '',
 })
 
 const emit = defineEmits<{

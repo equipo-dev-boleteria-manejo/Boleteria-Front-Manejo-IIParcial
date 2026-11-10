@@ -3,11 +3,12 @@
     :model-value="modelValue"
     :title="esEdicion ? 'Editar frecuencia' : 'Registrar nueva frecuencia'"
     max-width="2xl"
+    :scrollable="!esEdicion"
     :close-on-click-outside="!loading"
     @update:model-value="emit('update:modelValue', $event)"
     @close="emit('close')"
   >
-    <form id="form-frecuencia" class="space-y-4" novalidate @submit.prevent="enviar">
+    <form id="form-frecuencia" class="space-y-3" novalidate @submit.prevent="enviar">
       <div
         v-if="error"
         role="alert"
@@ -18,7 +19,7 @@
         <span>{{ error }}</span>
       </div>
 
-      <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <!-- Cooperativa vinculada a la sesión (o a la frecuencia que se edita) -->
         <div
           v-if="cooperativaMostrada !== null"
@@ -84,12 +85,10 @@
         <InputBase
           id="frecuencia-identificador"
           v-model="formulario.identificadorFrecuencia"
-          label="Identificador de frecuencia"
-          placeholder="Ej. FR-001"
-          required
-          :disabled="loading || esEdicion"
-          :error="erroresVisibles.identificadorFrecuencia"
-          :helper-text="esEdicion ? 'El identificador no se puede modificar.' : 'Debe ser único dentro de la cooperativa.'"
+          label="Código de frecuencia"
+          disabled
+          readonly
+          helper-text="Código autonumérico generado automáticamente por el sistema."
         />
 
         <InputBase
@@ -118,7 +117,7 @@
             <label
               v-for="opcion in OPCIONES_DIAS"
               :key="opcion.valor"
-              class="inline-flex cursor-pointer items-center gap-2 rounded-xl border bg-white px-3 py-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
+              class="inline-flex cursor-pointer items-center gap-2 rounded-xl border bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-50"
               :class="erroresVisibles.diasOperacion ? 'border-red-300' : 'border-slate-300'"
             >
               <input
@@ -185,6 +184,8 @@ interface Props {
   cooperativaId?: number | null
   /** Si se indica, el modal funciona en modo edición con estos datos precargados. */
   frecuencia?: DatosEdicionFrecuencia | null
+  /** Código autonumérico para nueva frecuencia */
+  siguienteCodigo?: string
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -192,6 +193,7 @@ const props = withDefaults(defineProps<Props>(), {
   error: null,
   cooperativaId: null,
   frecuencia: null,
+  siguienteCodigo: 'FR-001',
 })
 
 const emit = defineEmits<{
@@ -210,11 +212,17 @@ const cooperativaMostrada = computed<number | null>(
 const { formulario, erroresVisibles, hayErroresVisibles, hayCambios, mensajeDirecto, validarTodo, iniciar, aDto, aCambios } =
   useFrecuenciaFormValidation(() => cooperativaMostrada.value === null)
 
-// Cada vez que el modal se abre, el formulario arranca limpio (crear) o precargado (editar).
+// Cada vez que el modal se abre, el formulario arranca limpio con código autogenerado (crear) o precargado (editar).
 watch(
-  () => [props.modelValue, props.frecuencia] as const,
-  ([abierto, frecuencia]) => {
-    if (abierto) iniciar(frecuencia ?? undefined)
+  () => [props.modelValue, props.frecuencia, props.siguienteCodigo] as const,
+  ([abierto, frecuencia, siguienteCodigo]) => {
+    if (abierto) {
+      if (frecuencia) {
+        iniciar(frecuencia, true)
+      } else {
+        iniciar({ identificadorFrecuencia: siguienteCodigo || 'FR-001' }, false)
+      }
+    }
   },
   { immediate: true },
 )

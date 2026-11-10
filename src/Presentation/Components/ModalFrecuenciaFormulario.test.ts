@@ -37,7 +37,7 @@ describe('ModalCrearFrecuencia - registrar', () => {
     expect(wrapper.text()).toContain('La ciudad de origen es obligatoria')
     expect(wrapper.text()).toContain('La ciudad de destino es obligatoria')
     expect(wrapper.text()).toContain('La hora de salida es obligatoria')
-    expect(wrapper.text()).toContain('El identificador es obligatorio')
+    expect(valor(wrapper, '#frecuencia-identificador')).toBe('FR-001')
   })
 
   it('no muestra errores hasta que el usuario interactúa o intenta enviar', () => {

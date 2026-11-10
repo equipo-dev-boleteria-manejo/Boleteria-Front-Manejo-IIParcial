@@ -79,7 +79,7 @@ export function useFrecuenciaFormValidation(requiereCooperativa: () => boolean =
   );
 
   /** Deja el formulario limpio (crear) o precargado (editar), sin mostrar errores. */
-  function iniciar(datos?: DatosFrecuenciaEditable): void {
+  function iniciar(datos?: DatosFrecuenciaEditable, esModoEdicion?: boolean): void {
     const { totalParadas = 0, ...campos } = datos ?? {};
     paradasExistentes.value = totalParadas;
     reiniciar(() => {
@@ -89,7 +89,8 @@ export function useFrecuenciaFormValidation(requiereCooperativa: () => boolean =
         diasOperacion: [...(campos.diasOperacion ?? base.diasOperacion)],
       });
     });
-    huellaOriginal.value = datos ? huella() : null;
+    const esEdicion = esModoEdicion ?? (datos !== undefined && Boolean(campos.ciudadOrigen || campos.horaSalida));
+    huellaOriginal.value = esEdicion ? huella() : null;
   }
 
   /** Representación comparable de lo editable (días en orden de semana, textos sin espacios sobrantes). */

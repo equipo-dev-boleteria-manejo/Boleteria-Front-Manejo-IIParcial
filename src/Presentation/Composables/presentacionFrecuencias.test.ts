@@ -11,6 +11,7 @@ import {
   mensajeLegible,
   resumirDias,
   resumirFrecuencias,
+  siguienteCodigoFrecuencia,
   siguienteOrdenParada,
 } from './presentacionFrecuencias';
 
@@ -224,3 +225,35 @@ describe('filtrarFilas', () => {
     expect(OPCIONES_FILTRO_ESTADO.map((o) => o.value)).toEqual(['Todas', 'Activas', 'Inactivas']);
   });
 });
+
+describe('siguienteCodigoFrecuencia', () => {
+  it('devuelve FR-001 si no hay frecuencias registradas', () => {
+    expect(siguienteCodigoFrecuencia([])).toBe('FR-001');
+  });
+
+  it('calcula el siguiente autonumérico según el mayor número existente', () => {
+    const lista = [
+      { identificador: 'FR-001' },
+      { identificador: 'FR-002' },
+      { identificador: 'FR-006' },
+      { identificador: 'FR-003' },
+    ];
+    expect(siguienteCodigoFrecuencia(lista)).toBe('FR-007');
+  });
+
+  it('soporta identificadorFrecuencia además de identificador', () => {
+    const lista = [
+      { identificadorFrecuencia: 'FR-009' },
+    ];
+    expect(siguienteCodigoFrecuencia(lista)).toBe('FR-010');
+  });
+
+  it('ignora identificadores que no sigan el formato numérico sin romperse', () => {
+    const lista = [
+      { identificador: 'OTRO-CODIGO' },
+      { identificador: 'FR-005' },
+    ];
+    expect(siguienteCodigoFrecuencia(lista)).toBe('FR-006');
+  });
+});
+

@@ -177,7 +177,8 @@ describe('FrecuenciasAdmin - editar frecuencia', () => {
 
     expect(wrapper.text()).toContain('Registrar nueva frecuencia')
     expect(campo(wrapper, '#frecuencia-origen').value).toBe('')
-    expect(campo(wrapper, '#frecuencia-identificador').disabled).toBe(false)
+    expect(campo(wrapper, '#frecuencia-identificador').disabled).toBe(true)
+    expect(campo(wrapper, '#frecuencia-identificador').value).toBe('FR-002')
   })
 })
 
@@ -197,14 +198,13 @@ describe('FrecuenciasAdmin - registrar con cooperativa por defecto', () => {
     await wrapper.find('#frecuencia-origen').setValue('Quito')
     await wrapper.find('#frecuencia-destino').setValue('Ambato')
     await wrapper.find('#frecuencia-hora').setValue('07:00')
-    await wrapper.find('#frecuencia-identificador').setValue('FR-004')
     await wrapper.find('#form-frecuencia').trigger('submit')
     await flushPromises()
 
     expect(mocks.estado.registrarFrecuencia).toHaveBeenCalledWith(
-      expect.objectContaining({ cooperativaId: 1, identificadorFrecuencia: 'FR-004' }),
+      expect.objectContaining({ cooperativaId: 1, identificadorFrecuencia: 'FR-002' }),
     )
-    expect(mocks.feedback.showSuccess).toHaveBeenCalledWith('Frecuencia FR-004 registrada correctamente.')
+    expect(mocks.feedback.showSuccess).toHaveBeenCalledWith('Frecuencia FR-002 registrada correctamente.')
   })
 })
 
@@ -398,15 +398,14 @@ describe('FrecuenciasAdmin - frecuencias con paradas incompletas y conversión a
     await wrapper.find('#frecuencia-origen').setValue('Quito')
     await wrapper.find('#frecuencia-destino').setValue('Ambato')
     await wrapper.find('#frecuencia-hora').setValue('07:00')
-    await wrapper.find('#frecuencia-identificador').setValue('FR-009')
     const directo = wrapper.findAll('input[type="checkbox"]').find((casilla) => !casilla.element.closest('fieldset'))
     await directo?.setValue(false)
     await wrapper.find('#form-frecuencia').trigger('submit')
     await flushPromises()
 
-    expect(mocks.feedback.showSuccess).toHaveBeenCalledWith('Frecuencia FR-009 registrada correctamente.')
+    expect(mocks.feedback.showSuccess).toHaveBeenCalledWith('Frecuencia FR-002 registrada correctamente.')
     expect(mocks.feedback.showWarning).toHaveBeenCalledWith(
-      'La frecuencia FR-009 quedó inactiva: agrégale al menos una parada para activarla.',
+      'La frecuencia FR-002 quedó inactiva: agrégale al menos una parada para activarla.',
     )
   })
 })

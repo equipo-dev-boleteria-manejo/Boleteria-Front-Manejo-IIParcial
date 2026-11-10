@@ -222,6 +222,7 @@
       :error="modalAbierto ? error : null"
       :cooperativa-id="cooperativaId"
       :frecuencia="frecuenciaEnEdicion"
+      :siguiente-codigo="codigoAutonumerico"
       @submit="registrar"
       @guardar="guardarCambios"
       @sin-cambios="avisarSinCambiosFrecuencia"
@@ -298,6 +299,7 @@ import { useFrecuencias, type FilaFrecuencia } from '../../Composables/useFrecue
 import {
   OPCIONES_FILTRO_ESTADO,
   eliminaParadasAlGuardar,
+  siguienteCodigoFrecuencia,
   type DatosEdicionFrecuencia,
 } from '../../Composables/presentacionFrecuencias'
 import { useAuthStore } from '../../Store/authStore'
@@ -314,6 +316,7 @@ const {
   filaSeleccionada,
   paradasSeleccionadas,
   ordenSugeridoParada,
+  siguienteCodigo,
   resumen,
   busqueda,
   filtroEstado,
@@ -360,6 +363,8 @@ const frecuenciaEnEdicion = ref<DatosEdicionFrecuencia | null>(null)
 const idEnEdicion = ref<number | null>(null)
 const modalParadas = ref(false)
 const errorParadas = ref<string | null>(null)
+
+const codigoAutonumerico = computed(() => siguienteCodigo?.value ?? siguienteCodigoFrecuencia(filasFiltradas.value))
 
 const hayFrecuencias = computed(() => resumen.value.total > 0)
 

@@ -20,7 +20,7 @@ describe('ModalCrearFrecuencia', () => {
       'Ciudad de origen',
       'Ciudad de destino',
       'Hora de salida',
-      'Identificador de frecuencia',
+      'Código de frecuencia',
       'Código ANT',
       'Resolución ANT',
     ]) {

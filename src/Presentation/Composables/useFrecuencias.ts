@@ -31,6 +31,7 @@ import {
   filtrarFilas,
   mensajeLegible,
   resumirFrecuencias,
+  siguienteCodigoFrecuencia,
   siguienteOrdenParada,
   type DatosEdicionFrecuencia,
   type FilaFrecuencia,
@@ -67,6 +68,7 @@ export function useFrecuencias(
 
   // Cifras para las tarjetas de métricas y filtros de la barra de búsqueda.
   const resumen = computed<ResumenFrecuencias>(() => resumirFrecuencias(frecuencias.value));
+  const siguienteCodigo = computed<string>(() => siguienteCodigoFrecuencia(frecuencias.value));
   const busqueda = ref('');
   const filtroEstado = ref<FiltroEstado>('Todas');
   const filasFiltradas = computed<FilaFrecuencia[]>(() =>
@@ -269,6 +271,7 @@ export function useFrecuencias(
     filaSeleccionada,
     paradasSeleccionadas,
     ordenSugeridoParada,
+    siguienteCodigo,
     resumen,
     busqueda,
     filtroEstado,

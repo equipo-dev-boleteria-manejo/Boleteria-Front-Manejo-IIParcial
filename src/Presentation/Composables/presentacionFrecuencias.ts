@@ -225,3 +225,30 @@ export function filtrarFilas(
     );
   });
 }
+
+/**
+ * Calcula el siguiente código de frecuencia autonumérico basándose en las frecuencias existentes.
+ * Formato estándar: FR-001, FR-002, ..., FR-010, etc.
+ */
+export function siguienteCodigoFrecuencia(
+  frecuencias: Array<{ identificadorFrecuencia?: string; identificador?: string }>,
+  prefijo = 'FR',
+): string {
+  let maxNumero = 0;
+  const regex = new RegExp(`^${prefijo}-(\\d+)$`, 'i');
+
+  for (const f of frecuencias) {
+    const id = f.identificadorFrecuencia ?? f.identificador ?? '';
+    const match = id.trim().match(regex);
+    if (match && match[1]) {
+      const num = parseInt(match[1], 10);
+      if (!isNaN(num) && num > maxNumero) {
+        maxNumero = num;
+      }
+    }
+  }
+
+  const siguiente = maxNumero + 1;
+  return `${prefijo}-${String(siguiente).padStart(3, '0')}`;
+}
+
