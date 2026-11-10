@@ -23,13 +23,7 @@ describe('AsientosTarifasView.vue', () => {
       validarAsignacion: vi.fn(),
     });
 
-    const wrapper = mount(AsientosTarifasView, {
-      global: {
-        stubs: {
-          AppLayout: { template: '<div><slot /></div>' },
-        },
-      },
-    });
+    const wrapper = mount(AsientosTarifasView);
 
     // MetricCards
     expect(wrapper.text()).toContain('Total Asientos');
