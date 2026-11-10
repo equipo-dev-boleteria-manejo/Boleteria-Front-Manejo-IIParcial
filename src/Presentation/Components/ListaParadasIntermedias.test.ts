@@ -11,13 +11,15 @@ const parada = (extras: Partial<FilaParada> = {}): FilaParada => ({
   minutosDesdeOrigen: 120,
   permiteVenta: true,
   costo: '$2.50',
+  costoProporcional: 2.5,
   ...extras,
 });
 
 describe('ListaParadasIntermedias', () => {
-  it('estado vacío: muestra el mensaje y no renderiza la tabla', async () => {
+  it('estado vacío: usa el estado vacío de la tabla del sistema y no renderiza filas', async () => {
     const { html } = await renderizar(ListaParadasIntermedias, { paradas: [] });
 
+    expect(html).toContain('Sin paradas intermedias');
     expect(html).toContain('Esta frecuencia no tiene paradas intermedias');
     expect(html).toContain('0 paradas');
     expect(html).not.toContain('<table');
@@ -29,13 +31,21 @@ describe('ListaParadasIntermedias', () => {
     });
 
     expect(html).toContain('<table');
+    expect(html).toContain('aria-label="Lista de paradas intermedias"');
     expect(html).toContain('Latacunga');
     expect(html).toContain('Riobamba');
     expect(html).toContain('Permite venta');
     expect(html).toContain('Sin venta');
     expect(html).toContain('$2.50');
     expect(html).toContain('2 paradas');
-    expect(html).not.toContain('no tiene paradas intermedias');
+    expect(html).not.toContain('Sin paradas intermedias');
+  });
+
+  it('usa el botón de acción del sistema para eliminar cada parada', async () => {
+    const { html } = await renderizar(ListaParadasIntermedias, { paradas: [parada()] });
+
+    expect(html).toContain('Eliminar');
+    expect(html).toContain('aria-label="Eliminar la parada Latacunga"');
   });
 
   it('usa el singular cuando hay una sola parada', async () => {
@@ -55,11 +65,11 @@ describe('ListaParadasIntermedias', () => {
     expect(html).toContain('La parada es inválida');
   });
 
-  it('estado de carga: marca la tabla como ocupada y deshabilita las acciones', async () => {
+  it('estado de carga: marca la sección como ocupada y deshabilita las acciones', async () => {
     const { html } = await renderizar(ListaParadasIntermedias, { paradas: [parada()], loading: true });
 
     expect(html).toContain('aria-busy="true"');
-    expect(html).toMatch(/<button[^>]*disabled[^>]*aria-label="Eliminar la parada Latacunga"/);
+    expect(html).toMatch(/<button(?=[^>]*\bdisabled\b)(?=[^>]*aria-label="Eliminar la parada Latacunga")[^>]*>/);
   });
 
   it('precarga el orden sugerido en el formulario', async () => {
@@ -68,10 +78,12 @@ describe('ListaParadasIntermedias', () => {
     expect(html).toMatch(/<input[^>]*type="number"[^>]*value="3"/);
   });
 
-  it('permite venta por defecto en el formulario de nueva parada', async () => {
+  it('formulario de nueva parada con los campos del sistema y venta permitida por defecto', async () => {
     const { html } = await renderizar(ListaParadasIntermedias, { paradas: [] });
 
-    expect(html).toMatch(/<input(?=[^>]*type="checkbox")(?=[^>]*\bchecked\b)[^>]*>/);
     expect(html).toContain('Agregar parada');
+    expect(html).toContain('Minutos desde origen');
+    expect(html).toContain('Costo proporcional');
+    expect(html).toMatch(/<input(?=[^>]*type="checkbox")(?=[^>]*\bchecked\b)[^>]*>/);
   });
 });
